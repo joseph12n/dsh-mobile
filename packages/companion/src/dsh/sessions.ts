@@ -32,6 +32,17 @@ export function resolveSessionId(ctx: HostContext, raw: string): SessionResoluti
     return { ok: false, error: `No pude listar las sesiones: ${String(error)}` };
   }
 
+  // 0. Un número elige por posición, con la misma numeración que muestra /mobile.
+  if (/^\d+$/.test(wanted)) {
+    const index = Number(wanted) - 1;
+    const chosen = ids[index];
+    if (chosen) return { ok: true, id: chosen };
+    return {
+      ok: false,
+      error: `No hay sesión nº ${wanted}. Hay ${ids.length}:\n${ids.map((id, i) => `${i + 1}) ${id}`).join('\n')}`,
+    };
+  }
+
   // 1. Coincidencia exacta, tal cual llegó.
   if (ids.includes(wanted)) return { ok: true, id: wanted };
 
