@@ -1,0 +1,18 @@
+# Capa de patch del plugin DSH Mobile.
+#
+# Se enlaza desde el perfil con `link:` en package.json y se activa añadiendo el
+# bundle a `dsh.profile.bundles`, o bien insertando esta entrada en el
+# `cordis.patch.yml` del perfil:
+#
+#   - insert:
+#       - id: dsh-mobile-companion
+#         name: '@dsh-mobile/companion'
+#         config: {}
+#
+# El plugin escucha en 127.0.0.1:6768 (loopback). No se expone a la red hasta
+# que exista autenticación por dispositivo.
+
+- insert:
+    - id: dsh-mobile-companion
+      name: './dist/index.js'
+      config: {}
