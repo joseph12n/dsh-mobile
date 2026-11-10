@@ -68,24 +68,81 @@ describe('mensajes del host', () => {
     expect(ServerMessage.safeParse(msg).success).toBe(false);
   });
 
-  it('acepta una pregunta pendiente con opciones', () => {
+  it('acepta un lote de preguntas con opciones', () => {
     const msg = {
       v: PROTOCOL_VERSION,
       id: 'q',
       at,
       type: 'question.pending',
       question: {
-        id: 'q1',
+        callId: 'call-1',
         sessionId: 's1',
-        kind: 'select',
-        text: '¿Sigo?',
-        options: [{ id: 'yes', label: 'Sí' }],
-        multiSelect: false,
-        allowCustom: false,
+        state: 'open',
         createdAt: at,
+        items: [
+          {
+            id: 'q1',
+            text: '¿Sigo?',
+            options: [{ label: 'Sí' }, { label: 'No', description: 'mejor no' }],
+            multiSelect: false,
+            allowCustom: true,
+          },
+        ],
       },
     };
     expect(ServerMessage.safeParse(msg).success).toBe(true);
+  });
+
+  it('rechaza un lote sin preguntas', () => {
+    const msg = {
+      v: PROTOCOL_VERSION,
+      id: 'q',
+      at,
+      type: 'question.pending',
+      question: { callId: 'c', sessionId: 's1', state: 'open', createdAt: at, items: 'nada' },
+    };
+    expect(ServerMessage.safeParse(msg).success).toBe(false);
+  });
+});
+
+describe('respuestas a preguntas', () => {
+  it('acepta una respuesta que omite una pregunta del lote', () => {
+    const msg = {
+      v: PROTOCOL_VERSION,
+      id: 'a',
+      at,
+      type: 'question.answer',
+      callId: 'call-1',
+      sessionId: 's1',
+      answers: [{ id: 'q1', selected: [] }],
+    };
+    expect(ClientMessage.safeParse(msg).success).toBe(true);
+  });
+
+  it('acepta texto libre junto a la selección', () => {
+    const msg = {
+      v: PROTOCOL_VERSION,
+      id: 'a',
+      at,
+      type: 'question.answer',
+      callId: 'call-1',
+      sessionId: 's1',
+      answers: [{ id: 'q1', selected: ['Sí'], custom: 'y además esto' }],
+    };
+    expect(ClientMessage.safeParse(msg).success).toBe(true);
+  });
+
+  it('exige al menos una respuesta: un lote vacío no es responder', () => {
+    const msg = {
+      v: PROTOCOL_VERSION,
+      id: 'a',
+      at,
+      type: 'question.answer',
+      callId: 'call-1',
+      sessionId: 's1',
+      answers: [],
+    };
+    expect(ClientMessage.safeParse(msg).success).toBe(false);
   });
 });
 

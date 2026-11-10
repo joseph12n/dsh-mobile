@@ -5,8 +5,8 @@ import {
   Capability,
   DeviceInfo,
   HostInfo,
-  Question,
-  QuestionAnswer,
+  QuestionAnswerItem,
+  QuestionBatch,
   SessionId,
   SessionState,
   SessionSummary,
@@ -67,10 +67,14 @@ export const ReplySendMessage = message('reply.send', {
   text: z.string().min(1).max(32_000),
 });
 
+/**
+ * Responde un lote completo. DSH valida que cada pregunta del lote aparezca
+ * **exactamente una vez**, así que no se puede contestar de una en una.
+ */
 export const QuestionAnswerMessage = message('question.answer', {
-  questionId: z.string().min(1),
-  selected: z.array(z.string()),
-  custom: z.string().optional(),
+  callId: z.string().min(1),
+  sessionId: SessionId,
+  answers: z.array(QuestionAnswerItem).min(1),
 });
 
 export const RunStartMessage = message('run.start', {
@@ -140,7 +144,7 @@ export const ReplyOkMessage = message('reply.ok', {
 });
 
 export const AnswerOkMessage = message('answer.ok', {
-  questionId: z.string().min(1),
+  callId: z.string().min(1),
 });
 
 export const RunOkMessage = message('run.ok', {
@@ -162,13 +166,17 @@ export const SessionStateMessage = message('session.state', {
 });
 
 export const QuestionPendingMessage = message('question.pending', {
-  question: Question,
+  question: QuestionBatch,
 });
 
+/**
+ * El lote dejó de estar pendiente. O lo respondió este cliente, o lo resolvió el
+ * escritorio: en ambos casos el móvil deja de ofrecerlo.
+ */
 export const QuestionSettledMessage = message('question.settled', {
-  questionId: z.string().min(1),
+  callId: z.string().min(1),
   sessionId: SessionId,
-  answer: QuestionAnswer.optional(),
+  answers: z.array(QuestionAnswerItem).optional(),
 });
 
 export const DevicesChangedMessage = message('devices.changed', {
