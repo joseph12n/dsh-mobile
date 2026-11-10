@@ -35,6 +35,8 @@ jobs:
       - name: Lint
         run: pnpm lint
 
+      # Los paquetes consumen los tipos de `@dsh-mobile/protocol` desde su
+      # `dist/`, así que hay que compilarlo antes de comprobar tipos.
       - name: Typecheck
         run: pnpm typecheck
 
