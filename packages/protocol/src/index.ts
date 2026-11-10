@@ -2,6 +2,7 @@ export * from './version.js';
 export * from './errors.js';
 export * from './domain.js';
 export * from './envelope.js';
+export * from './pairing.js';
 export * from './messages.js';
 
 import { ClientMessage, ServerMessage } from './messages.js';

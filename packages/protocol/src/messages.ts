@@ -108,7 +108,8 @@ export const PongMessage = message('pong', {});
 
 export const HelloOkMessage = message('hello.ok', {
   host: HostInfo,
-  device: DeviceInfo,
+  /** Ausente mientras el cliente no está emparejado: `pair.ok` lo entrega. */
+  device: DeviceInfo.optional(),
 });
 
 export const PairOkMessage = message('pair.ok', {

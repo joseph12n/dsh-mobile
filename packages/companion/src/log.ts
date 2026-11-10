@@ -14,6 +14,9 @@ const DSH_HOME = process.env.DSH_HOME ?? join(homedir(), '.dsh');
 const DIR = join(DSH_HOME, 'companion');
 const FILE = join(DIR, 'probe.log');
 
+/** Directorio de estado del plugin (tokens, QR, logs). */
+export const COMPANION_DIR = DIR;
+
 /** En pruebas se apaga la escritura a disco para no ensuciar el log del usuario. */
 const FILE_LOGGING = process.env.DSH_MOBILE_LOG_FILE !== '0';
 

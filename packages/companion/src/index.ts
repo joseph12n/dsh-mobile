@@ -1,4 +1,8 @@
-import { PROBE_LOG_PATH, log } from './log.js';
+import { PROBE_LOG_PATH, COMPANION_DIR, log } from './log.js';
+import { DeviceRegistry } from './core/devices.js';
+import { PairingService } from './core/pairing.js';
+import { DevicesFile } from './persist/devices-file.js';
+import { join } from 'node:path';
 import { injectText } from './dsh/prompt.js';
 import { resolveSessionId } from './dsh/sessions.js';
 import type { HostContext } from './host-api.js';
@@ -103,12 +107,22 @@ export function apply(ctx: HostContext): void {
     log('el servicio de comandos no está disponible; /mobile queda fuera');
   }
 
+  // --- Estado del producto: emparejamiento y dispositivos ---------------------
+  const pairing = new PairingService();
+  const devices = new DeviceRegistry({
+    persistence: new DevicesFile(join(COMPANION_DIR, 'devices.json')),
+  });
+
   // --- Listener propio (E0.4) --------------------------------------------------
   const portFromEnv = Number(process.env.DSH_MOBILE_PORT ?? '');
   const options = Number.isInteger(portFromEnv) && portFromEnv > 0 ? { port: portFromEnv } : {};
+  const publicUrl = process.env.DSH_MOBILE_PUBLIC_URL?.trim();
 
   void startCompanionServer({
+    pairing,
+    devices,
     ...options,
+    ...(publicUrl ? { publicUrl } : {}),
     // Siempre en vivo: un informe cacheado miente en cuanto cambian las sesiones.
     report: () => probe(),
   })
