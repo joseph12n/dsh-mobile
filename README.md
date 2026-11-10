@@ -6,9 +6,9 @@ Controla tus sesiones desde el teléfono: mira el estado, lee la transcripción,
 aprueba preguntas y lanza o cancela ejecuciones. El PC sigue siendo el que ejecuta todo;
 el móvil es un control remoto, no un segundo agente.
 
-> **Estado: fase 0 (viabilidad).** El contrato, el plugin y la canalización de build
-> existen y están probados. La interfaz del producto **no** está escrita todavía: primero
-> se confirma que el plugin ve lo que tiene que ver dentro de DSH.
+> **Estado: fase 2 en curso.** El emparejamiento por QR, los tokens de dispositivo, el
+> listado de sesiones y la PWA que los consume funcionan y están probados. Falta la
+> transcripción y el puente de preguntas.
 
 ---
 
@@ -18,8 +18,9 @@ el móvil es un control remoto, no un segundo agente.
 PC (ejecuta DSH)                                  Teléfono
 ┌──────────────────────────────────────┐   ┌──────────────────────────┐
 │ plugin @dsh-mobile/companion         │   │ PWA @dsh-mobile/app      │
-│  · listener propio :6768             │◄─►│  · sesiones y estado     │
-│  · emparejamiento por QR             │WS │  · transcripción         │
+│  · listener propio :6768             │◄─►│  · emparejamiento        │
+│  · sirve la PWA compilada            │WS │  · sesiones y estado     │
+│  · emparejamiento por QR             │   │  · transcripción         │
 │  · token por dispositivo             │   │  · preguntas y respuestas│
 │  · puente a los servicios de DSH     │   │  · composer              │
 └──────────────────────────────────────┘   └──────────────────────────┘
@@ -31,6 +32,9 @@ núcleo y sin romperse con las actualizaciones del upstream.
 **La frontera es el contrato.** El móvil nunca habla con las tripas de DSH: habla
 `dsh-mobile/1`, un protocolo propio y versionado. Solo el plugin conoce DSH. Si upstream
 cambia, se toca un adaptador y el cliente no se entera.
+
+**Un solo artefacto.** El plugin sirve la PWA compilada, así que host y cliente no pueden
+desincronizarse: son la misma versión por construcción.
 
 ### Emparejamiento
 
@@ -50,11 +54,11 @@ Cambiar de red (LAN ↔ tailnet) se hace editando el endpoint, **sin re-empareja
 
 ## Paquetes
 
-| Paquete                                       | Qué es                                                 |
-| --------------------------------------------- | ------------------------------------------------------ |
-| [`@dsh-mobile/protocol`](packages/protocol)   | Contrato: esquemas Zod, tipos y constantes. Isomorfo   |
-| [`@dsh-mobile/companion`](packages/companion) | Plugin host: listener, emparejamiento, adaptador a DSH |
-| [`@dsh-mobile/app`](packages/app)             | PWA: React + Vite                                      |
+| Paquete                                       | Qué es                                                      |
+| --------------------------------------------- | ----------------------------------------------------------- |
+| [`@dsh-mobile/protocol`](packages/protocol)   | Contrato: esquemas Zod, tipos y constantes. Isomorfo        |
+| [`@dsh-mobile/companion`](packages/companion) | Plugin host: listener, emparejamiento, PWA, adaptador a DSH |
+| [`@dsh-mobile/app`](packages/app)             | PWA: React + Vite                                           |
 
 El contrato exige **TypeScript** en todo el repo: un esquema, dos consumidores, y un
 cambio incompatible rompe el build en vez de al usuario.
@@ -74,10 +78,15 @@ cambio incompatible rompe el build en vez de al usuario.
 pnpm install
 pnpm build        # protocol → companion → app (orden topológico)
 pnpm test         # vitest
+pnpm smoke        # arranca el servidor compilado y comprueba PWA + emparejamiento
 pnpm typecheck
 pnpm lint
 pnpm dev          # PWA en http://127.0.0.1:5173
 ```
+
+`pnpm smoke` es la comprobación de que **el paquete que se publicaría** funciona: levanta
+el servidor de `dist/` sirviendo la PWA de `dist/` en un puerto efímero y recorre
+emparejamiento y listado de sesiones.
 
 ## Uso del plugin
 
@@ -92,11 +101,14 @@ Enlázalo desde tu perfil de DSH (`~/.dsh/profiles/<perfil>/package.json`):
 
 El plugin escucha en `127.0.0.1:6768` y expone:
 
-| Ruta          | Qué hace                                                         |
-| ------------- | ---------------------------------------------------------------- |
-| `GET /health` | Estado, versión de protocolo y capacidades                       |
-| `GET /probe`  | Evidencia de la fase 0: sesiones visibles y preguntas pendientes |
-| `WS /ws`      | El contrato `dsh-mobile/1`                                       |
+| Ruta          | Qué hace                                                 |
+| ------------- | -------------------------------------------------------- |
+| `GET /`       | La PWA instalable                                        |
+| `GET /pair`   | QR de emparejamiento y código en texto                   |
+| `GET /health` | Estado, versión de protocolo, capacidades y dispositivos |
+| `WS /ws`      | El contrato `dsh-mobile/1`                               |
+
+Variables de entorno: `DSH_MOBILE_PORT`, `DSH_MOBILE_PUBLIC_URL`, `DSH_MOBILE_WEB_ROOT`.
 
 ---
 
