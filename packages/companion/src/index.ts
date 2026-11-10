@@ -28,12 +28,10 @@ const COMMAND_DESCRIPTION =
 export function apply(ctx: HostContext): void {
   log(`plugin cargado · evidencia en ${PROBE_LOG_PATH}`);
 
-  let lastReport: ProbeReport | undefined;
   const disposers: Array<() => void> = [];
 
   const probe = (): ProbeReport => {
     const report = runProbe(ctx);
-    lastReport = report;
     reportToLog(report);
     return report;
   };
@@ -105,7 +103,11 @@ export function apply(ctx: HostContext): void {
   const portFromEnv = Number(process.env.DSH_MOBILE_PORT ?? '');
   const options = Number.isInteger(portFromEnv) && portFromEnv > 0 ? { port: portFromEnv } : {};
 
-  void startCompanionServer({ ...options, report: () => lastReport ?? probe() })
+  void startCompanionServer({
+    ...options,
+    // Siempre en vivo: un informe cacheado miente en cuanto cambian las sesiones.
+    report: () => probe(),
+  })
     .then((running) => {
       disposers.push(() => {
         void running.close().catch(() => undefined);
