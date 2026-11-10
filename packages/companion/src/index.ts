@@ -3,6 +3,7 @@ import { DeviceRegistry } from './core/devices.js';
 import { PairingService } from './core/pairing.js';
 import { DevicesFile } from './persist/devices-file.js';
 import { join } from 'node:path';
+import { findWebRoot } from './routes/web-root.js';
 import { injectText } from './dsh/prompt.js';
 import { resolveSessionId } from './dsh/sessions.js';
 import type { HostContext } from './host-api.js';
@@ -117,12 +118,15 @@ export function apply(ctx: HostContext): void {
   const portFromEnv = Number(process.env.DSH_MOBILE_PORT ?? '');
   const options = Number.isInteger(portFromEnv) && portFromEnv > 0 ? { port: portFromEnv } : {};
   const publicUrl = process.env.DSH_MOBILE_PUBLIC_URL?.trim();
+  const webRoot = findWebRoot();
+  log(webRoot ? `PWA servida desde ${webRoot}` : 'PWA no encontrada; el host sirve solo la API');
 
   void startCompanionServer({
     pairing,
     devices,
     ...options,
     ...(publicUrl ? { publicUrl } : {}),
+    ...(webRoot ? { webRoot } : {}),
     // Siempre en vivo: un informe cacheado miente en cuanto cambian las sesiones.
     report: () => probe(),
   })

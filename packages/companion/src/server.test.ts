@@ -1,4 +1,7 @@
 import { once } from 'node:events';
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { WebSocket } from 'ws';
 import { PROTOCOL_VERSION, WEBSOCKET_PATH, parseServerMessage } from '@dsh-mobile/protocol';
@@ -110,6 +113,35 @@ describe('superficie HTTP', () => {
     expect(body.ok).toBe(true);
     expect(body.proto).toBe(PROTOCOL_VERSION);
     expect(body.devices).toBe(0);
+  });
+
+  it('sirve la PWA cuando hay raíz web', async () => {
+    const webRoot = mkdtempSync(join(tmpdir(), 'dsh-mobile-serve-'));
+    writeFileSync(join(webRoot, 'index.html'), '<!doctype html><title>DSH Mobile</title>');
+
+    const withWeb = await startCompanionServer({
+      pairing: new PairingService(),
+      devices: new DeviceRegistry({ persistence: new MemoryPersistence() }),
+      port: 0,
+      webRoot,
+    });
+
+    try {
+      const origin = `http://127.0.0.1:${withWeb.port}`;
+
+      const index = await fetch(`${origin}/`);
+      expect(index.status).toBe(200);
+      expect(await index.text()).toContain('DSH Mobile');
+
+      // La SPA cae al índice en cualquier ruta sin extensión.
+      const deep = await fetch(`${origin}/sesiones/abc`);
+      expect(deep.status).toBe(200);
+
+      // La API sigue mandando sobre los archivos.
+      expect((await fetch(`${origin}/health`)).status).toBe(200);
+    } finally {
+      await withWeb.close();
+    }
   });
 
   it('sirve el QR de emparejamiento como página', async () => {
