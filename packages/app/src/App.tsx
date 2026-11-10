@@ -4,10 +4,13 @@ import {
   PROTOCOL_VERSION,
   parsePairingUrl,
   type HostInfo,
+  type QuestionAnswerItem,
+  type QuestionBatch,
   type SessionSummary,
 } from '@dsh-mobile/protocol';
 import { CompanionClient, endpointFromLocation, normalizeEndpoint } from './lib/connection.js';
 import { storage } from './lib/storage.js';
+import { QuestionsCard } from './components/Questions.js';
 
 type View =
   | { kind: 'checking' }
@@ -40,6 +43,7 @@ export function App() {
   const [view, setView] = useState<View>({ kind: 'checking' });
   const [code, setCode] = useState('');
   const [endpointInput, setEndpointInput] = useState('');
+  const [questions, setQuestions] = useState<QuestionBatch[]>([]);
 
   const client = useMemo(() => ({ current: undefined as CompanionClient | undefined }), []);
 
@@ -49,7 +53,21 @@ export function App() {
       client.current?.close();
       const connection = new CompanionClient(endpoint);
       client.current = connection;
+      setQuestions([]);
       setView({ kind: 'connecting', endpoint });
+
+      // Se registra antes de pedir nada: los lotes llegan empujados detrás de la lista.
+      connection.onPush((message) => {
+        if (message.type === 'question.pending') {
+          const incoming = message.question;
+          setQuestions((previous) => [
+            ...previous.filter((batch) => batch.callId !== incoming.callId),
+            incoming,
+          ]);
+        } else if (message.type === 'question.settled') {
+          setQuestions((previous) => previous.filter((batch) => batch.callId !== message.callId));
+        }
+      });
 
       try {
         const token = storage.token();
@@ -69,6 +87,20 @@ export function App() {
         setView({ kind: 'sessions', endpoint, host: hello.host, sessions });
       } catch (error) {
         setView({ kind: 'error', endpoint, message: messageOf(error) });
+      }
+    },
+    [client],
+  );
+
+  const answer = useCallback(
+    async (callId: string, sessionId: string, answers: QuestionAnswerItem[]) => {
+      const connection = client.current;
+      if (!connection) return;
+      try {
+        await connection.answer(callId, sessionId, answers);
+        setQuestions((previous) => previous.filter((batch) => batch.callId !== callId));
+      } catch (error) {
+        setView({ kind: 'error', endpoint: connection.url, message: messageOf(error) });
       }
     },
     [client],
@@ -190,41 +222,49 @@ export function App() {
       )}
 
       {view.kind === 'sessions' && (
-        <section className="card">
-          <div className="row">
-            <h2>Sesiones</h2>
-            <button type="button" className="ghost" onClick={() => void refresh()}>
-              Actualizar
+        <>
+          <QuestionsCard
+            questions={questions}
+            onSubmit={(callId, sessionId, answers) => void answer(callId, sessionId, answers)}
+          />
+
+          <section className="card">
+            <div className="row">
+              <h2>Sesiones</h2>
+              <button type="button" className="ghost" onClick={() => void refresh()}>
+                Actualizar
+              </button>
+            </div>
+
+            {view.sessions.length === 0 ? (
+              <p className="muted">No hay sesiones vivas en el host.</p>
+            ) : (
+              <ul className="sessions">
+                {view.sessions.map((session) => (
+                  <li key={session.id}>
+                    <div className="session-main">
+                      <span className="session-title">{session.title}</span>
+                      <span className="muted small">{relativeTime(session.updatedAt)}</span>
+                    </div>
+                    <div className="session-meta">
+                      <span className={`badge ${session.state}`}>{STATE_LABEL[session.state]}</span>
+                      {session.pendingQuestions > 0 && (
+                        <span className="badge waiting">
+                          {session.pendingQuestions} pregunta
+                          {session.pendingQuestions > 1 ? 's' : ''}
+                        </span>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <button type="button" className="ghost" onClick={forget}>
+              Olvidar este dispositivo
             </button>
-          </div>
-
-          {view.sessions.length === 0 ? (
-            <p className="muted">No hay sesiones vivas en el host.</p>
-          ) : (
-            <ul className="sessions">
-              {view.sessions.map((session) => (
-                <li key={session.id}>
-                  <div className="session-main">
-                    <span className="session-title">{session.title}</span>
-                    <span className="muted small">{relativeTime(session.updatedAt)}</span>
-                  </div>
-                  <div className="session-meta">
-                    <span className={`badge ${session.state}`}>{STATE_LABEL[session.state]}</span>
-                    {session.pendingQuestions > 0 && (
-                      <span className="badge waiting">
-                        {session.pendingQuestions} pregunta{session.pendingQuestions > 1 ? 's' : ''}
-                      </span>
-                    )}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          <button type="button" className="ghost" onClick={forget}>
-            Olvidar este dispositivo
-          </button>
-        </section>
+          </section>
+        </>
       )}
 
       <footer className="foot">
