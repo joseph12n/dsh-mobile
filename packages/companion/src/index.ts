@@ -1,4 +1,5 @@
 import { PROBE_LOG_PATH, log } from './log.js';
+import { injectText } from './dsh/prompt.js';
 import type { HostContext } from './host-api.js';
 import { reportToLog, reportToText, runProbe, type ProbeReport } from './probe.js';
 import { startCompanionServer } from './server.js';
@@ -57,16 +58,44 @@ export function apply(ctx: HostContext): void {
         },
       });
 
+    // /mobile-say <sessionId> <texto> — E0.3. Acción explícita, nunca automática.
+    const registerSay = (): (() => void) =>
+      ctx.commands!.register({
+        name: 'mobile-say',
+        description: 'Inyecta un mensaje en una sesión vía sessionController.prompt (Fase 0, E0.3)',
+        input: { hint: '<sessionId> <texto>' },
+        handler: (invocation) => {
+          const raw = (invocation.rawInput ?? '').trim();
+          const split = raw.indexOf(' ');
+          if (split <= 0) {
+            return { kind: 'error', text: 'Uso: /mobile-say <sessionId> <texto>' };
+          }
+          const sessionId = raw.slice(0, split);
+          const text = raw.slice(split + 1).trim();
+          log(`E0.3: inyectando ${text.length} caracteres en ${sessionId}`);
+
+          void injectText(ctx, sessionId, text).then((result) =>
+            log(`E0.3 resultado: ok=${result.ok} · ${result.detail}`),
+          );
+
+          return {
+            kind: 'success',
+            text: `Envío despachado a ${sessionId}. El resultado queda en ${PROBE_LOG_PATH}.`,
+          };
+        },
+      });
+
     try {
       if (typeof ctx.effect === 'function') {
         ctx.effect(function* () {
           yield register();
+          yield registerSay();
         }, 'dsh-mobile commands');
       } else {
-        disposers.push(register());
+        disposers.push(register(), registerSay());
       }
     } catch (error) {
-      log(`no pude registrar el comando /mobile: ${String(error)}`);
+      log(`no pude registrar los comandos: ${String(error)}`);
     }
   } else {
     log('el servicio de comandos no está disponible; /mobile queda fuera');

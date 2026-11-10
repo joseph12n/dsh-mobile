@@ -50,6 +50,26 @@ export interface CommandsService {
 }
 
 /**
+ * Host Session business API (`ctx.sessionController`, dsh-api-session-controller).
+ *
+ * `prompt()` es la vía legítima para meter texto en una sesión: entra en la
+ * bandeja del agente y dispara el turno normal, exactamente como si se hubiera
+ * escrito desde la UI de escritorio. `mode: 'steer'` interrumpe el turno en
+ * curso; `'queue'` espera turno.
+ */
+export interface SessionPromptRequest {
+  /** Identidad acuñada por el cliente y persistida en el mensaje aceptado. */
+  requestId: string;
+  sessionId: string;
+  mode: 'queue' | 'steer';
+  content: ReadonlyArray<{ readonly type: 'text'; readonly text: string }>;
+}
+
+export interface SessionController {
+  prompt(request: SessionPromptRequest, signal: AbortSignal): Promise<{ accepted: boolean }>;
+}
+
+/**
  * El contexto de cordis. `effect` ejecuta un generador cuyos `yield`s son
  * recursos con `dispose`, y los limpia al descargar el plugin.
  */
@@ -58,15 +78,68 @@ export interface HostContext {
   sessionProjections?: ProjectionsService;
   commands?: CommandsService;
   effect?(factory: () => Generator<unknown, void, unknown>, label?: string): void;
+  /** Resolución de servicios del proxy de cordis; es la vía fiable fuera de `inject`. */
+  get?(name: string): unknown;
+  /** Capa de reflexión: su `store` es el registro de servicios montados. */
+  reflect?: { store?: Record<string, unknown> };
   [key: string]: unknown;
 }
 
-/** Lee un servicio del contexto sin lanzar si no está montado. */
+/**
+ * Lee un servicio del contexto.
+ *
+ * Acceder a `ctx.foo` sólo funciona para lo que el plugin declara en `inject`;
+ * para el resto hay que ir por el proxy de reflexión (`ctx.get`). Esto prueba las
+ * dos vías y cae al registro si hace falta.
+ */
 export function service<T>(ctx: HostContext, key: string): T | undefined {
   try {
-    const value = ctx[key];
-    return (value as T | undefined) ?? undefined;
+    const direct = ctx[key];
+    if (direct !== undefined) return direct as T;
   } catch {
-    return undefined;
+    // El proxy puede lanzar si el servicio no está disponible.
+  }
+
+  try {
+    if (typeof ctx.get === 'function') {
+      const resolved = ctx.get(key);
+      if (resolved !== undefined) return resolved as T;
+    }
+  } catch {
+    // Igual que arriba.
+  }
+
+  return undefined;
+}
+
+/** Nombres de todos los servicios montados, según el registro de cordis. */
+export function serviceNames(ctx: HostContext): string[] {
+  try {
+    const store = ctx.reflect?.store;
+    return store ? Object.keys(store) : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Métodos y accesores que expone el prototipo de un servicio. */
+export function methodNames(value: unknown, limit = 24): string[] {
+  if (value === null || typeof value !== 'object') return [];
+  try {
+    const names = new Set<string>();
+
+    // Recorre la cadena de prototipos hasta Object, para no perder métodos heredados.
+    let proto = Object.getPrototypeOf(value) as object | null;
+    while (proto && proto !== Object.prototype) {
+      for (const name of Object.getOwnPropertyNames(proto)) {
+        if (name === 'constructor') continue;
+        names.add(name);
+      }
+      proto = Object.getPrototypeOf(proto) as object | null;
+    }
+
+    return [...names].slice(0, limit);
+  } catch {
+    return [];
   }
 }
