@@ -1,5 +1,6 @@
 import { PROBE_LOG_PATH, log } from './log.js';
 import { injectText } from './dsh/prompt.js';
+import { resolveSessionId } from './dsh/sessions.js';
 import type { HostContext } from './host-api.js';
 import { reportToLog, reportToText, runProbe, type ProbeReport } from './probe.js';
 import { startCompanionServer } from './server.js';
@@ -68,17 +69,20 @@ export function apply(ctx: HostContext): void {
           if (split <= 0) {
             return { kind: 'error', text: 'Uso: /mobile-say <sessionId> <texto>' };
           }
-          const sessionId = raw.slice(0, split);
-          const text = raw.slice(split + 1).trim();
-          log(`E0.3: inyectando ${text.length} caracteres en ${sessionId}`);
 
-          void injectText(ctx, sessionId, text).then((result) =>
+          const resolution = resolveSessionId(ctx, raw.slice(0, split));
+          if (!resolution.ok) return { kind: 'error', text: resolution.error };
+
+          const text = raw.slice(split + 1).trim();
+          log(`E0.3: inyectando ${text.length} caracteres en ${resolution.id}`);
+
+          void injectText(ctx, resolution.id, text).then((result) =>
             log(`E0.3 resultado: ok=${result.ok} · ${result.detail}`),
           );
 
           return {
             kind: 'success',
-            text: `Envío despachado a ${sessionId}. El resultado queda en ${PROBE_LOG_PATH}.`,
+            text: `Envío despachado a ${resolution.id}. El resultado queda en ${PROBE_LOG_PATH}.`,
           };
         },
       });
