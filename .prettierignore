@@ -1,0 +1,10 @@
+node_modules/
+dist/
+coverage/
+pnpm-lock.yaml
+
+# Documentos internos de trabajo; no forman parte del repositorio público.
+MEMORIA.md
+AGENTS.md
+PLAN.md
+ARQUITECTURA.md

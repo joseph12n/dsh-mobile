@@ -1,0 +1,45 @@
+# Dependencias
+node_modules/
+.pnpm-store/
+
+# Build
+dist/
+build/
+out/
+*.tsbuildinfo
+
+# Entorno y secretos
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Estado local del plugin (tokens de dispositivo, QR, logs)
+.estado/
+.devices.json
+*.log
+
+# Certificados locales de LAN
+certs/
+
+# Editor y sistema
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# OneDrive / temporales
+~$*
+*.tmp
+
+# ---------------------------------------------------------------------------
+# Documentos internos de trabajo. NO se publican: contienen rutas de la máquina,
+# el nombre del tailnet y notas de contexto que no aportan al repositorio público.
+# El diseño público vive en README.md y docs/.
+# ---------------------------------------------------------------------------
+/MEMORIA.md
+/AGENTS.md
+/PLAN.md
+/ARQUITECTURA.md

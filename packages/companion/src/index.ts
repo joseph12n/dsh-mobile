@@ -1,0 +1,115 @@
+import { PROBE_LOG_PATH, log } from './log.js';
+import type { HostContext } from './host-api.js';
+import { reportToLog, reportToText, runProbe, type ProbeReport } from './probe.js';
+import { startCompanionServer } from './server.js';
+
+/**
+ * dsh-mobile companion — plugin host.
+ *
+ * Estado actual: **spike de Fase 0**. No es el producto todavía. Sirve para
+ * responder con evidencia si un plugin puede ver sesiones, leer la proyección de
+ * preguntas y abrir su propio listener. Todo lo que falla se registra; nunca se
+ * propaga al host.
+ */
+
+export const name = 'dsh-mobile-companion';
+
+/**
+ * Servicios que el plugin necesita. Cordis no activa el plugin hasta que están
+ * montados, así que dentro de `apply` se pueden usar sin comprobaciones de
+ * carrera (aun así se accede de forma defensiva).
+ */
+export const inject = ['sessions', 'sessionProjections', 'commands'];
+
+const COMMAND_DESCRIPTION =
+  'Sondeo del compañero móvil: sesiones, preguntas pendientes y listener (Fase 0)';
+
+export function apply(ctx: HostContext): void {
+  log(`plugin cargado · evidencia en ${PROBE_LOG_PATH}`);
+
+  let lastReport: ProbeReport | undefined;
+  const disposers: Array<() => void> = [];
+
+  const probe = (): ProbeReport => {
+    const report = runProbe(ctx);
+    lastReport = report;
+    reportToLog(report);
+    return report;
+  };
+
+  // --- Comando /mobile: el sondeo bajo demanda ---------------------------------
+  if (ctx.commands) {
+    const register = (): (() => void) =>
+      ctx.commands!.register({
+        name: 'mobile',
+        description: COMMAND_DESCRIPTION,
+        input: { hint: '[estado]' },
+        handler: () => {
+          try {
+            const report = probe();
+            return {
+              kind: 'success',
+              text: `${reportToText(report)}\n\nEvidencia completa: ${PROBE_LOG_PATH}`,
+            };
+          } catch (error) {
+            return { kind: 'error', text: `El sondeo falló: ${String(error)}` };
+          }
+        },
+      });
+
+    try {
+      if (typeof ctx.effect === 'function') {
+        ctx.effect(function* () {
+          yield register();
+        }, 'dsh-mobile commands');
+      } else {
+        disposers.push(register());
+      }
+    } catch (error) {
+      log(`no pude registrar el comando /mobile: ${String(error)}`);
+    }
+  } else {
+    log('el servicio de comandos no está disponible; /mobile queda fuera');
+  }
+
+  // --- Listener propio (E0.4) --------------------------------------------------
+  const portFromEnv = Number(process.env.DSH_MOBILE_PORT ?? '');
+  const options = Number.isInteger(portFromEnv) && portFromEnv > 0 ? { port: portFromEnv } : {};
+
+  void startCompanionServer({ ...options, report: () => lastReport ?? probe() })
+    .then((running) => {
+      disposers.push(() => {
+        void running.close().catch(() => undefined);
+      });
+      log(`listener listo en el puerto ${running.port} (prueba: GET /health)`);
+    })
+    .catch((error: unknown) => {
+      log(`no pude abrir el listener: ${String(error)}`);
+    });
+
+  // --- Sondeo de arranque ------------------------------------------------------
+  // Se difiere para que el host termine de montar sesiones y proyecciones.
+  const timer = setTimeout(() => {
+    try {
+      probe();
+    } catch (error) {
+      log(`el sondeo de arranque falló: ${String(error)}`);
+    }
+  }, 2000);
+  if (typeof timer.unref === 'function') timer.unref();
+
+  // Cierre ordenado si el host descarga el plugin.
+  ctx.effect?.(function* () {
+    yield () => {
+      clearTimeout(timer);
+      for (const dispose of disposers.reverse()) {
+        try {
+          dispose();
+        } catch {
+          // Un disposer defectuoso no debe impedir los demás.
+        }
+      }
+      log('plugin descargado');
+    };
+  }, 'dsh-mobile lifecycle');
+}

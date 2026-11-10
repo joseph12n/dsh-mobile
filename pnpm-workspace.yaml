@@ -1,0 +1,5 @@
+packages:
+  - 'packages/*'
+
+# Un solo store por repo; hoisted para que el plugin resuelva igual dentro de DSH.
+nodeLinker: hoisted
