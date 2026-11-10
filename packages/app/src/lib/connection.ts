@@ -6,6 +6,7 @@ import {
   type ClientMessage,
   type DeviceInfo,
   type HostInfo,
+  type QuestionAnswerItem,
   type ServerMessage,
   type SessionSummary,
 } from '@dsh-mobile/protocol';
@@ -67,6 +68,7 @@ export class CompanionClient {
   #socket: WebSocket | undefined;
   #pending = new Map<string, Pending>();
   #onState: (state: ConnectionState) => void = () => undefined;
+  #onPush: (message: ServerMessage) => void = () => undefined;
 
   constructor(url: string) {
     this.#url = url;
@@ -78,6 +80,15 @@ export class CompanionClient {
 
   onState(listener: (state: ConnectionState) => void): void {
     this.#onState = listener;
+  }
+
+  /**
+   * Escucha los mensajes que el host empuja sin que nadie los pida, como
+   * `question.pending` o `question.settled`. Las respuestas a peticiones viajan
+   * por su promesa y no llegan aquí.
+   */
+  onPush(listener: (message: ServerMessage) => void): void {
+    this.#onPush = listener;
   }
 
   /** Abre el socket. Resuelve cuando el `hello.ok` llega. */
@@ -138,6 +149,12 @@ export class CompanionClient {
     return response.type === 'sessions.ok' ? response.sessions : [];
   }
 
+  /** Responde un lote completo. El host rechaza un lote parcial. */
+  async answer(callId: string, sessionId: string, answers: QuestionAnswerItem[]): Promise<void> {
+    const response = await this.#request({ type: 'question.answer', callId, sessionId, answers });
+    if (response.type === 'error') throw new Error(response.message);
+  }
+
   close(): void {
     this.#failAll(new Error('Conexión cerrada.'));
     this.#socket?.close();
@@ -171,11 +188,15 @@ export class CompanionClient {
     if (!message) return;
 
     const pending = this.#pending.get(message.id);
-    if (!pending) return;
+    if (pending) {
+      clearTimeout(pending.timer);
+      this.#pending.delete(message.id);
+      pending.resolve(message);
+      return;
+    }
 
-    clearTimeout(pending.timer);
-    this.#pending.delete(message.id);
-    pending.resolve(message);
+    // Sin petición que lo espere: es un envío espontáneo del host.
+    this.#onPush(message);
   }
 
   #failAll(error: Error): void {
