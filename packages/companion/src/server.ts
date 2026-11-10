@@ -56,7 +56,7 @@ export function startCompanionServer(options: ServerOptions = {}): Promise<Runni
     const url = req.url ?? '/';
 
     if (url === '/health') {
-      res.writeHead(200, { 'content-type': 'application/json' });
+      res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
       res.end(
         JSON.stringify({
           ok: true,
@@ -69,12 +69,12 @@ export function startCompanionServer(options: ServerOptions = {}): Promise<Runni
     }
 
     if (url === '/probe' && options.report) {
-      res.writeHead(200, { 'content-type': 'application/json' });
+      res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify(options.report(), null, 2));
       return;
     }
 
-    res.writeHead(404, { 'content-type': 'application/json' });
+    res.writeHead(404, { 'content-type': 'application/json; charset=utf-8' });
     res.end(JSON.stringify({ error: 'not-found', path: url }));
   });
 

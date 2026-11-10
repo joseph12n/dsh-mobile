@@ -1,6 +1,8 @@
 import { log } from './log.js';
 import {
+  methodNames,
   service,
+  serviceNames,
   type HostContext,
   type HostSession,
   type ProjectionsService,
@@ -13,7 +15,21 @@ import {
  * No intenta hacer el producto: intenta **averiguar qué es cierto en esta
  * máquina**. Cada comprobación registra lo que encontró o por qué no pudo, y
  * ninguna lanza hacia el host.
+ *
+ * Lo que se busca, en orden:
+ *  - E0.1 preguntas pendientes, vía la proyección `userQuestions`
+ *  - E0.2 sesiones vivas y transcripción
+ *  - E0.3 por dónde se inyecta texto: aquí se enumeran los servicios reales en
+ *    lugar de adivinar nombres
  */
+
+/** Servicios que podrían servir para leer o inyectar conversación. */
+const RELEVANT_SERVICE = /agent|turn|prompt|input|inbox|rpc|session|question|tool/i;
+
+export interface ServiceDetail {
+  name: string;
+  methods: string[];
+}
 
 export interface SessionFacts {
   id: string;
@@ -26,10 +42,14 @@ export interface SessionFacts {
 
 export interface ProbeReport {
   timestamp: string;
+  /** Nombres de todos los servicios montados, según el registro de cordis. */
+  serviceNames: string[];
+  /** Métodos de los servicios que podrían tocar la conversación. */
+  serviceDetails: ServiceDetail[];
   services: Record<string, string>;
   sessionCount: number | undefined;
   sessions: SessionFacts[];
-  /** Qué APIs de inyección de texto existen, por nombre. */
+  /** Qué APIs candidatas existen, por nombre. */
   injectionCandidates: Record<string, string>;
 }
 
@@ -47,8 +67,7 @@ function describe(value: unknown): string {
 /** Resumen legible de una forma desconocida: tipo, longitud y primeras claves. */
 function summarize(value: unknown): string {
   if (Array.isArray(value)) {
-    const first = value[0];
-    return `array(${value.length}) primer elemento: ${describe(first)}`;
+    return `array(${value.length}) primer elemento: ${describe(value[0])}`;
   }
   return describe(value);
 }
@@ -86,13 +105,19 @@ function sessionFacts(
 }
 
 /**
- * Ejecuta las comprobaciones E0.1 (preguntas) y E0.2 (sesiones y transcripción)
- * y devuelve los hechos. No escribe nada en las sesiones.
+ * Ejecuta las comprobaciones y devuelve los hechos. No escribe nada en las
+ * sesiones: es un sondeo de lectura.
  */
 export function runProbe(ctx: HostContext): ProbeReport {
   const sessions = service<SessionsService>(ctx, 'sessions');
   const projections = service<ProjectionsService>(ctx, 'sessionProjections');
   const userQuestions = service<Record<string, unknown>>(ctx, 'userQuestions');
+  const firstSession = sessions?.list()[0];
+
+  const names = serviceNames(ctx);
+  const details: ServiceDetail[] = names
+    .filter((name) => RELEVANT_SERVICE.test(name))
+    .map((name) => ({ name, methods: methodNames(service(ctx, name)) }));
 
   const services: Record<string, string> = {
     sessions: describe(sessions),
@@ -100,8 +125,6 @@ export function runProbe(ctx: HostContext): ProbeReport {
     commands: describe(service(ctx, 'commands')),
     userQuestions: describe(userQuestions),
     tools: describe(service(ctx, 'tools')),
-    agents: describe(service(ctx, 'agents')),
-    agent: describe(service(ctx, 'agent')),
   };
 
   let sessionCount: number | undefined;
@@ -119,18 +142,21 @@ export function runProbe(ctx: HostContext): ProbeReport {
     }
   }
 
-  // E0.3: no sabemos dónde vive la inyección de texto; se reporta qué existe.
+  // E0.3: qué hay disponible para meter texto en una sesión.
+  const sessionController = service<Record<string, unknown>>(ctx, 'sessionController');
   const injectionCandidates: Record<string, string> = {
-    'session.append': describe((sessions?.list() ?? [])[0]?.['append' as keyof HostSession]),
+    sessionController: describe(sessionController),
+    'sessionController.prompt': describe(sessionController?.['prompt']),
+    'session.append': describe(firstSession?.['append' as keyof HostSession]),
     'userQuestions.answer': describe(userQuestions?.['answer']),
     'ctx.agents': describe(service(ctx, 'agents')),
-    'ctx.agent': describe(service(ctx, 'agent')),
-    'ctx.prompt': describe(service(ctx, 'prompt')),
-    'ctx.turns': describe(service(ctx, 'turns')),
+    'ctx.agentLoop': describe(service(ctx, 'agentLoop')),
   };
 
   return {
     timestamp: new Date().toISOString(),
+    serviceNames: names,
+    serviceDetails: details,
     services,
     sessionCount,
     sessions: facts,
@@ -141,13 +167,18 @@ export function runProbe(ctx: HostContext): ProbeReport {
 /** Vuelca el informe al log de evidencia, línea por línea. */
 export function reportToLog(report: ProbeReport): void {
   log('===== FASE 0: sondeo =====');
-  log(`servicios: ${JSON.stringify(report.services)}`);
+  log(`servicios montados (${report.serviceNames.length}): ${report.serviceNames.join(', ')}`);
+
+  for (const detail of report.serviceDetails) {
+    log(`  · ${detail.name}: ${detail.methods.join(', ') || '(sin métodos enumerables)'}`);
+  }
+
   log(`sesiones vivas: ${report.sessionCount ?? 'no disponible'}`);
 
   for (const session of report.sessions) {
     log(
       `- sesión ${session.id}: mensajes=${session.messageCount ?? '?'} ` +
-        `asOfSeq=${session.asOfSeq ?? '?'} proyecciones=[${(session.projectionKeys ?? []).join(', ')}]`,
+        `asOfSeq=${session.asOfSeq ?? '?'} proyecciones=${session.projectionKeys?.length ?? 0}`,
     );
     log(`  userQuestions -> ${summarize(session.pendingQuestions)}`);
   }
@@ -161,24 +192,27 @@ export function reportToText(report: ProbeReport): string {
   const lines: string[] = [];
   lines.push(`Sondeo Fase 0 — ${report.timestamp}`);
   lines.push(`Sesiones vivas: ${report.sessionCount ?? 'no disponible'}`);
+  lines.push(`Servicios montados: ${report.serviceNames.length}`);
   lines.push('');
-  lines.push('Servicios:');
-  for (const [key, value] of Object.entries(report.services)) {
-    lines.push(`  ${key}: ${value}`);
-  }
-  lines.push('');
-  lines.push('Sesiones:');
+
   for (const session of report.sessions) {
     lines.push(
-      `  ${session.id} · mensajes=${session.messageCount ?? '?'} · asOfSeq=${session.asOfSeq ?? '?'}`,
+      `Sesión ${session.id} · mensajes=${session.messageCount ?? '?'} · asOfSeq=${session.asOfSeq ?? '?'}`,
     );
-    lines.push(`    proyecciones: ${(session.projectionKeys ?? []).join(', ') || 'ninguna'}`);
-    lines.push(`    userQuestions: ${summarize(session.pendingQuestions)}`);
+    lines.push(`  userQuestions: ${summarize(session.pendingQuestions)}`);
   }
+
+  lines.push('');
+  lines.push('Servicios relacionados con la conversación:');
+  for (const detail of report.serviceDetails) {
+    lines.push(`  ${detail.name}: ${detail.methods.join(', ') || '(sin métodos enumerables)'}`);
+  }
+
   lines.push('');
   lines.push('Candidatos de inyección de texto:');
   for (const [key, value] of Object.entries(report.injectionCandidates)) {
     lines.push(`  ${key}: ${value}`);
   }
+
   return lines.join('\n');
 }
