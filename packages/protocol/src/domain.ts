@@ -4,10 +4,6 @@ import { z } from 'zod';
 export const SessionId = z.string().min(1);
 export type SessionId = z.infer<typeof SessionId>;
 
-/** Identificador de una pregunta pendiente. */
-export const QuestionId = z.string().min(1);
-export type QuestionId = z.infer<typeof QuestionId>;
-
 /**
  * Estado visible de una sesión. Es una reducción deliberada: el móvil es un
  * mando, no necesita el ciclo de vida completo del agente.
@@ -63,37 +59,64 @@ export type TranscriptEvent = z.infer<typeof TranscriptEvent>;
 
 /** Opción seleccionable de una pregunta. */
 export const QuestionOption = z.object({
-  id: z.string().min(1),
   label: z.string(),
   description: z.string().optional(),
 });
 export type QuestionOption = z.infer<typeof QuestionOption>;
 
 /**
- * Pregunta pendiente. `kind` distingue una selección normal de una aprobación
- * con forma fija (rechazar / permitir / permitir siempre).
+ * Una pregunta dentro de un lote.
+ *
+ * DSH agrupa las preguntas de una misma llamada a `ask_user_question`: la
+ * respuesta se valida por lote, así que el cliente tiene que contestar **todas**
+ * las preguntas juntas. Modelarlo de uno en uno solo produce rechazos.
  */
-export const Question = z.object({
-  id: QuestionId,
-  sessionId: SessionId,
-  kind: z.enum(['select', 'approval', 'text']),
+export const QuestionItem = z.object({
+  id: z.string().min(1),
+  /** El texto que se muestra. */
   text: z.string(),
-  /** Contexto adicional: el plan, el comando que se va a ejecutar, etc. */
+  /** Contexto adicional: el plan, el comando, el diff… */
   detail: z.string().optional(),
+  /** Encabezado corto, cuando la pregunta lo trae. */
+  header: z.string().optional(),
   options: z.array(QuestionOption),
   multiSelect: z.boolean(),
-  /** Permite responder texto libre además de (o en vez de) las opciones. */
+  /** `true` si el lote admite texto libre además de las opciones. */
   allowCustom: z.boolean(),
+});
+export type QuestionItem = z.infer<typeof QuestionItem>;
+
+/** Estado de un lote: abierto, o continuado (solo puede responderse en un turno nuevo). */
+export const QuestionState = z.enum(['open', 'continued']);
+export type QuestionState = z.infer<typeof QuestionState>;
+
+/**
+ * Un lote de preguntas pendientes.
+ *
+ * `callId` es la identidad con la que se responde: la respuesta nombra el lote,
+ * no cada pregunta por separado.
+ */
+export const QuestionBatch = z.object({
+  callId: z.string().min(1),
+  sessionId: SessionId,
+  state: QuestionState,
+  items: z.array(QuestionItem),
   createdAt: z.number().int().nonnegative(),
 });
-export type Question = z.infer<typeof Question>;
+export type QuestionBatch = z.infer<typeof QuestionBatch>;
 
-/** Respuesta a una pregunta. `selected: []` sin `custom` significa omitida. */
-export const QuestionAnswer = z.object({
+/**
+ * Respuesta a una pregunta del lote.
+ *
+ * `selected: []` sin `custom` significa **omitida**, y es una respuesta
+ * legítima. No es lo mismo que no responder.
+ */
+export const QuestionAnswerItem = z.object({
+  id: z.string().min(1),
   selected: z.array(z.string()),
   custom: z.string().optional(),
 });
-export type QuestionAnswer = z.infer<typeof QuestionAnswer>;
+export type QuestionAnswerItem = z.infer<typeof QuestionAnswerItem>;
 
 /** Datos del host que el cliente muestra en el emparejamiento. */
 export const HostInfo = z.object({
