@@ -5,6 +5,7 @@ import { DevicesFile } from './persist/devices-file.js';
 import { join } from 'node:path';
 import { findWebRoot } from './routes/web-root.js';
 import { listSessions } from './dsh/session-source.js';
+import { answerQuestion, listPendingQuestions } from './dsh/questions.js';
 import { injectText } from './dsh/prompt.js';
 import { resolveSessionId } from './dsh/sessions.js';
 import type { HostContext } from './host-api.js';
@@ -130,6 +131,9 @@ export function apply(ctx: HostContext): void {
     ...(webRoot ? { webRoot } : {}),
     // Sesiones: la misma fuente que usa la lista del escritorio.
     listSessions: () => listSessions(ctx),
+    // Preguntas: proyección `userQuestions` y respuesta por lote.
+    listQuestions: () => listPendingQuestions(ctx),
+    answerQuestion: (input) => answerQuestion(ctx, input),
     // Siempre en vivo: un informe cacheado miente en cuanto cambian las sesiones.
     report: () => probe(),
   })

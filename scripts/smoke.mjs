@@ -1,5 +1,5 @@
 // Verificación de humo de los artefactos compilados: el servidor de dist/ sirviendo
-// la PWA de dist/, con emparejamiento y lista de sesiones de punta a punta.
+// la PWA de dist/, con emparejamiento, sesiones y preguntas de punta a punta.
 //
 //   pnpm build && pnpm smoke
 //
@@ -41,9 +41,27 @@ const server = await startCompanionServer({
       seq: 7,
       agentAvailable: true,
       running: false,
-      pendingQuestions: 2,
+      pendingQuestions: 1,
     },
   ],
+  listQuestions: () => [
+    {
+      callId: 'call-demo',
+      sessionId: 'demo-1',
+      state: 'open',
+      createdAt: 0,
+      items: [
+        {
+          id: 'q1',
+          text: '¿Sigo?',
+          options: [{ label: 'Sí' }, { label: 'No' }],
+          multiSelect: false,
+          allowCustom: true,
+        },
+      ],
+    },
+  ],
+  answerQuestion: () => ({ ok: true }),
 });
 
 const base = `http://127.0.0.1:${server.port}`;
@@ -80,21 +98,33 @@ check('el QR se genera', pairHtml.includes('data:image/png;base64,'));
 
 const code = pairHtml.match(/<code>([^<]+)<\/code>/)?.[1];
 
-function call(frames, want) {
+/** Envía marcos y resuelve cuando llegaron todos los tipos pedidos. */
+function collect(frames, wanted) {
   return new Promise((resolve, reject) => {
     const socket = new WebSocket(wsUrl);
+    const seen = [];
+    const pending = new Set(wanted);
+
     const timer = setTimeout(() => {
       socket.terminate();
-      reject(new Error('timeout esperando respuesta'));
+      reject(new Error(`timeout; llegaron: ${seen.map((m) => m.type).join(', ') || 'nada'}`));
     }, 5000);
 
     socket.on('open', () => frames.forEach((frame) => socket.send(JSON.stringify(frame))));
     socket.on('message', (raw) => {
       const message = JSON.parse(raw.toString('utf8'));
-      if (message.type === want) {
+      seen.push(message);
+      pending.delete(message.type);
+      if (message.type === 'error' && pending.size > 0) {
         clearTimeout(timer);
         socket.close();
-        resolve(message);
+        reject(new Error(`error del host: ${message.code} ${message.message}`));
+        return;
+      }
+      if (pending.size === 0) {
+        clearTimeout(timer);
+        socket.close();
+        resolve(seen);
       }
     });
     socket.on('error', (error) => {
@@ -113,18 +143,42 @@ const msg = (type, extra = {}) => ({
   ...extra,
 });
 
-const paired = await call(
+const paired = await collect(
   [msg('hello', { proto: V }), msg('pair.redeem', { code, deviceName: 'smoke', platform: 'node' })],
-  'pair.ok',
+  ['pair.ok'],
 );
-check('el emparejamiento entrega token', typeof paired.deviceToken === 'string');
+const token = paired.find((message) => message.type === 'pair.ok').deviceToken;
+check('el emparejamiento entrega token', typeof token === 'string');
 
-const listed = await call(
-  [msg('hello', { proto: V, deviceToken: paired.deviceToken }), msg('sessions.list')],
-  'sessions.ok',
+const listed = await collect(
+  [msg('hello', { proto: V, deviceToken: token }), msg('sessions.list')],
+  ['sessions.ok', 'question.pending'],
 );
-check('la lista de sesiones llega', Array.isArray(listed.sessions) && listed.sessions.length === 1);
-check('el estado refleja las preguntas pendientes', listed.sessions[0]?.state === 'waiting');
+const sessions = listed.find((message) => message.type === 'sessions.ok').sessions;
+const question = listed.find((message) => message.type === 'question.pending').question;
+
+check('la lista de sesiones llega', Array.isArray(sessions) && sessions.length === 1);
+check('el estado refleja las preguntas pendientes', sessions[0]?.state === 'waiting');
+check(
+  'el lote de preguntas se empuja',
+  question?.callId === 'call-demo' && question.items.length === 1,
+);
+
+const answered = await collect(
+  [
+    msg('hello', { proto: V, deviceToken: token }),
+    msg('question.answer', {
+      callId: 'call-demo',
+      sessionId: 'demo-1',
+      answers: [{ id: 'q1', selected: ['Sí'] }],
+    }),
+  ],
+  ['answer.ok'],
+);
+check(
+  'la respuesta se confirma',
+  answered.find((message) => message.type === 'answer.ok')?.callId === 'call-demo',
+);
 
 await server.close();
 

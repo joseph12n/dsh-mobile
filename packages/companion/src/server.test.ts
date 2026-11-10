@@ -65,8 +65,9 @@ interface TestClient {
   close(): void;
 }
 
-async function openClient(): Promise<TestClient> {
-  const socket = new WebSocket(`ws://${base}${WEBSOCKET_PATH}`);
+async function openClient(port?: number): Promise<TestClient> {
+  const target = port ?? running.port;
+  const socket = new WebSocket(`ws://127.0.0.1:${target}${WEBSOCKET_PATH}`);
   const queue: Record<string, unknown>[] = [];
   const waiters: Array<(value: Record<string, unknown>) => void> = [];
 
@@ -328,6 +329,134 @@ describe('listado de sesiones sobre el WebSocket', () => {
     } finally {
       await server.close();
     }
+  });
+});
+
+describe('preguntas sobre el WebSocket', () => {
+  const batch = {
+    callId: 'call-1',
+    sessionId: 'session-uno',
+    state: 'open' as const,
+    createdAt: 0,
+    items: [
+      {
+        id: 'q1',
+        text: '¿Sigo?',
+        options: [{ label: 'Sí' }, { label: 'No' }],
+        multiSelect: false,
+        allowCustom: true,
+      },
+    ],
+  };
+
+  async function withServer(
+    deps: { answer?: (input: { callId: string; sessionId: string; answers: unknown[] }) => never },
+    run: (client: TestClient) => Promise<void>,
+  ): Promise<void> {
+    const registry = new DeviceRegistry({ persistence: new MemoryPersistence() });
+    const { token } = registry.enroll('Pixel', 'android');
+
+    const server = await startCompanionServer({
+      pairing: new PairingService(),
+      devices: registry,
+      port: 0,
+      listSessions: () =>
+        Promise.resolve([
+          {
+            id: 'session-uno',
+            title: 'Con pregunta',
+            updatedAt: 1,
+            seq: 3,
+            agentAvailable: true,
+            running: false,
+            pendingQuestions: 1,
+          },
+        ]),
+      listQuestions: () => [batch],
+      ...(deps.answer
+        ? {
+            answerQuestion: deps.answer as unknown as (input: {
+              callId: string;
+              sessionId: string;
+              answers: Array<{ id: string; selected: string[] }>;
+            }) => {
+              ok: boolean;
+              code?: 'not-found' | 'bad-request' | 'internal';
+              message?: string;
+            },
+          }
+        : {}),
+    });
+
+    try {
+      const client = await openClient(server.port);
+      client.send(hello({ deviceToken: token }));
+      // Sin esperar al hello.ok, la primera respuesta que llegaría sería esa.
+      const ready = await client.next();
+      expect(ready['type']).toBe('hello.ok');
+      await run(client);
+      client.close();
+    } finally {
+      await server.close();
+    }
+  }
+
+  it('empuja los lotes pendientes justo detrás de la lista', async () => {
+    await withServer({}, async (client) => {
+      client.send({ v: PROTOCOL_VERSION, id: 'l', at: Date.now(), type: 'sessions.list' });
+      const listing = await client.next();
+      expect(listing['type']).toBe('sessions.ok');
+
+      const pending = await client.next();
+      expect(pending['type']).toBe('question.pending');
+      const question = pending['question'] as { callId: string; items: unknown[] };
+      expect(question.callId).toBe('call-1');
+      expect(question.items).toHaveLength(1);
+    });
+  });
+
+  it('confirma la respuesta con answer.ok', async () => {
+    await withServer({ answer: () => ({ ok: true }) as never }, async (client) => {
+      client.send({
+        v: PROTOCOL_VERSION,
+        id: 'a',
+        at: Date.now(),
+        type: 'question.answer',
+        callId: 'call-1',
+        sessionId: 'session-uno',
+        answers: [{ id: 'q1', selected: ['Sí'] }],
+      });
+      const response = await client.next();
+      expect(response['type']).toBe('answer.ok');
+      expect(response['callId']).toBe('call-1');
+    });
+  });
+
+  it('traduce el fallo del host a un error de contrato', async () => {
+    await withServer(
+      {
+        answer: () =>
+          ({
+            ok: false,
+            code: 'not-found',
+            message: 'La sesión no está cargada en el host.',
+          }) as never,
+      },
+      async (client) => {
+        client.send({
+          v: PROTOCOL_VERSION,
+          id: 'a',
+          at: Date.now(),
+          type: 'question.answer',
+          callId: 'call-1',
+          sessionId: 'session-uno',
+          answers: [{ id: 'q1', selected: ['Sí'] }],
+        });
+        const response = await client.next();
+        expect(response['type']).toBe('error');
+        expect(response['code']).toBe('not-found');
+      },
+    );
   });
 });
 
