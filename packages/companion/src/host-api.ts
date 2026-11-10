@@ -112,17 +112,26 @@ export function service<T>(ctx: HostContext, key: string): T | undefined {
   return undefined;
 }
 
-/** Nombres de todos los servicios montados, según el registro de cordis. */
+/**
+ * Nombres de todos los servicios montados.
+ *
+ * El registro de cordis (`ctx.reflect.store`) se indexa por **símbolos**, no por
+ * cadenas: `Object.keys()` siempre devuelve vacío. Cada entrada es un `Impl` con
+ * su `name`, que es el identificador del servicio.
+ */
 export function serviceNames(ctx: HostContext): string[] {
-  // `ctx.reflect` no es accesible como propiedad si no está inyectado; el proxy
-  // sí lo resuelve. Se prueban las dos vías, igual que con cualquier servicio.
   const reflect =
-    service<{ store?: Record<string, unknown> }>(ctx, 'reflect') ??
-    (ctx.reflect as { store?: Record<string, unknown> } | undefined);
+    (ctx.reflect as { store?: Record<symbol, { name?: string }> } | undefined) ??
+    service<{ store?: Record<symbol, { name?: string }> }>(ctx, 'reflect');
 
   try {
     const store = reflect?.store;
-    return store ? Object.keys(store) : [];
+    if (!store) return [];
+
+    return Object.getOwnPropertySymbols(store)
+      .map((symbol) => store[symbol]?.name)
+      .filter((name): name is string => typeof name === 'string')
+      .sort();
   } catch {
     return [];
   }
