@@ -227,6 +227,110 @@ describe('contrato sobre WebSocket', () => {
   });
 });
 
+describe('listado de sesiones sobre el WebSocket', () => {
+  it('entrega las sesiones a un dispositivo emparejado', async () => {
+    const persistence = new MemoryPersistence();
+    const registry = new DeviceRegistry({ persistence });
+    const { token } = registry.enroll('Pixel', 'android');
+
+    const server = await startCompanionServer({
+      pairing: new PairingService(),
+      devices: registry,
+      port: 0,
+      listSessions: () =>
+        Promise.resolve([
+          {
+            id: 'session-uno',
+            title: 'Primera',
+            updatedAt: 1_700_000_000_000,
+            seq: 12,
+            agentAvailable: true,
+            running: false,
+            pendingQuestions: 0,
+          },
+        ]),
+    });
+
+    try {
+      const socket = new WebSocket(`ws://127.0.0.1:${server.port}${WEBSOCKET_PATH}`);
+      const messages: Record<string, unknown>[] = [];
+      socket.on('message', (data: Buffer) => {
+        const parsed = parseServerMessage(data.toString('utf8'));
+        if (parsed) messages.push(parsed as Record<string, unknown>);
+      });
+      await once(socket, 'open');
+
+      socket.send(
+        JSON.stringify({
+          v: PROTOCOL_VERSION,
+          id: 'h',
+          at: Date.now(),
+          type: 'hello',
+          proto: 1,
+          deviceToken: token,
+        }),
+      );
+      socket.send(
+        JSON.stringify({ v: PROTOCOL_VERSION, id: 'l', at: Date.now(), type: 'sessions.list' }),
+      );
+
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      socket.close();
+
+      const listing = messages.find((message) => message['type'] === 'sessions.ok');
+      expect(listing).toBeDefined();
+      const sessions = listing?.['sessions'] as Array<Record<string, unknown>>;
+      expect(sessions).toHaveLength(1);
+      expect(sessions[0]).toMatchObject({ id: 'session-uno', title: 'Primera', state: 'idle' });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('devuelve una lista vacía si el host no tiene fuente de sesiones', async () => {
+    const persistence = new MemoryPersistence();
+    const registry = new DeviceRegistry({ persistence });
+    const { token } = registry.enroll('Pixel', 'android');
+
+    const server = await startCompanionServer({
+      pairing: new PairingService(),
+      devices: registry,
+      port: 0,
+    });
+
+    try {
+      const socket = new WebSocket(`ws://127.0.0.1:${server.port}${WEBSOCKET_PATH}`);
+      const messages: Record<string, unknown>[] = [];
+      socket.on('message', (data: Buffer) => {
+        const parsed = parseServerMessage(data.toString('utf8'));
+        if (parsed) messages.push(parsed as Record<string, unknown>);
+      });
+      await once(socket, 'open');
+      socket.send(
+        JSON.stringify({
+          v: PROTOCOL_VERSION,
+          id: 'h',
+          at: Date.now(),
+          type: 'hello',
+          proto: 1,
+          deviceToken: token,
+        }),
+      );
+      socket.send(
+        JSON.stringify({ v: PROTOCOL_VERSION, id: 'l', at: Date.now(), type: 'sessions.list' }),
+      );
+
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      socket.close();
+
+      const listing = messages.find((message) => message['type'] === 'sessions.ok');
+      expect(listing?.['sessions']).toEqual([]);
+    } finally {
+      await server.close();
+    }
+  });
+});
+
 describe('emparejamiento de punta a punta', () => {
   it('canjea el código, entrega el token y autentica con él', async () => {
     const client = await openClient();
