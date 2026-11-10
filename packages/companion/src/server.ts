@@ -20,6 +20,7 @@ import type { Device, DeviceRegistry } from './core/devices.js';
 import type { PairingService } from './core/pairing.js';
 import { log } from './log.js';
 import type { ProbeReport } from './probe.js';
+import { serveStatic } from './routes/static.js';
 
 /**
  * Listener propio del plugin.
@@ -43,6 +44,8 @@ export interface ServerDeps {
   publicUrl?: string;
   capabilities?: Capability[];
   report?: () => ProbeReport;
+  /** Raíz de la PWA compilada. Sin ella el host sirve solo la API. */
+  webRoot?: string;
 }
 
 export interface RunningServer {
@@ -182,6 +185,14 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
           res.writeHead(500, json);
           res.end(JSON.stringify({ error: 'qr-failed' }));
         });
+      return;
+    }
+
+    // La PWA va al final: las rutas de la API mandan sobre los archivos.
+    const asset = serveStatic(deps.webRoot, url);
+    if (asset.status === 200 && asset.body) {
+      res.writeHead(200, asset.headers);
+      res.end(asset.body);
       return;
     }
 
