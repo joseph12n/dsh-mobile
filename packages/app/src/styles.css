@@ -5,6 +5,8 @@
   --text: #e6edf3;
   --muted: #8b9bab;
   --accent: #4ade80;
+  --warn: #fbbf24;
+  --danger: #f87171;
   color-scheme: dark;
 }
 
@@ -32,15 +34,16 @@ body {
   display: flex;
 }
 
+/* Respeta el notch y la barra inferior del teléfono. */
 .shell {
   flex: 1;
   display: flex;
   flex-direction: column;
   gap: 20px;
-  /* Respeta el notch y la barra inferior del teléfono. */
   padding: max(24px, env(safe-area-inset-top)) 20px max(24px, env(safe-area-inset-bottom));
   max-width: 640px;
   margin: 0 auto;
+  width: 100%;
 }
 
 .head h1 {
@@ -52,6 +55,16 @@ body {
 .muted {
   color: var(--muted);
   font-size: 14px;
+}
+
+.small {
+  font-size: 12px;
+}
+
+.error {
+  color: var(--danger);
+  font-size: 14px;
+  margin: 12px 0 0;
 }
 
 .head p {
@@ -76,6 +89,41 @@ body {
   color: var(--muted);
 }
 
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.row h2 {
+  margin: 0;
+}
+
+.field {
+  display: block;
+  margin-bottom: 14px;
+}
+
+.field span {
+  display: block;
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+.field input {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: #0e141b;
+  color: var(--text);
+  font-size: 16px; /* 16px evita el zoom automático en iOS */
+}
+
 button {
   /* Objetivo táctil de 44 px, el mínimo cómodo en móvil. */
   min-height: 44px;
@@ -92,6 +140,79 @@ button {
 button:disabled {
   background: var(--line);
   color: var(--muted);
+}
+
+button.ghost {
+  background: transparent;
+  color: var(--text);
+  border-color: var(--line);
+  font-weight: 500;
+  width: auto;
+  padding: 8px 14px;
+  font-size: 14px;
+}
+
+.sessions {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sessions li {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #0e141b;
+}
+
+.session-main {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.session-title {
+  font-size: 15px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-meta {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.badge {
+  font-size: 12px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+
+.badge.working {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+.badge.waiting {
+  color: var(--warn);
+  border-color: color-mix(in srgb, var(--warn) 40%, transparent);
+}
+
+.badge.error {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 40%, transparent);
 }
 
 .foot {
