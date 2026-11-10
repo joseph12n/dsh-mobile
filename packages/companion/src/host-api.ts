@@ -114,8 +114,14 @@ export function service<T>(ctx: HostContext, key: string): T | undefined {
 
 /** Nombres de todos los servicios montados, según el registro de cordis. */
 export function serviceNames(ctx: HostContext): string[] {
+  // `ctx.reflect` no es accesible como propiedad si no está inyectado; el proxy
+  // sí lo resuelve. Se prueban las dos vías, igual que con cualquier servicio.
+  const reflect =
+    service<{ store?: Record<string, unknown> }>(ctx, 'reflect') ??
+    (ctx.reflect as { store?: Record<string, unknown> } | undefined);
+
   try {
-    const store = ctx.reflect?.store;
+    const store = reflect?.store;
     return store ? Object.keys(store) : [];
   } catch {
     return [];
