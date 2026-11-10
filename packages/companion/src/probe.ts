@@ -195,11 +195,10 @@ export function reportToText(report: ProbeReport): string {
   lines.push(`Servicios montados: ${report.serviceNames.length}`);
   lines.push('');
 
-  for (const session of report.sessions) {
-    lines.push(
-      `Sesión ${session.id} · mensajes=${session.messageCount ?? '?'} · asOfSeq=${session.asOfSeq ?? '?'}`,
-    );
-    lines.push(`  userQuestions: ${summarize(session.pendingQuestions)}`);
+  for (const [index, session] of report.sessions.entries()) {
+    lines.push(`${index + 1}) ${session.id}`);
+    lines.push(`   mensajes=${session.messageCount ?? '?'} · asOfSeq=${session.asOfSeq ?? '?'}`);
+    lines.push(`   userQuestions: ${summarize(session.pendingQuestions)}`);
   }
 
   lines.push('');
@@ -212,6 +211,11 @@ export function reportToText(report: ProbeReport): string {
   lines.push('Candidatos de inyección de texto:');
   for (const [key, value] of Object.entries(report.injectionCandidates)) {
     lines.push(`  ${key}: ${value}`);
+  }
+
+  if (report.sessions.length > 0) {
+    lines.push('');
+    lines.push('Para inyectar en una: /mobile-say <número> <texto>');
   }
 
   return lines.join('\n');
