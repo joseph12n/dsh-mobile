@@ -14,6 +14,8 @@ import {
   type Capability,
   type DeviceInfo,
   type HostInfo,
+  type QuestionAnswerItem,
+  type QuestionBatch,
   type ServerMessage,
 } from '@dsh-mobile/protocol';
 import type { Device, DeviceRegistry } from './core/devices.js';
@@ -49,6 +51,14 @@ export interface ServerDeps {
   webRoot?: string;
   /** Fuente de sesiones. Sin ella `sessions.list` devuelve una lista vacía. */
   listSessions?: () => Promise<SessionRecord[]>;
+  /** Lotes de preguntas pendientes. Se empujan tras listar sesiones. */
+  listQuestions?: () => QuestionBatch[];
+  /** Responde un lote. Sin ella `question.answer` no está disponible. */
+  answerQuestion?: (input: {
+    callId: string;
+    sessionId: string;
+    answers: QuestionAnswerItem[];
+  }) => { ok: boolean; code?: 'not-found' | 'bad-request' | 'internal'; message?: string };
 }
 
 export interface RunningServer {
@@ -358,6 +368,57 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
           at: Date.now(),
           type: 'sessions.ok',
           sessions: records.map(toWireSession),
+        });
+
+        // Las preguntas pendientes viajan justo detrás: el cliente no tiene que
+        // pedirlas aparte y nunca ve una sesión marcada "en espera" sin saber
+        // qué se está esperando.
+        for (const batch of deps.listQuestions?.() ?? []) {
+          if (socket.readyState !== socket.OPEN) return;
+          send(socket, {
+            v: PROTOCOL_VERSION,
+            id: newMessageId(),
+            at: Date.now(),
+            type: 'question.pending',
+            question: batch,
+          });
+        }
+        return;
+      }
+
+      if (message.type === 'question.answer') {
+        if (!deps.answerQuestion) {
+          send(
+            socket,
+            errorMessage(message.id, 'bad-request', 'Este host no puede responder preguntas.'),
+          );
+          return;
+        }
+
+        const outcome = deps.answerQuestion({
+          callId: message.callId,
+          sessionId: message.sessionId,
+          answers: message.answers,
+        });
+
+        if (!outcome.ok) {
+          send(
+            socket,
+            errorMessage(
+              message.id,
+              outcome.code ?? 'internal',
+              outcome.message ?? 'No pude responder.',
+            ),
+          );
+          return;
+        }
+
+        send(socket, {
+          v: PROTOCOL_VERSION,
+          id: message.id,
+          at: Date.now(),
+          type: 'answer.ok',
+          callId: message.callId,
         });
         return;
       }
