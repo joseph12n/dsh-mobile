@@ -21,6 +21,7 @@ import type { PairingService } from './core/pairing.js';
 import { log } from './log.js';
 import type { ProbeReport } from './probe.js';
 import { serveStatic } from './routes/static.js';
+import { toWireSession, type SessionRecord } from './dsh/session-source.js';
 
 /**
  * Listener propio del plugin.
@@ -46,6 +47,8 @@ export interface ServerDeps {
   report?: () => ProbeReport;
   /** Raíz de la PWA compilada. Sin ella el host sirve solo la API. */
   webRoot?: string;
+  /** Fuente de sesiones. Sin ella `sessions.list` devuelve una lista vacía. */
+  listSessions?: () => Promise<SessionRecord[]>;
 }
 
 export interface RunningServer {
@@ -217,6 +220,17 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
     log('conexión abierta');
 
     socket.on('message', (data: Buffer) => {
+      // El manejador es asíncrono porque hay consultas que lo son. Cualquier
+      // fallo se responde como `internal` en vez de cerrar el socket.
+      void handleFrame(data).catch((error: unknown) => {
+        log(`marco fallido: ${String(error)}`);
+        if (socket.readyState === socket.OPEN) {
+          send(socket, errorMessage(newMessageId(), 'internal', 'Fallo interno del host.'));
+        }
+      });
+    });
+
+    async function handleFrame(data: Buffer): Promise<void> {
       // Límite por ventana de un minuto, contra un cliente defectuoso.
       const now = Date.now();
       if (now - connection.windowStart > 60_000) {
@@ -334,6 +348,20 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
         return;
       }
 
+      if (message.type === 'sessions.list') {
+        const records = deps.listSessions ? await deps.listSessions() : [];
+        if (socket.readyState !== socket.OPEN) return;
+
+        send(socket, {
+          v: PROTOCOL_VERSION,
+          id: message.id,
+          at: Date.now(),
+          type: 'sessions.ok',
+          sessions: records.map(toWireSession),
+        });
+        return;
+      }
+
       send(
         socket,
         errorMessage(
@@ -342,7 +370,7 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
           `${message.type} todavía no está implementado en este build.`,
         ),
       );
-    });
+    }
 
     socket.on('error', (error: Error) => log(`error de WebSocket: ${error.message}`));
     socket.on('close', () => log('conexión cerrada'));
