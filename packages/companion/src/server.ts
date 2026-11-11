@@ -13,6 +13,7 @@ import {
   parseClientMessage,
   type Capability,
   type DeviceInfo,
+  type HistoryEntry,
   type HostInfo,
   type QuestionAnswerItem,
   type QuestionBatch,
@@ -59,6 +60,18 @@ export interface ServerDeps {
     sessionId: string;
     answers: QuestionAnswerItem[];
   }) => { ok: boolean; code?: 'not-found' | 'bad-request' | 'internal'; message?: string };
+  /** Una página de historial de la sesión. */
+  readHistory?: (
+    sessionId: string,
+    options: { before?: number; limit?: number },
+  ) => Promise<{ entries: HistoryEntry[]; hasMore: boolean }>;
+  /** Se suscribe a los eventos de una sesión y los empuja al cliente. */
+  subscribeSession?: (
+    sessionId: string,
+    options: { since?: number; onEvent: (entry: HistoryEntry) => void; onEnd?: () => void },
+  ) => { stop(): void };
+  /** Cancela el turno en curso. */
+  cancelRun?: (sessionId: string) => boolean;
 }
 
 export interface RunningServer {
@@ -228,6 +241,9 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
     };
 
     log('conexión abierta');
+
+    // Suscripciones vivas de esta conexión, para cortarlas al cerrar el socket.
+    const subscriptions = new Map<string, { stop(): void }>();
 
     socket.on('message', (data: Buffer) => {
       // El manejador es asíncrono porque hay consultas que lo son. Cualquier
@@ -423,6 +439,89 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
         return;
       }
 
+      if (message.type === 'session.history') {
+        const page = deps.readHistory
+          ? await deps.readHistory(message.sessionId, {
+              ...(message.before !== undefined ? { before: message.before } : {}),
+              ...(message.limit !== undefined ? { limit: message.limit } : {}),
+            })
+          : { entries: [], hasMore: false };
+
+        if (socket.readyState !== socket.OPEN) return;
+        send(socket, {
+          v: PROTOCOL_VERSION,
+          id: message.id,
+          at: Date.now(),
+          type: 'history.ok',
+          sessionId: message.sessionId,
+          entries: page.entries,
+          hasMore: page.hasMore,
+        });
+        return;
+      }
+
+      if (message.type === 'session.subscribe') {
+        if (!deps.subscribeSession) {
+          send(
+            socket,
+            errorMessage(message.id, 'bad-request', 'Este host no puede suscribir sesiones.'),
+          );
+          return;
+        }
+
+        // Una suscripción por sesión y conexión: volver a pedirla no acumula.
+        subscriptions.get(message.sessionId)?.stop();
+
+        const subscription = deps.subscribeSession(message.sessionId, {
+          ...(message.since !== undefined ? { since: message.since } : {}),
+          onEvent: (entry) => {
+            if (socket.readyState !== socket.OPEN) return;
+            send(socket, {
+              v: PROTOCOL_VERSION,
+              id: newMessageId(),
+              at: Date.now(),
+              type: 'session.event',
+              sessionId: message.sessionId,
+              seq: entry.seq,
+              event: entry.event,
+            });
+          },
+          onEnd: () => subscriptions.delete(message.sessionId),
+        });
+
+        subscriptions.set(message.sessionId, subscription);
+
+        send(socket, {
+          v: PROTOCOL_VERSION,
+          id: message.id,
+          at: Date.now(),
+          type: 'session.ok',
+          sessionId: message.sessionId,
+          seq: message.since ?? 0,
+        });
+        return;
+      }
+
+      if (message.type === 'run.cancel') {
+        const accepted = deps.cancelRun?.(message.sessionId) ?? false;
+        if (!accepted) {
+          send(
+            socket,
+            errorMessage(message.id, 'not-found', 'No hay ningún turno en curso en esa sesión.'),
+          );
+          return;
+        }
+        send(socket, {
+          v: PROTOCOL_VERSION,
+          id: message.id,
+          at: Date.now(),
+          type: 'run.ok',
+          sessionId: message.sessionId,
+          state: 'idle',
+        });
+        return;
+      }
+
       send(
         socket,
         errorMessage(
@@ -434,7 +533,11 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
     }
 
     socket.on('error', (error: Error) => log(`error de WebSocket: ${error.message}`));
-    socket.on('close', () => log('conexión cerrada'));
+    socket.on('close', () => {
+      for (const [, subscription] of subscriptions) subscription.stop();
+      subscriptions.clear();
+      log('conexión cerrada');
+    });
   });
 
   return new Promise<RunningServer>((resolve, reject) => {
