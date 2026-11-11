@@ -81,6 +81,7 @@ const server = await startCompanionServer({
     return { stop: () => undefined };
   },
   cancelRun: () => true,
+  sendReply: async () => ({ ok: true }),
 });
 
 const base = `http://127.0.0.1:${server.port}`;
@@ -229,6 +230,18 @@ const cancelled = await collect(
 check(
   'la cancelación se confirma',
   cancelled.some((message) => message.type === 'run.ok'),
+);
+
+const written = await collect(
+  [
+    msg('hello', { proto: V, deviceToken: token }),
+    msg('reply.send', { sessionId: 'demo-1', text: 'hola desde el humo' }),
+  ],
+  ['reply.ok'],
+);
+check(
+  'el texto enviado se confirma',
+  written.some((message) => message.type === 'reply.ok'),
 );
 
 await server.close();

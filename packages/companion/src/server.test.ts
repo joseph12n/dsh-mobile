@@ -607,6 +607,77 @@ describe('transcripción sobre el WebSocket', () => {
       expect(response['code']).toBe('not-found');
     });
   });
+
+  it('confirma el texto enviado a la sesión', async () => {
+    const registry = new DeviceRegistry({ persistence: new MemoryPersistence() });
+    const { token } = registry.enroll('Pixel', 'android');
+    const sent: Array<{ sessionId: string; text: string }> = [];
+
+    const server = await startCompanionServer({
+      pairing: new PairingService(),
+      devices: registry,
+      port: 0,
+      sendReply: (sessionId, text) => {
+        sent.push({ sessionId, text });
+        return Promise.resolve({ ok: true });
+      },
+    });
+
+    try {
+      const client = await openClient(server.port);
+      client.send(hello({ deviceToken: token }));
+      await client.next();
+      client.send({
+        v: PROTOCOL_VERSION,
+        id: 'r',
+        at: Date.now(),
+        type: 'reply.send',
+        sessionId: 'session-uno',
+        text: 'hola desde el móvil',
+      });
+
+      const response = await client.next();
+      expect(response['type']).toBe('reply.ok');
+      expect(response['sessionId']).toBe('session-uno');
+      expect(sent).toEqual([{ sessionId: 'session-uno', text: 'hola desde el móvil' }]);
+      client.close();
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('traduce el fallo al escribir en un error de contrato', async () => {
+    const registry = new DeviceRegistry({ persistence: new MemoryPersistence() });
+    const { token } = registry.enroll('Pixel', 'android');
+
+    const server = await startCompanionServer({
+      pairing: new PairingService(),
+      devices: registry,
+      port: 0,
+      sendReply: () =>
+        Promise.resolve({ ok: false, code: 'bad-request' as const, message: 'vacío' }),
+    });
+
+    try {
+      const client = await openClient(server.port);
+      client.send(hello({ deviceToken: token }));
+      await client.next();
+      client.send({
+        v: PROTOCOL_VERSION,
+        id: 'r',
+        at: Date.now(),
+        type: 'reply.send',
+        sessionId: 'session-uno',
+        text: 'algo',
+      });
+      const response = await client.next();
+      expect(response['type']).toBe('error');
+      expect(response['code']).toBe('bad-request');
+      client.close();
+    } finally {
+      await server.close();
+    }
+  });
 });
 
 describe('emparejamiento de punta a punta', () => {
