@@ -5,6 +5,7 @@ import {
   parseServerMessage,
   type ClientMessage,
   type DeviceInfo,
+  type HistoryEntry,
   type HostInfo,
   type QuestionAnswerItem,
   type ServerMessage,
@@ -152,6 +153,40 @@ export class CompanionClient {
   /** Responde un lote completo. El host rechaza un lote parcial. */
   async answer(callId: string, sessionId: string, answers: QuestionAnswerItem[]): Promise<void> {
     const response = await this.#request({ type: 'question.answer', callId, sessionId, answers });
+    if (response.type === 'error') throw new Error(response.message);
+  }
+
+  /** Página de historial. Sin `before`, la más reciente. */
+  async history(
+    sessionId: string,
+    options: { before?: number; limit?: number } = {},
+  ): Promise<{ entries: HistoryEntry[]; hasMore: boolean }> {
+    const response = await this.#request({
+      type: 'session.history',
+      sessionId,
+      ...(options.before !== undefined ? { before: options.before } : {}),
+      ...(options.limit !== undefined ? { limit: options.limit } : {}),
+    });
+    if (response.type === 'error') throw new Error(response.message);
+    return response.type === 'history.ok'
+      ? { entries: response.entries, hasMore: response.hasMore }
+      : { entries: [], hasMore: false };
+  }
+
+  /** Se suscribe a los eventos de una sesión. Los eventos llegan por `onPush`. */
+  async subscribe(sessionId: string, since?: number): Promise<number> {
+    const response = await this.#request({
+      type: 'session.subscribe',
+      sessionId,
+      ...(since !== undefined ? { since } : {}),
+    });
+    if (response.type === 'error') throw new Error(response.message);
+    return response.type === 'session.ok' ? response.seq : 0;
+  }
+
+  /** Cancela el turno en curso. */
+  async cancel(sessionId: string): Promise<void> {
+    const response = await this.#request({ type: 'run.cancel', sessionId });
     if (response.type === 'error') throw new Error(response.message);
   }
 

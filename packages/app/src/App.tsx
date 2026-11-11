@@ -3,6 +3,7 @@ import {
   PROTOCOL_NAME,
   PROTOCOL_VERSION,
   parsePairingUrl,
+  type HistoryEntry,
   type HostInfo,
   type QuestionAnswerItem,
   type QuestionBatch,
@@ -11,6 +12,7 @@ import {
 import { CompanionClient, endpointFromLocation, normalizeEndpoint } from './lib/connection.js';
 import { storage } from './lib/storage.js';
 import { QuestionsCard } from './components/Questions.js';
+import { SessionView } from './components/SessionView.js';
 
 type View =
   | { kind: 'checking' }
@@ -44,6 +46,10 @@ export function App() {
   const [code, setCode] = useState('');
   const [endpointInput, setEndpointInput] = useState('');
   const [questions, setQuestions] = useState<QuestionBatch[]>([]);
+  const [openSession, setOpenSession] = useState<SessionSummary | undefined>(undefined);
+  const [entries, setEntries] = useState<HistoryEntry[]>([]);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(false);
 
   const client = useMemo(() => ({ current: undefined as CompanionClient | undefined }), []);
 
@@ -66,6 +72,13 @@ export function App() {
           ]);
         } else if (message.type === 'question.settled') {
           setQuestions((previous) => previous.filter((batch) => batch.callId !== message.callId));
+        } else if (message.type === 'session.event') {
+          setEntries((previous) =>
+            // Fusiona por `seq`: un evento repetido tras reconectar no se pinta dos veces.
+            previous.some((entry) => entry.seq === message.seq)
+              ? previous
+              : [...previous, { seq: message.seq, at: message.at, event: message.event }],
+          );
         }
       });
 
@@ -105,6 +118,63 @@ export function App() {
     },
     [client],
   );
+
+  /** Abre una sesión: historial y flujo de eventos. */
+  const open = useCallback(
+    async (session: SessionSummary) => {
+      const connection = client.current;
+      if (!connection) return;
+
+      setOpenSession(session);
+      setEntries([]);
+      setHasMore(false);
+      setLoadingHistory(true);
+
+      try {
+        const page = await connection.history(session.id, { limit: 40 });
+        setEntries([...page.entries].sort((a, b) => a.seq - b.seq));
+        setHasMore(page.hasMore);
+        await connection.subscribe(session.id, session.seq);
+      } catch (error) {
+        setView({ kind: 'error', endpoint: connection.url, message: messageOf(error) });
+      } finally {
+        setLoadingHistory(false);
+      }
+    },
+    [client],
+  );
+
+  /** Página anterior del historial. */
+  const loadMore = useCallback(async () => {
+    const connection = client.current;
+    if (!connection || !openSession || entries.length === 0) return;
+
+    setLoadingHistory(true);
+    try {
+      const oldest = entries[0]!.seq;
+      const page = await connection.history(openSession.id, { before: oldest, limit: 40 });
+      setEntries((previous) =>
+        [...page.entries, ...previous]
+          .filter((entry, index, all) => all.findIndex((item) => item.seq === entry.seq) === index)
+          .sort((a, b) => a.seq - b.seq),
+      );
+      setHasMore(page.hasMore);
+    } catch {
+      setHasMore(false);
+    } finally {
+      setLoadingHistory(false);
+    }
+  }, [client, openSession, entries]);
+
+  const stop = useCallback(async () => {
+    const connection = client.current;
+    if (!connection || !openSession) return;
+    try {
+      await connection.cancel(openSession.id);
+    } catch (error) {
+      setView({ kind: 'error', endpoint: connection.url, message: messageOf(error) });
+    }
+  }, [client, openSession]);
 
   // Arranque: un enlace de emparejamiento manda sobre todo lo demás.
   useEffect(() => {
@@ -228,42 +298,68 @@ export function App() {
             onSubmit={(callId, sessionId, answers) => void answer(callId, sessionId, answers)}
           />
 
-          <section className="card">
-            <div className="row">
-              <h2>Sesiones</h2>
-              <button type="button" className="ghost" onClick={() => void refresh()}>
-                Actualizar
-              </button>
-            </div>
+          {openSession ? (
+            <SessionView
+              session={openSession}
+              entries={entries}
+              hasMore={hasMore}
+              loading={loadingHistory}
+              onBack={() => {
+                setOpenSession(undefined);
+                setEntries([]);
+              }}
+              onLoadMore={() => void loadMore()}
+              onCancel={() => void stop()}
+            />
+          ) : (
+            <section className="card">
+              <div className="row">
+                <h2>Sesiones</h2>
+                <button type="button" className="ghost" onClick={() => void refresh()}>
+                  Actualizar
+                </button>
+              </div>
 
-            {view.sessions.length === 0 ? (
-              <p className="muted">No hay sesiones vivas en el host.</p>
-            ) : (
-              <ul className="sessions">
-                {view.sessions.map((session) => (
-                  <li key={session.id}>
-                    <div className="session-main">
-                      <span className="session-title">{session.title}</span>
-                      <span className="muted small">{relativeTime(session.updatedAt)}</span>
-                    </div>
-                    <div className="session-meta">
-                      <span className={`badge ${session.state}`}>{STATE_LABEL[session.state]}</span>
-                      {session.pendingQuestions > 0 && (
-                        <span className="badge waiting">
-                          {session.pendingQuestions} pregunta
-                          {session.pendingQuestions > 1 ? 's' : ''}
+              {view.sessions.length === 0 ? (
+                <p className="muted">No hay sesiones vivas en el host.</p>
+              ) : (
+                <ul className="sessions">
+                  {view.sessions.map((session) => (
+                    <li
+                      key={session.id}
+                      className="session-row"
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => void open(session)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') void open(session);
+                      }}
+                    >
+                      <div className="session-main">
+                        <span className="session-title">{session.title}</span>
+                        <span className="muted small">{relativeTime(session.updatedAt)}</span>
+                      </div>
+                      <div className="session-meta">
+                        <span className={`badge ${session.state}`}>
+                          {STATE_LABEL[session.state]}
                         </span>
-                      )}
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
+                        {session.pendingQuestions > 0 && (
+                          <span className="badge waiting">
+                            {session.pendingQuestions} pregunta
+                            {session.pendingQuestions > 1 ? 's' : ''}
+                          </span>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
 
-            <button type="button" className="ghost" onClick={forget}>
-              Olvidar este dispositivo
-            </button>
-          </section>
+              <button type="button" className="ghost" onClick={forget}>
+                Olvidar este dispositivo
+              </button>
+            </section>
+          )}
         </>
       )}
 
