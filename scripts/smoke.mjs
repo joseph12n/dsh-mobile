@@ -62,6 +62,25 @@ const server = await startCompanionServer({
     },
   ],
   answerQuestion: () => ({ ok: true }),
+  readHistory: async () => ({
+    entries: [
+      { seq: 4, at: 1_700_000_000_000, event: { kind: 'message', role: 'user', text: 'hola' } },
+    ],
+    hasMore: false,
+  }),
+  subscribeSession: (_sessionId, options) => {
+    setTimeout(
+      () =>
+        options.onEvent({
+          seq: 5,
+          at: 1_700_000_000_500,
+          event: { kind: 'state', state: 'working' },
+        }),
+      10,
+    );
+    return { stop: () => undefined };
+  },
+  cancelRun: () => true,
 });
 
 const base = `http://127.0.0.1:${server.port}`;
@@ -178,6 +197,38 @@ const answered = await collect(
 check(
   'la respuesta se confirma',
   answered.find((message) => message.type === 'answer.ok')?.callId === 'call-demo',
+);
+
+const history = await collect(
+  [msg('hello', { proto: V, deviceToken: token }), msg('session.history', { sessionId: 'demo-1' })],
+  ['history.ok'],
+);
+const page = history.find((message) => message.type === 'history.ok');
+check('el historial llega con su página', page?.entries?.length === 1 && page.hasMore === false);
+
+const streamed = await collect(
+  [
+    msg('hello', { proto: V, deviceToken: token }),
+    msg('session.subscribe', { sessionId: 'demo-1', since: 0 }),
+  ],
+  ['session.ok', 'session.event'],
+);
+check(
+  'la suscripción confirma',
+  streamed.some((message) => message.type === 'session.ok'),
+);
+check(
+  'y empuja eventos vivos',
+  streamed.find((message) => message.type === 'session.event')?.seq === 5,
+);
+
+const cancelled = await collect(
+  [msg('hello', { proto: V, deviceToken: token }), msg('run.cancel', { sessionId: 'demo-1' })],
+  ['run.ok'],
+);
+check(
+  'la cancelación se confirma',
+  cancelled.some((message) => message.type === 'run.ok'),
 );
 
 await server.close();
