@@ -24,6 +24,12 @@ import type { PairingService } from './core/pairing.js';
 import { log } from './log.js';
 import type { ProbeReport } from './probe.js';
 import { serveStatic } from './routes/static.js';
+import {
+  noticeHeadline,
+  originNotice,
+  publicOriginFor,
+  type OriginNotice,
+} from './routes/origin.js';
 import { toWireSession, type SessionRecord } from './dsh/session-source.js';
 
 /**
@@ -131,7 +137,17 @@ function escapeHtml(value: string): string {
 }
 
 /** Página de emparejamiento: muestra el QR y el código por si hay que teclearlo. */
-function pairingPage(link: string, code: string, expiresAt: number, qrDataUrl: string): string {
+function pairingPage(
+  link: string,
+  code: string,
+  expiresAt: number,
+  qrDataUrl: string,
+  notice?: OriginNotice,
+): string {
+  const banner = notice
+    ? `<div class="warn ${notice.severity}"><strong>${escapeHtml(noticeHeadline(notice))}</strong><br>${escapeHtml(notice.message)}</div>`
+    : '';
+
   return `<!doctype html>
 <html lang="es">
 <meta charset="utf-8">
@@ -141,20 +157,25 @@ function pairingPage(link: string, code: string, expiresAt: number, qrDataUrl: s
   :root { color-scheme: dark; }
   body { margin:0; min-height:100dvh; display:grid; place-items:center; background:#0b0f14; color:#e6edf3;
          font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
-  main { text-align:center; padding:32px 24px; }
+  main { text-align:center; padding:32px 24px; max-width:560px; }
   h1 { font-size:20px; margin:0 0 8px; }
   p { color:#8b9bab; margin:0 0 24px; font-size:14px; }
+  .warn { text-align:left; margin:0 0 20px; padding:12px 14px; border-radius:12px;
+          border:1px solid #7f1d1d; background:#1f1013; color:#fca5a5; font-size:13px; line-height:1.5; }
+  .warn.warning { border-color:#78350f; background:#1c1508; color:#fcd34d; }
   img { width:min(320px,80vw); height:auto; background:#fff; border-radius:16px; padding:12px; }
   code { display:block; margin:20px auto 0; font-size:15px; letter-spacing:2px; color:#4ade80; word-break:break-all; }
   small { display:block; margin-top:12px; color:#8b9bab; }
+  small.link { word-break:break-all; }
 </style>
 <main>
+  ${banner}
   <h1>Emparejar DSH Mobile</h1>
   <p>Escanea este código con la cámara del teléfono.</p>
   <img src="${qrDataUrl}" alt="Código QR de emparejamiento">
   <code>${escapeHtml(code)}</code>
   <small>Caduca a las ${escapeHtml(new Date(expiresAt).toLocaleTimeString())} · un solo uso</small>
-  <small>${escapeHtml(link)}</small>
+  <small class="link">${escapeHtml(link)}</small>
 </main>
 </html>`;
 }
@@ -174,13 +195,27 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
 
   // Se conoce al escuchar; mientras tanto vale el puerto pedido.
   let listeningPort = requestedPort;
-  const publicOrigin = (): string => deps.publicUrl ?? `http://${HOST}:${listeningPort}`;
+
+  /** Dirección por la que entró la petición: es la que el teléfono debe usar. */
+  const originFor = (req: IncomingMessage): string =>
+    publicOriginFor({
+      host: req.headers.host,
+      forwardedProto: req.headers['x-forwarded-proto'] as string | undefined,
+      fallbackPort: listeningPort,
+      configured: deps.publicUrl,
+    });
+
+  /** Dirección del listener tal como la conoce el proceso; para logs y arranque. */
+  const localOrigin = (): string => deps.publicUrl ?? `http://${HOST}:${listeningPort}`;
 
   const http: Server = createServer((req: IncomingMessage, res: ServerResponse) => {
     const url = req.url ?? '/';
     const json = { 'content-type': 'application/json; charset=utf-8' };
 
     if (url === '/health') {
+      const origin = originFor(req);
+      const notice = originNotice(origin);
+
       res.writeHead(200, json);
       res.end(
         JSON.stringify({
@@ -189,6 +224,10 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
           proto: PROTOCOL_VERSION,
           capabilities,
           devices: devices.list().length,
+          // Diagnóstico: si abres esto desde la dirección que usará el teléfono,
+          // el aviso tiene que desaparecer.
+          origin,
+          ...(notice ? { warning: notice.message, warningSeverity: notice.severity } : {}),
         }),
       );
       return;
@@ -201,21 +240,32 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
     }
 
     if (url === '/pair') {
-      // Reutiliza el código vigente si lo hay: recargar la página no debe
-      // invalidar el QR que ya está en pantalla.
-      const existing = pairing.pending()[0] ?? pairing.issue();
-      const link = buildPairingUrl(publicOrigin(), existing.code);
+      // `Host` lo controla el cliente y aquí se construye una URL con él: un
+      // valor raro no puede tumbar la petición ni, sin manejador global, el
+      // proceso del host.
+      try {
+        // Reutiliza el código vigente si lo hay: recargar la página no debe
+        // invalidar el QR que ya está en pantalla.
+        const existing = pairing.pending()[0] ?? pairing.issue();
+        const origin = originFor(req);
+        const link = buildPairingUrl(origin, existing.code);
+        const notice = originNotice(origin);
 
-      void QRCode.toDataURL(link, { margin: 1, width: 320, errorCorrectionLevel: 'M' })
-        .then((dataUrl) => {
-          res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-          res.end(pairingPage(link, existing.code, existing.expiresAt, dataUrl));
-        })
-        .catch((error: unknown) => {
-          log(`no pude generar el QR: ${String(error)}`);
-          res.writeHead(500, json);
-          res.end(JSON.stringify({ error: 'qr-failed' }));
-        });
+        void QRCode.toDataURL(link, { margin: 1, width: 320, errorCorrectionLevel: 'M' })
+          .then((dataUrl) => {
+            res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+            res.end(pairingPage(link, existing.code, existing.expiresAt, dataUrl, notice));
+          })
+          .catch((error: unknown) => {
+            log(`no pude generar el QR: ${String(error)}`);
+            res.writeHead(500, json);
+            res.end(JSON.stringify({ error: 'qr-failed' }));
+          });
+      } catch (error) {
+        log(`/pair falló: ${String(error)}`);
+        res.writeHead(400, json);
+        res.end(JSON.stringify({ error: 'bad-request' }));
+      }
       return;
     }
 
@@ -583,11 +633,11 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
       const address = http.address();
       listeningPort =
         typeof address === 'object' && address !== null ? address.port : requestedPort;
-      log(`listener escuchando en ${publicOrigin()} (ws ${WEBSOCKET_PATH})`);
+      log(`listener escuchando en ${localOrigin()} (ws ${WEBSOCKET_PATH})`);
 
       resolve({
         port: listeningPort,
-        publicUrl: publicOrigin(),
+        publicUrl: localOrigin(),
         async close() {
           for (const client of wss.clients) client.terminate();
           await new Promise<void>((done) => wss.close(() => done()));
