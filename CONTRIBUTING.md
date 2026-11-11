@@ -95,11 +95,66 @@ móvil se prueba en un teléfono.
 
 ## Commits y PR
 
-- Un cambio lógico por commit; mensaje en imperativo y en español
-  (`añade emparejamiento por QR`, no `añadido`).
+Este repositorio sigue **[Conventional Commits 1.0.0](https://www.conventionalcommits.org/en/v1.0.0/)**.
+Lo verifica `commitlint` en cada pull request, así que un mensaje fuera de formato rompe la CI.
+
+```
+<tipo>[alcance opcional]: <descripción>
+
+[cuerpo opcional, una línea en blanco después del asunto]
+
+[pies opcionales]
+```
+
+| Tipo       | Cuándo                                        |
+| ---------- | --------------------------------------------- |
+| `feat`     | Una funcionalidad nueva                       |
+| `fix`      | Un fallo corregido                            |
+| `docs`     | Solo documentación                            |
+| `test`     | Solo pruebas                                  |
+| `refactor` | Cambio interno sin cambio de comportamiento   |
+| `perf`     | Mejora de rendimiento                         |
+| `build`    | Dependencias o empaquetado                    |
+| `ci`       | Workflows y automatización                    |
+| `chore`    | Mantenimiento que no encaja en los anteriores |
+| `revert`   | Deshacer un commit anterior                   |
+
+Ejemplos reales de este repositorio:
+
+```
+feat(app): adopta la paleta y la tipografia reales de DeepSeek Harness
+fix(app): escribe el buffer de los iconos sin recodificar
+ci: ejecuta el humo y la comprobacion de iconos
+docs: alinea la documentacion sobre LAN y tailnet
+```
+
+Reglas del asunto:
+
+- **En español**, en imperativo («añade», no «añadido»), y el **tipo en inglés**.
+- Sin punto final. Como mucho 100 caracteres.
+- El alcance, entre paréntesis, dice la zona: `app`, `companion`, `protocol`, `docs`, `ci`.
+
+El cuerpo explica **por qué**, no qué. Si el cambio rompe compatibilidad, añade `!` después
+del tipo (`feat(protocol)!: ...`) y un pie `BREAKING CHANGE:` explicando qué se rompe y cómo
+migrar.
+
+Referencias al issue con un pie, no en el asunto:
+
+```
+fix(app): corrige la ruta de la PWA
+
+web-root calculaba la raiz del paquete un nivel de menos.
+
+Refs: #16
+```
+
+### PR
+
 - Un PR que cambie el contrato debe explicar la compatibilidad.
 - Si algo **no** está verificado, dilo en el PR. Se prefiere un "no lo he probado" a una
   afirmación por intuición.
+- Se fusiona con **squash**, así que el título del PR se convierte en el mensaje del commit:
+  tiene que cumplir la misma convención.
 
 ## Seguridad
 
