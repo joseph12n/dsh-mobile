@@ -104,6 +104,19 @@ check(
 );
 check('el manifest se revalida', manifest.headers.get('cache-control') === 'no-cache');
 
+const manifestJson = await manifest.json();
+const sizes = new Set(manifestJson.icons.map((icon) => icon.sizes));
+// Chromium exige estos dos tamaños en PNG para ofrecer el aviso de instalación.
+check('el manifest declara iconos de 192 y 512', sizes.has('192x192') && sizes.has('512x512'));
+
+for (const icon of manifestJson.icons.filter((entry) => entry.src.endsWith('.png'))) {
+  const response = await fetch(`${base}${icon.src}`);
+  check(
+    `el icono ${icon.src} se sirve`,
+    response.status === 200 && response.headers.get('content-type') === 'image/png',
+  );
+}
+
 const assetPath = indexHtml.match(/src="([^"]+\.js)"/)?.[1];
 if (assetPath) {
   const asset = await fetch(`${base}${assetPath}`);

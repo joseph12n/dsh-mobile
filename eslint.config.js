@@ -36,7 +36,7 @@ export default tseslint.config(
   },
   {
     // Scripts sueltos en Node: necesitan los globales del runtime.
-    files: ['scripts/**/*.mjs'],
+    files: ['scripts/**/*.mjs', '**/scripts/**/*.mjs'],
     languageOptions: {
       globals: {
         console: 'readonly',
