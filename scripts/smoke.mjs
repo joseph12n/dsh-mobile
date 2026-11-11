@@ -109,6 +109,19 @@ const sizes = new Set(manifestJson.icons.map((icon) => icon.sizes));
 // Chromium exige estos dos tamaños en PNG para ofrecer el aviso de instalación.
 check('el manifest declara iconos de 192 y 512', sizes.has('192x192') && sizes.has('512x512'));
 
+// No basta con el tamaño: sin `type: image/png` el navegador puede descartarlo.
+for (const size of ['192x192', '512x512']) {
+  const entry = manifestJson.icons.find((icon) => icon.sizes === size);
+  check(`el icono ${size} es PNG`, entry?.type === 'image/png' && entry.src.endsWith('.png'));
+}
+
+// Android recorta con formas arbitrarias: sin una variante maskable, el lanzador
+// mete el icono en un cuadrado blanco.
+check(
+  'hay una variante maskable',
+  manifestJson.icons.some((icon) => String(icon.purpose ?? '').includes('maskable')),
+);
+
 for (const icon of manifestJson.icons.filter((entry) => entry.src.endsWith('.png'))) {
   const response = await fetch(`${base}${icon.src}`);
   check(
@@ -116,6 +129,9 @@ for (const icon of manifestJson.icons.filter((entry) => entry.src.endsWith('.png
     response.status === 200 && response.headers.get('content-type') === 'image/png',
   );
 }
+
+// iOS no lee el manifest: lo referencia el HTML, y si falta, el icono no aparece.
+check('el apple-touch-icon se sirve', (await fetch(`${base}/apple-touch-icon.png`)).status === 200);
 
 const assetPath = indexHtml.match(/src="([^"]+\.js)"/)?.[1];
 if (assetPath) {
