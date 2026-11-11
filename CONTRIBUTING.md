@@ -111,6 +111,7 @@ Lo verifica `commitlint` en cada pull request, así que un mensaje fuera de form
 | `feat`     | Una funcionalidad nueva                       |
 | `fix`      | Un fallo corregido                            |
 | `docs`     | Solo documentación                            |
+| `style`    | Formato, sin cambio de comportamiento         |
 | `test`     | Solo pruebas                                  |
 | `refactor` | Cambio interno sin cambio de comportamiento   |
 | `perf`     | Mejora de rendimiento                         |
@@ -131,7 +132,8 @@ docs: alinea la documentacion sobre LAN y tailnet
 Reglas del asunto:
 
 - **En español**, en imperativo («añade», no «añadido»), y el **tipo en inglés**.
-- Sin punto final. Como mucho 100 caracteres.
+- Sin punto final. **La línea entera, prefijo incluido, no pasa de 100 caracteres**: es lo
+  que mide `header-max-length`. Si no cabe, acorta el asunto y explica en el cuerpo.
 - El alcance, entre paréntesis, dice la zona: `app`, `companion`, `protocol`, `docs`, `ci`.
 
 El cuerpo explica **por qué**, no qué. Si el cambio rompe compatibilidad, añade `!` después
@@ -153,8 +155,10 @@ Refs: #16
 - Un PR que cambie el contrato debe explicar la compatibilidad.
 - Si algo **no** está verificado, dilo en el PR. Se prefiere un "no lo he probado" a una
   afirmación por intuición.
-- Se fusiona con **squash**, así que el título del PR se convierte en el mensaje del commit:
-  tiene que cumplir la misma convención.
+- Se fusiona con **squash**, así que el título del PR se convierte en el mensaje del commit
+  y **se valida con las mismas reglas** que los commits (`commitlint` lo comprueba en un
+  paso aparte). Los commits ya fusionados con merge commit quedan como están: reescribir
+  historia publicada rompe más de lo que ordena.
 
 ## Seguridad
 
