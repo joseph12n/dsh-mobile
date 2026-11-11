@@ -460,6 +460,155 @@ describe('preguntas sobre el WebSocket', () => {
   });
 });
 
+describe('transcripción sobre el WebSocket', () => {
+  async function withTranscript(
+    deps: {
+      history?: (
+        sessionId: string,
+        options: { before?: number; limit?: number },
+      ) => Promise<{
+        entries: Array<{ seq: number; at: number; event: { kind: 'state'; state: 'idle' } }>;
+        hasMore: boolean;
+      }>;
+      subscribe?: (
+        sessionId: string,
+        options: { since?: number; onEvent: (e: never) => void; onEnd?: () => void },
+      ) => { stop(): void };
+      cancel?: (sessionId: string) => boolean;
+    },
+    run: (client: TestClient) => Promise<void>,
+  ): Promise<void> {
+    const registry = new DeviceRegistry({ persistence: new MemoryPersistence() });
+    const { token } = registry.enroll('Pixel', 'android');
+
+    const server = await startCompanionServer({
+      pairing: new PairingService(),
+      devices: registry,
+      port: 0,
+      ...(deps.history ? { readHistory: deps.history } : {}),
+      ...(deps.subscribe
+        ? {
+            subscribeSession: deps.subscribe as unknown as NonNullable<
+              Parameters<typeof startCompanionServer>[0]['subscribeSession']
+            >,
+          }
+        : {}),
+      ...(deps.cancel ? { cancelRun: deps.cancel } : {}),
+    });
+
+    try {
+      const client = await openClient(server.port);
+      client.send(hello({ deviceToken: token }));
+      await client.next();
+      await run(client);
+      client.close();
+    } finally {
+      await server.close();
+    }
+  }
+
+  const entry = {
+    seq: 7,
+    at: 1_700_000_000_000,
+    event: { kind: 'state' as const, state: 'idle' as const },
+  };
+
+  it('devuelve una página de historial', async () => {
+    await withTranscript(
+      { history: async () => ({ entries: [entry], hasMore: true }) },
+      async (client) => {
+        client.send({
+          v: PROTOCOL_VERSION,
+          id: 'h',
+          at: Date.now(),
+          type: 'session.history',
+          sessionId: 'session-uno',
+          limit: 10,
+        });
+        const response = await client.next();
+        expect(response['type']).toBe('history.ok');
+        expect((response['entries'] as unknown[]).length).toBe(1);
+        expect(response['hasMore']).toBe(true);
+      },
+    );
+  });
+
+  it('devuelve historial vacío si el host no puede leerlo', async () => {
+    await withTranscript({}, async (client) => {
+      client.send({
+        v: PROTOCOL_VERSION,
+        id: 'h',
+        at: Date.now(),
+        type: 'session.history',
+        sessionId: 'session-uno',
+      });
+      const response = await client.next();
+      expect(response['type']).toBe('history.ok');
+      expect(response['entries']).toEqual([]);
+    });
+  });
+
+  it('confirma la suscripción y empuja los eventos', async () => {
+    await withTranscript(
+      {
+        subscribe: (_sessionId, options) => {
+          // Emite un evento tras confirmar, como haría el host real.
+          setTimeout(() => options.onEvent(entry as never), 20);
+          return { stop: () => undefined };
+        },
+      },
+      async (client) => {
+        client.send({
+          v: PROTOCOL_VERSION,
+          id: 'sub',
+          at: Date.now(),
+          type: 'session.subscribe',
+          sessionId: 'session-uno',
+          since: 3,
+        });
+
+        const ack = await client.next();
+        expect(ack['type']).toBe('session.ok');
+        expect(ack['seq']).toBe(3);
+
+        const event = await client.next();
+        expect(event['type']).toBe('session.event');
+        expect(event['seq']).toBe(7);
+      },
+    );
+  });
+
+  it('cancela una ejecución en curso', async () => {
+    await withTranscript({ cancel: () => true }, async (client) => {
+      client.send({
+        v: PROTOCOL_VERSION,
+        id: 'c',
+        at: Date.now(),
+        type: 'run.cancel',
+        sessionId: 'session-uno',
+      });
+      const response = await client.next();
+      expect(response['type']).toBe('run.ok');
+      expect(response['state']).toBe('idle');
+    });
+  });
+
+  it('explica cuando no hay nada que cancelar', async () => {
+    await withTranscript({ cancel: () => false }, async (client) => {
+      client.send({
+        v: PROTOCOL_VERSION,
+        id: 'c',
+        at: Date.now(),
+        type: 'run.cancel',
+        sessionId: 'session-uno',
+      });
+      const response = await client.next();
+      expect(response['type']).toBe('error');
+      expect(response['code']).toBe('not-found');
+    });
+  });
+});
+
 describe('emparejamiento de punta a punta', () => {
   it('canjea el código, entrega el token y autentica con él', async () => {
     const client = await openClient();

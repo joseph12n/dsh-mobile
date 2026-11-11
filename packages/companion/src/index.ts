@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { findWebRoot } from './routes/web-root.js';
 import { listSessions } from './dsh/session-source.js';
 import { answerQuestion, listPendingQuestions } from './dsh/questions.js';
+import { cancelRun, readHistory, subscribeSession } from './dsh/transcript.js';
 import { injectText } from './dsh/prompt.js';
 import { resolveSessionId } from './dsh/sessions.js';
 import type { HostContext } from './host-api.js';
@@ -134,6 +135,10 @@ export function apply(ctx: HostContext): void {
     // Preguntas: proyección `userQuestions` y respuesta por lote.
     listQuestions: () => listPendingQuestions(ctx),
     answerQuestion: (input) => answerQuestion(ctx, input),
+    // Transcripción: historial paginado, eventos en vivo y cancelación.
+    readHistory: (sessionId, options) => readHistory(ctx, sessionId, options),
+    subscribeSession: (sessionId, options) => subscribeSession(ctx, sessionId, options),
+    cancelRun: (sessionId) => cancelRun(ctx, sessionId),
     // Siempre en vivo: un informe cacheado miente en cuanto cambian las sesiones.
     report: () => probe(),
   })
