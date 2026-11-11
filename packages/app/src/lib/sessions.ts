@@ -76,18 +76,25 @@ export function groupSessions(
     .map((kind) => ({ kind, title: TITLES[kind], sessions: buckets[kind] }));
 }
 
-/** "hace 5 min", "hace 3 h", "hace 2 d". Vacío si no se conoce la fecha. */
+/**
+ * "hace 5 min", "hace 3 h", "hace 2 d". Vacío si no se conoce la fecha.
+ *
+ * Se trunca en vez de redondear: si dijera "hace 7 d" a los 6,5 días, el texto
+ * contradiría al grupo (esa sesión todavía no está en "Más antiguas").
+ */
 export function relativeTime(timestamp: number, now: number = Date.now()): string {
   if (!timestamp) return '';
 
-  const seconds = Math.max(0, Math.round((now - timestamp) / 1000));
+  // Suelo en segundos, no redondeo: redondear hacia arriba hacía que el texto
+  // dijera "hace 7 d" medio segundo antes de que la sesión entrara en ese grupo.
+  const seconds = Math.max(0, Math.floor((now - timestamp) / 1000));
   if (seconds < 60) return 'ahora';
 
-  const minutes = Math.round(seconds / 60);
+  const minutes = Math.floor(seconds / 60);
   if (minutes < 60) return `hace ${minutes} min`;
 
-  const hours = Math.round(minutes / 60);
+  const hours = Math.floor(minutes / 60);
   if (hours < 24) return `hace ${hours} h`;
 
-  return `hace ${Math.round(hours / 24)} d`;
+  return `hace ${Math.floor(hours / 24)} d`;
 }

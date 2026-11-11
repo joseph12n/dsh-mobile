@@ -67,6 +67,16 @@ const server = await startCompanionServer({
       running: false,
       pendingQuestions: 0,
     },
+    // Una sesión vieja, para que se vea el grupo plegable de "Más antiguas".
+    {
+      id: 'session-d',
+      title: 'Migrar los informes a la nueva plantilla',
+      updatedAt: now - 11 * 24 * 60 * 60 * 1000,
+      seq: 64,
+      agentAvailable: true,
+      running: false,
+      pendingQuestions: 0,
+    },
   ],
   listQuestions: () => [
     {

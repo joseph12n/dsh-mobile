@@ -268,9 +268,21 @@ button.ghost:hover:not(:disabled) {
   margin-left: auto;
 }
 
+/* Foco visible en cualquier control. Sin esto, el navegador dibuja un contorno de
+   1 px casi negro sobre el fondo oscuro y no se ve dónde estás al tabular. */
+button:focus-visible,
+[role='button']:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--link);
+  outline-offset: 2px;
+}
+/* Pequeño en apariencia, pero el área táctil sigue siendo de 44 px: en un móvil
+   un botón de 32 px se falla con el pulgar. */
 button.ghost.tiny {
-  min-height: 32px;
-  padding: 4px 10px;
+  min-height: 44px;
+  padding: 4px 12px;
   font-size: 12px;
 }
 
@@ -448,11 +460,8 @@ button.ghost.tiny {
   border-color: var(--line-emphasis);
 }
 
-/* Quitar el contorno sin poner otro dejaba el foco invisible: 1,63:1. */
-.session-row:focus-visible {
-  outline: 2px solid var(--link);
-  outline-offset: 2px;
-}
+/* Quitar el contorno sin poner otro dejaba el foco invisible: 1,63:1. La regla
+   global de `[role='button']:focus-visible` ya cubre este caso. */
 
 .session-heading {
   margin: 12px 0 4px;

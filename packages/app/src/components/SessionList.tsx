@@ -49,6 +49,9 @@ export function SessionList({
                   className="ghost tiny"
                   onClick={() => setShowStale((previous) => !previous)}
                   aria-expanded={showStale}
+                  // Solo apunta al grupo cuando existe: un `aria-controls` que
+                  // cuelga de un elemento no renderizado es una referencia rota.
+                  aria-controls={showStale ? `grupo-${section.kind}` : undefined}
                 >
                   {showStale ? 'Ocultar' : 'Mostrar'}
                 </button>
@@ -56,7 +59,7 @@ export function SessionList({
             </header>
 
             {collapsed ? null : (
-              <ul className="sessions">
+              <ul className="sessions" id={`grupo-${section.kind}`}>
                 {section.sessions.map((session) => (
                   <li
                     key={session.id}
@@ -65,7 +68,10 @@ export function SessionList({
                     tabIndex={0}
                     onClick={() => onOpen(session)}
                     onKeyDown={(event) => {
-                      if (event.key === 'Enter' || event.key === ' ') onOpen(session);
+                      if (event.key !== 'Enter' && event.key !== ' ') return;
+                      // Sin esto, Espacio además desplaza la página.
+                      event.preventDefault();
+                      onOpen(session);
                     }}
                   >
                     <div className="session-main">
