@@ -155,9 +155,10 @@ host responde `not-found` diciéndolo.
 
 ## 11. Seguridad
 
-- **Loopback por defecto.** El listener se enlaza a `127.0.0.1` y no acepta conexiones
-  directas desde la LAN. Se publica por el nombre del tailnet con `tailscale serve`, porque
-  la autenticación por dispositivo ya existe y no se quiere un puerto abierto.
+- **Solo loopback.** La dirección de escucha es una constante (`HOST = '127.0.0.1'`), no una
+  opción de configuración: no existe un modo de red. Se publica por el nombre del tailnet con
+  `tailscale serve`, que sí alcanza el loopback y aporta HTTPS. La autenticación por
+  dispositivo ya existe; lo que no se quiere es un puerto abierto.
 - **Token por dispositivo**, guardado en hash; revocar uno no afecta a los demás.
 - **Alcance acotado**: sesiones, preguntas y ejecuciones. Nada de ajustes, credenciales ni
   gestión de plugins.

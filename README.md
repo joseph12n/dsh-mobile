@@ -128,8 +128,9 @@ las herramientas de vista previa para no ensuciar el log del usuario).
 
 ## Seguridad
 
-- **Loopback por defecto.** El plugin escucha en `127.0.0.1` y se publica por el nombre del
-  tailnet con `tailscale serve`. **No acepta conexiones directas desde la LAN.**
+- **Solo loopback.** La dirección de escucha es una constante en el código, no una opción: el
+  plugin atiende en `127.0.0.1` y se publica por el nombre del tailnet con `tailscale serve`.
+  **No acepta conexiones directas desde la LAN** porque nunca abre ese socket.
 - **Nunca a internet sin autenticación sólida.** Esto es un cliente que puede ejecutar
   acciones en tu máquina. Hoy la red privada del tailnet es el único camino soportado;
   exponerlo a internet no lo es.

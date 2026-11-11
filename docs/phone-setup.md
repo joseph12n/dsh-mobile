@@ -107,7 +107,7 @@ pantalla que tienes que escanear.
 | "Conexión rechazada" al escanear | El QR apunta a `127.0.0.1`: abre `/pair` desde el nombre del tailnet  |
 | El teléfono no ve el PC          | Falta instalar Tailscale en el teléfono o está con otra cuenta        |
 | El health check no responde      | **DSH está cerrado**: sin el plugin no hay nada escuchando            |
-| Carga pero no se puede instalar  | Entraste por una dirección que no es HTTPS: usa el nombre del tailnet |
+| Carga pero no ofrece instalarse  | Entraste por una dirección que no es HTTPS: usa el nombre del tailnet |
 | `tailscale serve --https` falla  | Falta activar _HTTPS Certificates_ en la consola                      |
 | El QR sale con aviso rojo        | La dirección desde la que abriste `/pair` no sirve para el teléfono   |
 
