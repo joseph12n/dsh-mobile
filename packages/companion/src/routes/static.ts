@@ -55,7 +55,7 @@ export function cacheControlFor(urlPath: string): string {
 
   if (normalized.startsWith('/assets/')) {
     const name = normalized.slice(normalized.lastIndexOf('/') + 1);
-    if (HASHED_ASSET.test(name)) return 'public, max-age=31536000, immutable';
+    if (isHashedAsset(name)) return 'public, max-age=31536000, immutable';
   }
 
   if (normalized.startsWith('/fonts/') && FONT_FILE.test(normalized.slice(7))) {
@@ -65,8 +65,31 @@ export function cacheControlFor(urlPath: string): string {
   return 'no-cache';
 }
 
-/** `nombre-<hash>.ext`, que es como Vite nombra lo que puede cachearse. */
-const HASHED_ASSET = /^[\w.-]+-[A-Za-z0-9_-]{8,}\.[a-z0-9]+$/;
+/**
+ * `nombre-<hash>.ext`, que es como Vite nombra lo que puede cachearse.
+ *
+ * Se parte por el último guion en vez de usar una expresión con dos clases
+ * solapadas (`[\w.-]+-[hash]`): esas dos pueden repartirse la misma cadena de
+ * muchas formas y el retroceso crece muy por encima de lo lineal.
+ */
+function isHashedAsset(name: string): boolean {
+  const dot = name.lastIndexOf('.');
+  if (dot <= 0) return false;
+
+  const stem = name.slice(0, dot);
+  const extension = name.slice(dot + 1);
+  const dash = stem.lastIndexOf('-');
+  if (dash <= 0) return false;
+
+  const hash = stem.slice(dash + 1);
+  return HASH.test(hash) && EXTENSION.test(extension);
+}
+
+/** Sufijo con pinta de hash de Vite. */
+const HASH = /^[A-Za-z0-9_-]{8,}$/;
+
+/** Extensión alfanumérica corta. */
+const EXTENSION = /^[a-z0-9]+$/i;
 
 /** Una fuente dentro de `/fonts/`, sin subdirectorios. */
 const FONT_FILE = /^[^/]+\.(woff2?|ttf)$/i;

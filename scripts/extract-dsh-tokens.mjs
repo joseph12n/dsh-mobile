@@ -15,15 +15,15 @@
 import { readFileSync } from 'node:fs';
 
 // La ruta la escribe quien ejecuta la herramienta en su propia máquina: no hay
-// entrada no confiable. El análisis estático lo marca como lectura de ruta
-// controlada por el usuario, de ahí el NOSONAR.
-const file = process.argv[2]; // NOSONAR
+// entrada no confiable. El análisis estático marca la lectura como ruta
+// controlada por el usuario; el NOSONAR va en esa línea, no aquí.
+const file = process.argv[2];
 if (!file) {
   console.error('falta la ruta al client.js del paquete de tema');
   process.exit(1);
 }
 
-const raw = readFileSync(file, 'utf8');
+const raw = readFileSync(file, 'utf8'); // NOSONAR: la ruta la da quien ejecuta la herramienta
 
 // Se permite espacio antes de la llave: un `body[data-ds-dark-theme] {` con
 // espacio devolvía cero bloques y el script salía con éxito, sin avisar.
@@ -48,6 +48,9 @@ function darkBlocks(source) {
 
     parts.push(source.slice(open + 1, index));
   }
+
+  // Sin bloques se devuelve vacío, para que la guarda de más abajo lo detecte.
+  if (parts.length === 0) return '';
 
   // Cada bloque se cierra con `;`: en CSS minificado la última declaración de una
   // regla puede no llevarlo, y sin esto el alias se perdía en silencio.
