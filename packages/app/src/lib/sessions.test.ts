@@ -111,3 +111,24 @@ describe('tiempo relativo', () => {
     expect(relativeTime(NOW + 60_000, NOW)).toBe('ahora');
   });
 });
+
+describe('bordes del corte de antigüedad', () => {
+  it('justo en siete días todavía no es "Más antiguas"', () => {
+    // El límite es inclusivo por abajo: a los 7 días exactos ya es antigua, y el
+    // texto no debe decir "hace 6 d" mientras está en ese grupo.
+    const exacto = session({ id: 'exacto', updatedAt: NOW - STALE_AFTER_MS });
+    const sections = groupSessions([exacto], NOW);
+    expect(sections[0]?.kind).toBe('stale');
+  });
+
+  it('un milisegundo antes sigue en reposo', () => {
+    const casi = session({ id: 'casi', updatedAt: NOW - STALE_AFTER_MS + 1 });
+    expect(groupSessions([casi], NOW)[0]?.kind).toBe('idle');
+  });
+
+  it('el texto no adelanta el grupo: 6,5 días dice 6, no 7', () => {
+    // Decía "hace 7 d" estando todavía en "En reposo", que se contradice.
+    const seisYMedio = NOW - 6.5 * 86_400_000;
+    expect(relativeTime(seisYMedio, NOW)).toBe('hace 6 d');
+  });
+});
