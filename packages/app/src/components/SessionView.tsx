@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { HistoryEntry, SessionSummary, TranscriptEvent } from '@dsh-mobile/protocol';
-import { groupTurns, toolEntries, visibleEntries, type Turn } from '../lib/turns.js';
+import { groupTurns, partTurn, type Turn } from '../lib/turns.js';
 
 /**
  * Transcripción de una sesión.
@@ -61,62 +61,50 @@ function EventRow({ entry }: { entry: HistoryEntry }) {
  * cada turno hace de encabezado, así que no se repite abajo.
  */
 function TurnBlock({ turn, number }: { turn: Turn; number: number }) {
+  // Un solo estado por turno basta: las rachas de herramientas se pliegan juntas.
   const [showTools, setShowTools] = useState(false);
-
-  const prompts = turn.entries.filter(
-    (entry) => entry.event.kind === 'message' && entry.event.role === 'user',
-  );
-  const rest = turn.entries.filter((entry) => !prompts.includes(entry));
-  const tools = toolEntries(turn);
-  const visible = visibleEntries(turn).filter((entry) => !prompts.includes(entry));
+  const parts = partTurn(turn.entries);
+  const toolsId = `herramientas-${turn.id}`;
+  const label = turn.prompt ? `Turno ${number}: ${turn.prompt}` : `Turno ${number}`;
 
   return (
-    <section className="turn">
+    <section className="turn" aria-label={label}>
       <header className="turn-head">
         <span className="turn-number">Turno {number}</span>
         <span className="muted small">{timeOf(turn.at)}</span>
       </header>
 
       <ul className="transcript">
-        {prompts.map((entry) => (
-          <EventRow key={entry.seq} entry={entry} />
-        ))}
+        {parts.map((part) => {
+          if (part.kind === 'entry') {
+            return <EventRow key={part.entry.seq} entry={part.entry} />;
+          }
 
-        {visible.map((entry) => (
-          <EventRow key={`${entry.seq}-${entry.event.kind}`} entry={entry} />
-        ))}
+          return (
+            <li key={`herramientas-${part.entries[0]?.seq ?? 0}`} className="tool-group">
+              <button
+                type="button"
+                className="ghost tiny"
+                onClick={() => setShowTools((previous) => !previous)}
+                aria-expanded={showTools}
+                // Solo apunta al grupo cuando existe: una referencia a un id que
+                // no está renderizado es ARIA inválido.
+                aria-controls={showTools ? toolsId : undefined}
+              >
+                {part.entries.length} herramienta{part.entries.length > 1 ? 's' : ''}
+                {showTools ? ' · ocultar' : ''}
+              </button>
 
-        {tools.length > 0 && (
-          <li className="tool-group">
-            <button
-              type="button"
-              className="ghost tiny"
-              onClick={() => setShowTools((previous) => !previous)}
-              aria-expanded={showTools}
-              aria-controls={`herramientas-${turn.id}`}
-            >
-              {tools.length} herramienta{tools.length > 1 ? 's' : ''}
-              {showTools ? ' · ocultar' : ''}
-            </button>
-
-            {showTools && (
-              <ul className="transcript nested" id={`herramientas-${turn.id}`}>
-                {tools.map((entry) => (
-                  <EventRow key={`${entry.seq}-${entry.event.kind}`} entry={entry} />
-                ))}
-              </ul>
-            )}
-          </li>
-        )}
-
-        {/* Entradas que no son ni pregunta, ni mensaje visible, ni herramienta:
-            no debería quedar ninguna, pero si queda se pinta en vez de perderse. */}
-        {rest
-          .filter((entry) => entry.event.kind !== 'tool')
-          .filter((entry) => !visible.includes(entry))
-          .map((entry) => (
-            <EventRow key={`resto-${entry.seq}`} entry={entry} />
-          ))}
+              {showTools && (
+                <ul className="transcript nested" id={toolsId}>
+                  {part.entries.map((entry) => (
+                    <EventRow key={`${entry.seq}-tool`} entry={entry} />
+                  ))}
+                </ul>
+              )}
+            </li>
+          );
+        })}
       </ul>
     </section>
   );

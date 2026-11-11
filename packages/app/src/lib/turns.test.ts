@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { HistoryEntry, TranscriptEvent } from '@dsh-mobile/protocol';
-import { groupTurns, toolEntries, toolsIn, visibleEntries } from './turns.js';
+import { groupTurns, partTurn, toolEntries, toolsIn, visibleEntries } from './turns.js';
 
 /**
  * Un turno es lo que pidió el humano y todo lo que provocó. El detalle de la
@@ -101,5 +101,81 @@ describe('visibilidad dentro de un turno', () => {
       'state',
     ]);
     expect(toolEntries(turn!).map((item) => item.event.kind)).toEqual(['tool']);
+  });
+});
+
+describe('orden dentro del turno', () => {
+  it('una herramienta entre dos mensajes se queda entre ellos', () => {
+    // Antes se sacaban al final: al desplegar, la herramienta aparecía después de
+    // una respuesta que en realidad había llegado más tarde.
+    const [turn] = groupTurns([
+      entry(user('pregunta')),
+      entry(tool('leer')),
+      entry(agent('respuesta')),
+    ]);
+
+    const kinds = partTurn(turn!.entries).map((part) =>
+      part.kind === 'entry'
+        ? `${part.entry.event.kind}:${'role' in part.entry.event ? part.entry.event.role : ''}`
+        : `tools:${part.entries.length}`,
+    );
+
+    expect(kinds).toEqual(['message:user', 'tools:1', 'message:assistant']);
+  });
+
+  it('junta las herramientas consecutivas en un solo trozo', () => {
+    const [turn] = groupTurns([
+      entry(user('uno')),
+      entry(tool('a')),
+      entry(tool('b')),
+      entry(tool('c')),
+      entry(agent('fin')),
+    ]);
+
+    const parts = partTurn(turn!.entries);
+    expect(parts).toHaveLength(3);
+    expect(parts[1]).toEqual({ kind: 'tools', entries: expect.any(Array) });
+    expect((parts[1] as { entries: unknown[] }).entries).toHaveLength(3);
+  });
+
+  it('dos rachas separadas no se mezclan', () => {
+    const [turn] = groupTurns([
+      entry(user('uno')),
+      entry(tool('a')),
+      entry(agent('medio')),
+      entry(tool('b')),
+    ]);
+
+    const parts = partTurn(turn!.entries);
+    expect(parts.map((part) => part.kind)).toEqual(['entry', 'tools', 'entry', 'tools']);
+  });
+
+  it('no pierde ninguna entrada al partir', () => {
+    const entries = [
+      entry(user('uno')),
+      entry(tool('a')),
+      entry(agent('x')),
+      entry(tool('b')),
+      entry(state('idle')),
+    ];
+    const [turn] = groupTurns(entries);
+    const total = partTurn(turn!.entries).reduce(
+      (count, part) => count + (part.kind === 'tools' ? part.entries.length : 1),
+      0,
+    );
+    expect(total).toBe(entries.length);
+  });
+});
+
+describe('casos raros de agrupación', () => {
+  it('dos mensajes del humano seguidos abren dos turnos', () => {
+    const turns = groupTurns([entry(user('uno')), entry(user('dos'))]);
+    expect(turns.map((turn) => turn.prompt)).toEqual(['uno', 'dos']);
+  });
+
+  it('una sesión sin mensajes del humano es un turno sin pregunta', () => {
+    const turns = groupTurns([entry(state('working')), entry(tool('leer'))]);
+    expect(turns).toHaveLength(1);
+    expect(turns[0]?.prompt).toBeUndefined();
   });
 });

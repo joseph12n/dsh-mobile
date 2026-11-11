@@ -75,3 +75,31 @@ export function visibleEntries(turn: Turn): HistoryEntry[] {
 export function toolEntries(turn: Turn): HistoryEntry[] {
   return turn.entries.filter((entry) => entry.event.kind === 'tool');
 }
+
+/** Un trozo del turno: una entrada visible, o una racha de herramientas. */
+export type TurnPart =
+  { kind: 'entry'; entry: HistoryEntry } | { kind: 'tools'; entries: HistoryEntry[] };
+
+/**
+ * Parte un turno en trozos **conservando el orden cronológico**.
+ *
+ * Las herramientas consecutivas se agrupan en el sitio donde ocurrieron. Antes se
+ * sacaban al final del turno, y al desplegarlas aparecían después de una respuesta
+ * que en realidad había llegado más tarde. En una traza eso se lee al revés.
+ */
+export function partTurn(entries: readonly HistoryEntry[]): TurnPart[] {
+  const parts: TurnPart[] = [];
+
+  for (const entry of entries) {
+    if (entry.event.kind !== 'tool') {
+      parts.push({ kind: 'entry', entry });
+      continue;
+    }
+
+    const last = parts.at(-1);
+    if (last?.kind === 'tools') last.entries.push(entry);
+    else parts.push({ kind: 'tools', entries: [entry] });
+  }
+
+  return parts;
+}
