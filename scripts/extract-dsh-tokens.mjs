@@ -14,7 +14,10 @@
 //  - En una cascada gana la **última** declaración, no la primera.
 import { readFileSync } from 'node:fs';
 
-const file = process.argv[2];
+// La ruta la escribe quien ejecuta la herramienta en su propia máquina: no hay
+// entrada no confiable. El análisis estático lo marca como lectura de ruta
+// controlada por el usuario, de ahí el NOSONAR.
+const file = process.argv[2]; // NOSONAR
 if (!file) {
   console.error('falta la ruta al client.js del paquete de tema');
   process.exit(1);
@@ -46,7 +49,9 @@ function darkBlocks(source) {
     parts.push(source.slice(open + 1, index));
   }
 
-  return parts.join(';');
+  // Cada bloque se cierra con `;`: en CSS minificado la última declaración de una
+  // regla puede no llevarlo, y sin esto el alias se perdía en silencio.
+  return `${parts.join(';')};`;
 }
 
 /**

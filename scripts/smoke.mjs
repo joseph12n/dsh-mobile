@@ -5,10 +5,16 @@
 //
 // No toca DSH: arranca el servidor con datos de ejemplo en un puerto efímero. Sirve
 // para comprobar que el paquete que se publicaría funciona tal cual.
-import WebSocket from 'ws';
-import { startCompanionServer } from '../packages/companion/dist/server.js';
-import { PairingService } from '../packages/companion/dist/core/pairing.js';
-import { DeviceRegistry } from '../packages/companion/dist/core/devices.js';
+//
+// El módulo de log del plugin escribe en $DSH_HOME/companion/probe.log; aquí se
+// desactiva antes de importarlo, porque una verificación no debe ensuciar el log
+// del usuario. La variable se lee al cargar el módulo, de ahí el import dinámico.
+process.env.DSH_MOBILE_LOG_FILE = '0';
+
+const { default: WebSocket } = await import('ws');
+const { startCompanionServer } = await import('../packages/companion/dist/server.js');
+const { PairingService } = await import('../packages/companion/dist/core/pairing.js');
+const { DeviceRegistry } = await import('../packages/companion/dist/core/devices.js');
 
 const WEB_ROOT = new URL('../packages/app/dist', import.meta.url).pathname.replace(
   /^\/([A-Za-z]:)/,

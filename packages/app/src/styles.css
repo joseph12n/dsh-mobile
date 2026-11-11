@@ -14,14 +14,6 @@
 @font-face {
   font-family: 'Montserrat';
   font-style: normal;
-  font-weight: 300;
-  font-display: swap;
-  src: url(/fonts/montserrat-light.woff2) format('woff2');
-}
-
-@font-face {
-  font-family: 'Montserrat';
-  font-style: normal;
   font-weight: 400;
   font-display: swap;
   src: url(/fonts/montserrat-regular.woff2) format('woff2');
@@ -146,7 +138,9 @@ body {
   font-weight: 500;
 }
 
-.card p {
+/* :not() para no pisar .error ni .question-text, que tienen menos
+   especificidad y quedaban sin efecto. */
+.card p:not(.error):not(.question-text) {
   margin: 0 0 16px;
   line-height: 1.5;
   color: var(--muted);
@@ -368,6 +362,14 @@ button.ghost:hover:not(:disabled) {
   color: var(--text-secondary);
   border-color: var(--line-strong);
   font-weight: 400;
+}
+
+/* Hover propio: el genérico de `button` se excluye a propósito, porque su
+   especificidad ganaba y dejaba la opción con fondo claro y texto gris. */
+.option:not(.chosen):hover:not(:disabled) {
+  background: var(--hover);
+  border-color: var(--line-emphasis);
+  color: var(--text);
 }
 
 .option.chosen {

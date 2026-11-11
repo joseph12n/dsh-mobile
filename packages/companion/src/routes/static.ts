@@ -43,28 +43,33 @@ function contentTypeFor(file: string): string {
  *
  * - Assets con hash en el nombre (los emite Vite): inmutables para siempre.
  * - Fuentes: nombres estables, sin hash. Un día de caché reduce la descarga
- *   repetida de ~180 KB sin arriesgar quedarse con una fuente vieja para siempre.
+ *   repetida de ~120 KB sin arriesgar quedarse con una fuente vieja para siempre.
  * - Todo lo demás, incluido `index.html`: revalidar siempre, o una actualización
  *   del plugin dejaría al móvil con la versión anterior pegada.
+ *
+ * La comprobación evita un cuantificador anidado sobre la ruta completa —eso
+ * produce retroceso superlineal— y trabaja solo sobre el nombre del archivo.
  */
 export function cacheControlFor(urlPath: string): string {
   const normalized = urlPath.split('?')[0]?.replace(/\\/g, '/') ?? '';
 
-  if (/\/assets\/[^/]+-[A-Za-z0-9_-]{8,}\.[a-z0-9]+$/i.test(normalized)) {
-    return 'public, max-age=31536000, immutable';
+  if (normalized.startsWith('/assets/')) {
+    const name = normalized.slice(normalized.lastIndexOf('/') + 1);
+    if (HASHED_ASSET.test(name)) return 'public, max-age=31536000, immutable';
   }
 
-  if (/^\/fonts\/[^/]+\.(woff2?|ttf)$/i.test(normalized)) {
+  if (normalized.startsWith('/fonts/') && FONT_FILE.test(normalized.slice(7))) {
     return 'public, max-age=86400';
   }
 
   return 'no-cache';
 }
 
-/** `true` si el recurso merece caché larga e inmutable. */
-export function isImmutable(urlPath: string): boolean {
-  return cacheControlFor(urlPath).includes('immutable');
-}
+/** `nombre-<hash>.ext`, que es como Vite nombra lo que puede cachearse. */
+const HASHED_ASSET = /^[\w.-]+-[A-Za-z0-9_-]{8,}\.[a-z0-9]+$/;
+
+/** Una fuente dentro de `/fonts/`, sin subdirectorios. */
+const FONT_FILE = /^[^/]+\.(woff2?|ttf)$/i;
 
 function headersFor(file: string, size: number, cacheControl: string): Record<string, string> {
   return {
