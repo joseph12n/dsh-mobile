@@ -166,6 +166,19 @@ export function App() {
     }
   }, [client, openSession, entries]);
 
+  const sendText = useCallback(
+    async (text: string) => {
+      const connection = client.current;
+      if (!connection || !openSession) return;
+      try {
+        await connection.reply(openSession.id, text);
+      } catch (error) {
+        setView({ kind: 'error', endpoint: connection.url, message: messageOf(error) });
+      }
+    },
+    [client, openSession],
+  );
+
   const stop = useCallback(async () => {
     const connection = client.current;
     if (!connection || !openSession) return;
@@ -310,6 +323,7 @@ export function App() {
               }}
               onLoadMore={() => void loadMore()}
               onCancel={() => void stop()}
+              onSend={(text) => void sendText(text)}
             />
           ) : (
             <section className="card">
