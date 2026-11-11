@@ -30,6 +30,9 @@ certs/
 Thumbs.db
 desktop.ini
 
+# Capturas de vista previa (no son entregables)
+.preview/
+
 # OneDrive / temporales
 ~$*
 *.tmp

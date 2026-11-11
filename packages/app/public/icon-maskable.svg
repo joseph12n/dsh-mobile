@@ -6,10 +6,10 @@
     central, así que el fondo va a sangre (sin esquinas redondeadas, las pone el
     lanzador) y el contenido se queda dentro de ese círculo seguro.
   -->
-  <rect width="192" height="192" fill="#0b0f14" />
+  <rect width="192" height="192" fill="#151517" />
   <g transform="translate(96 96) scale(0.72) translate(-96 -96)">
-    <rect x="58" y="30" width="76" height="132" rx="14" fill="none" stroke="#4ade80" stroke-width="6" />
-    <rect x="84" y="40" width="24" height="6" rx="3" fill="#4ade80" />
-    <circle cx="96" cy="140" r="7" fill="#4ade80" />
+    <rect x="58" y="30" width="76" height="132" rx="14" fill="none" stroke="#5686fe" stroke-width="6" />
+    <rect x="84" y="40" width="24" height="6" rx="3" fill="#5686fe" />
+    <circle cx="96" cy="140" r="7" fill="#5686fe" />
   </g>
 </svg>

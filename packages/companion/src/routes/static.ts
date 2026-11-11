@@ -39,24 +39,66 @@ function contentTypeFor(file: string): string {
 }
 
 /**
- * Un recurso merece caché larga solo si Vite le puso hash en el nombre
- * (`index-a1b2c3.js`). Todo lo demás — el índice, el manifest, los iconos — debe
- * revalidarse, o una actualización del plugin dejaría al móvil con la versión
- * anterior pegada.
+ * Política de caché.
  *
- * Se decide sobre la **URL**, no sobre la ruta del archivo: en Windows esta
- * última lleva barras invertidas y nunca coincidiría.
+ * - Assets con hash en el nombre (los emite Vite): inmutables para siempre.
+ * - Fuentes: nombres estables, sin hash. Un día de caché reduce la descarga
+ *   repetida de ~120 KB sin arriesgar quedarse con una fuente vieja para siempre.
+ * - Todo lo demás, incluido `index.html`: revalidar siempre, o una actualización
+ *   del plugin dejaría al móvil con la versión anterior pegada.
+ *
+ * La comprobación evita un cuantificador anidado sobre la ruta completa —eso
+ * produce retroceso superlineal— y trabaja solo sobre el nombre del archivo.
  */
-export function isImmutable(urlPath: string): boolean {
+export function cacheControlFor(urlPath: string): string {
   const normalized = urlPath.split('?')[0]?.replace(/\\/g, '/') ?? '';
-  return /\/assets\/[^/]+-[A-Za-z0-9_-]{8,}\.[a-z0-9]+$/i.test(normalized);
+
+  if (normalized.startsWith('/assets/')) {
+    const name = normalized.slice(normalized.lastIndexOf('/') + 1);
+    if (isHashedAsset(name)) return 'public, max-age=31536000, immutable';
+  }
+
+  if (normalized.startsWith('/fonts/') && FONT_FILE.test(normalized.slice(7))) {
+    return 'public, max-age=86400';
+  }
+
+  return 'no-cache';
 }
 
-function headersFor(file: string, size: number, immutable: boolean): Record<string, string> {
+/**
+ * `nombre-<hash>.ext`, que es como Vite nombra lo que puede cachearse.
+ *
+ * Se parte por el último guion en vez de usar una expresión con dos clases
+ * solapadas (`[\w.-]+-[hash]`): esas dos pueden repartirse la misma cadena de
+ * muchas formas y el retroceso crece muy por encima de lo lineal.
+ */
+function isHashedAsset(name: string): boolean {
+  const dot = name.lastIndexOf('.');
+  if (dot <= 0) return false;
+
+  const stem = name.slice(0, dot);
+  const extension = name.slice(dot + 1);
+  const dash = stem.lastIndexOf('-');
+  if (dash <= 0) return false;
+
+  const hash = stem.slice(dash + 1);
+  return HASH.test(hash) && EXTENSION.test(extension);
+}
+
+/** Sufijo con pinta de hash de Vite. */
+const HASH = /^[A-Za-z0-9_-]{8,}$/;
+
+/** Extensión alfanumérica corta. */
+const EXTENSION = /^[a-z0-9]+$/i;
+
+/** Una fuente dentro de `/fonts/`, sin subdirectorios. */
+const FONT_FILE = /^[^/]+\.(woff2?|ttf)$/i;
+
+function headersFor(file: string, size: number, cacheControl: string): Record<string, string> {
   return {
     'content-type': contentTypeFor(file),
     'content-length': String(size),
-    'cache-control': immutable ? 'public, max-age=31536000, immutable' : 'no-cache',
+    'cache-control': cacheControl,
     'x-content-type-options': 'nosniff',
   };
 }
@@ -111,7 +153,11 @@ export function serveStatic(root: string | undefined, urlPath: string): StaticRe
 
   try {
     const body = readFileSync(file);
-    return { status: 200, body, headers: headersFor(file, body.length, isImmutable(urlPath)) };
+    return {
+      status: 200,
+      body,
+      headers: headersFor(file, body.length, cacheControlFor(urlPath)),
+    };
   } catch {
     return { status: 404 };
   }
