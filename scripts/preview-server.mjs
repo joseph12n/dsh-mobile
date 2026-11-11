@@ -113,6 +113,23 @@ const server = await startCompanionServer({
           text: 'Lista. Añade la columna `conciliada` y es idempotente. Antes de aplicarla quiero confirmar que el respaldo está hecho.',
         },
       },
+      // Segunda racha en el MISMO turno: es el caso que producía ids duplicados y
+      // desplegaba todas las rachas a la vez. Tiene que verse en la vista previa.
+      {
+        seq: 4,
+        at: now - 40_000,
+        event: {
+          kind: 'tool',
+          name: 'write',
+          summary: 'db/migrations/0042_conciliada.sql',
+          status: 'ok',
+        },
+      },
+      {
+        seq: 5,
+        at: now - 30_000,
+        event: { kind: 'state', state: 'waiting' },
+      },
     ],
     hasMore: false,
   }),

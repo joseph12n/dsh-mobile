@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { HistoryEntry, TranscriptEvent } from '@dsh-mobile/protocol';
-import { groupTurns, partTurn, toolEntries, toolsIn, visibleEntries } from './turns.js';
+import { groupTurns, partTurn } from './turns.js';
 
 /**
  * Un turno es lo que pidió el humano y todo lo que provocó. El detalle de la
@@ -40,19 +40,6 @@ describe('agrupación en turnos', () => {
     expect(turns[0]?.entries).toHaveLength(2);
   });
 
-  it('las herramientas pertenecen al turno en el que ocurrieron', () => {
-    const turns = groupTurns([
-      entry(user('uno')),
-      entry(tool('leer')),
-      entry(tool('escribir')),
-      entry(user('dos')),
-      entry(tool('buscar')),
-    ]);
-
-    expect(toolsIn(turns[0]!)).toBe(2);
-    expect(toolsIn(turns[1]!)).toBe(1);
-  });
-
   it('lo anterior al primer mensaje no se atribuye al primer turno', () => {
     // Un evento de estado al arrancar la sesión no lo pidió nadie.
     const turns = groupTurns([entry(state('idle')), entry(user('hola'))]);
@@ -83,24 +70,6 @@ describe('agrupación en turnos', () => {
     const before = structuredClone(entries);
     groupTurns(entries);
     expect(entries).toEqual(before);
-  });
-});
-
-describe('visibilidad dentro de un turno', () => {
-  it('pliega las herramientas pero no los mensajes ni los estados', () => {
-    const [turn] = groupTurns([
-      entry(user('uno')),
-      entry(tool('leer')),
-      entry(agent('listo')),
-      entry(state('idle')),
-    ]);
-
-    expect(visibleEntries(turn!).map((item) => item.event.kind)).toEqual([
-      'message',
-      'message',
-      'state',
-    ]);
-    expect(toolEntries(turn!).map((item) => item.event.kind)).toEqual(['tool']);
   });
 });
 

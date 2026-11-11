@@ -54,17 +54,52 @@ function EventRow({ entry }: { entry: HistoryEntry }) {
 }
 
 /**
+ * Una racha de herramientas seguidas dentro de un turno.
+ *
+ * El estado y el `id` son **por racha**, no por turno: un turno puede tener varias
+ * (herramientas, respuesta, más herramientas), y compartir el `id` producía ids
+ * duplicados y un `aria-controls` que apuntaba al grupo equivocado. Además, con un
+ * estado por turno, pulsar un botón desplegaba todas las rachas aunque dijera
+ * "1 herramienta".
+ */
+function ToolRun({ entries }: { entries: HistoryEntry[] }) {
+  const [open, setOpen] = useState(false);
+  const id = `herramientas-${entries[0]?.seq ?? 0}`;
+
+  return (
+    <li className="tool-group">
+      <button
+        type="button"
+        className="ghost tiny"
+        onClick={() => setOpen((previous) => !previous)}
+        aria-expanded={open}
+        // Solo apunta al grupo cuando existe: una referencia a un id que no está
+        // renderizado es ARIA inválido.
+        aria-controls={open ? id : undefined}
+      >
+        {entries.length} herramienta{entries.length > 1 ? 's' : ''}
+        {open ? ' · ocultar' : ''}
+      </button>
+
+      {open && (
+        <ul className="transcript nested" id={id}>
+          {entries.map((entry) => (
+            <EventRow key={`${entry.seq}-tool`} entry={entry} />
+          ))}
+        </ul>
+      )}
+    </li>
+  );
+}
+
+/**
  * Un turno: lo que pidió el humano y lo que provocó.
  *
- * Las herramientas van **plegadas** porque son muchas y ruidosas; lo que cuenta
- * qué pasó —mensajes y cambios de estado— siempre se ve. La primera pregunta de
- * cada turno hace de encabezado, así que no se repite abajo.
+ * Las herramientas van **plegadas** porque son muchas y ruidosas; los mensajes y
+ * los cambios de estado siempre se ven, dentro del turno y **en su orden real**.
  */
 function TurnBlock({ turn, number }: { turn: Turn; number: number }) {
-  // Un solo estado por turno basta: las rachas de herramientas se pliegan juntas.
-  const [showTools, setShowTools] = useState(false);
   const parts = partTurn(turn.entries);
-  const toolsId = `herramientas-${turn.id}`;
   const label = turn.prompt ? `Turno ${number}: ${turn.prompt}` : `Turno ${number}`;
 
   return (
@@ -75,36 +110,13 @@ function TurnBlock({ turn, number }: { turn: Turn; number: number }) {
       </header>
 
       <ul className="transcript">
-        {parts.map((part) => {
-          if (part.kind === 'entry') {
-            return <EventRow key={part.entry.seq} entry={part.entry} />;
-          }
-
-          return (
-            <li key={`herramientas-${part.entries[0]?.seq ?? 0}`} className="tool-group">
-              <button
-                type="button"
-                className="ghost tiny"
-                onClick={() => setShowTools((previous) => !previous)}
-                aria-expanded={showTools}
-                // Solo apunta al grupo cuando existe: una referencia a un id que
-                // no está renderizado es ARIA inválido.
-                aria-controls={showTools ? toolsId : undefined}
-              >
-                {part.entries.length} herramienta{part.entries.length > 1 ? 's' : ''}
-                {showTools ? ' · ocultar' : ''}
-              </button>
-
-              {showTools && (
-                <ul className="transcript nested" id={toolsId}>
-                  {part.entries.map((entry) => (
-                    <EventRow key={`${entry.seq}-tool`} entry={entry} />
-                  ))}
-                </ul>
-              )}
-            </li>
-          );
-        })}
+        {parts.map((part) =>
+          part.kind === 'entry' ? (
+            <EventRow key={part.entry.seq} entry={part.entry} />
+          ) : (
+            <ToolRun key={`herramientas-${part.entries[0]?.seq ?? 0}`} entries={part.entries} />
+          ),
+        )}
       </ul>
     </section>
   );

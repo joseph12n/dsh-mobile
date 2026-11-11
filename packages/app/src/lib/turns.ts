@@ -56,26 +56,6 @@ export function groupTurns(entries: readonly HistoryEntry[]): Turn[] {
   return turns;
 }
 
-/** Cuántas llamadas a herramientas hay en un turno. */
-export function toolsIn(turn: Turn): number {
-  return turn.entries.filter((entry) => entry.event.kind === 'tool').length;
-}
-
-/**
- * Entradas de un turno que merecen verse siempre.
- *
- * Las herramientas se pliegan porque son muchas y ruidosas; los mensajes y los
- * cambios de estado no, porque son los que cuentan qué pasó.
- */
-export function visibleEntries(turn: Turn): HistoryEntry[] {
-  return turn.entries.filter((entry) => entry.event.kind !== 'tool');
-}
-
-/** Entradas de herramienta de un turno, para el grupo plegable. */
-export function toolEntries(turn: Turn): HistoryEntry[] {
-  return turn.entries.filter((entry) => entry.event.kind === 'tool');
-}
-
 /** Un trozo del turno: una entrada visible, o una racha de herramientas. */
 export type TurnPart =
   { kind: 'entry'; entry: HistoryEntry } | { kind: 'tools'; entries: HistoryEntry[] };
