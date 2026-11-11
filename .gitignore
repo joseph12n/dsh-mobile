@@ -1,6 +1,3 @@
-# Capturas de vista previa (no son entregables)
-.preview/
-
 # Dependencias
 node_modules/
 .pnpm-store/
