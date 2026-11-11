@@ -28,8 +28,7 @@ import sharp from 'sharp';
 const here = dirname(fileURLToPath(import.meta.url));
 const pub = join(here, '..', 'public');
 
-const BACKGROUND = '#0b0f14';
-const check = process.argv.includes('--check');
+const BACKGROUND = '#151517';
 
 /** Un PNG cuadrado a partir de un SVG del directorio público, en memoria. */
 async function render(svg, size, opaque) {
