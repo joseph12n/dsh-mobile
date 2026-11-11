@@ -190,6 +190,12 @@ export class CompanionClient {
     if (response.type === 'error') throw new Error(response.message);
   }
 
+  /** Escribe en la sesión. El host confirma la aceptación, no la posición. */
+  async reply(sessionId: string, text: string): Promise<void> {
+    const response = await this.#request({ type: 'reply.send', sessionId, text });
+    if (response.type === 'error') throw new Error(response.message);
+  }
+
   close(): void {
     this.#failAll(new Error('Conexión cerrada.'));
     this.#socket?.close();

@@ -139,6 +139,13 @@ export function apply(ctx: HostContext): void {
     readHistory: (sessionId, options) => readHistory(ctx, sessionId, options),
     subscribeSession: (sessionId, options) => subscribeSession(ctx, sessionId, options),
     cancelRun: (sessionId) => cancelRun(ctx, sessionId),
+    // Compositor: escribir en la sesión por el mismo camino que el escritorio.
+    sendReply: async (sessionId, text) => {
+      const result = await injectText(ctx, sessionId, text);
+      return result.ok
+        ? { ok: true }
+        : { ok: false, code: 'bad-request' as const, message: result.detail };
+    },
     // Siempre en vivo: un informe cacheado miente en cuanto cambian las sesiones.
     report: () => probe(),
   })
