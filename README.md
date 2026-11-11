@@ -48,7 +48,12 @@ Un solo escaneo resuelve _a dónde_ conectarse y _quién_ eres. El código va en
 de la URL, así que no viaja al servidor ni queda en logs. Caduca a los 10 minutos, es de
 un solo uso y el canje crea un **token de dispositivo** guardado en hash.
 
-Cambiar de red (LAN ↔ tailnet) se hace editando el endpoint, **sin re-emparejar**.
+El token es del dispositivo, no de la red, así que **el protocolo no ata la conexión a una
+dirección**. Dicho eso, con honestidad: **la app todavía no ofrece cambiar el endpoint**;
+hoy, para apuntar a otra dirección hay que volver a emparejar. Está en el issue #22.
+
+Y el único camino que llega al plugin es el **nombre del tailnet**, porque escucha solo en
+loopback. La LAN directa no está implementada.
 
 ---
 
@@ -109,6 +114,8 @@ El plugin escucha en `127.0.0.1:6768` y expone:
 | `WS /ws`      | El contrato `dsh-mobile/1`                               |
 
 Variables de entorno: `DSH_MOBILE_PORT`, `DSH_MOBILE_PUBLIC_URL`, `DSH_MOBILE_WEB_ROOT`.
+`DSH_MOBILE_LOG_FILE=0` desactiva el archivo de evidencia del plugin (lo usan las pruebas y
+las herramientas de vista previa para no ensuciar el log del usuario).
 
 ### Qué puedes hacer desde el teléfono
 
@@ -121,10 +128,12 @@ Variables de entorno: `DSH_MOBILE_PORT`, `DSH_MOBILE_PUBLIC_URL`, `DSH_MOBILE_WE
 
 ## Seguridad
 
-- **Loopback por defecto.** El listener no se expone a la red hasta que existe
-  autenticación por dispositivo.
+- **Solo loopback.** La dirección de escucha es una constante en el código, no una opción: el
+  plugin atiende en `127.0.0.1` y se publica por el nombre del tailnet con `tailscale serve`.
+  **No acepta conexiones directas desde la LAN** porque nunca abre ese socket.
 - **Nunca a internet sin autenticación sólida.** Esto es un cliente que puede ejecutar
-  acciones en tu máquina. LAN y tailnet primero.
+  acciones en tu máquina. Hoy la red privada del tailnet es el único camino soportado;
+  exponerlo a internet no lo es.
 - **Token por dispositivo, guardado en hash.** Revocar uno no afecta a los demás.
 - **El host decide.** El cliente no oculta por CSS lo que no puede hacer: el servidor no
   lo envía.

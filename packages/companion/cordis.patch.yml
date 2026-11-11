@@ -9,8 +9,10 @@
 #         name: '@dsh-mobile/companion'
 #         config: {}
 #
-# El plugin escucha en 127.0.0.1:6768 (loopback). No se expone a la red hasta
-# que exista autenticación por dispositivo.
+# El plugin escucha en 127.0.0.1:6768 (loopback fijo: no hay modo de red). La
+# autenticación por dispositivo ya existe; para llegar desde un teléfono se
+# publica por el nombre del tailnet con `tailscale serve`, que sí alcanza el
+# loopback y aporta HTTPS. La LAN directa no está soportada.
 
 - insert:
     - id: dsh-mobile-companion
