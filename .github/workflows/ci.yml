@@ -43,5 +43,17 @@ jobs:
       - name: Build
         run: pnpm build
 
+      # Los PNG del manifest se commitean. Si alguien toca un SVG y no regenera,
+      # quedan desincronizados y nadie se entera hasta ver el icono viejo en el
+      # teléfono.
+      - name: Iconos al día
+        run: pnpm --filter @dsh-mobile/app icons --check
+
+      # Levanta el servidor compilado sirviendo la PWA compilada y recorre el
+      # contrato entero. Sin esto, las comprobaciones de integración no protegen
+      # ninguna fusión.
+      - name: Humo
+        run: pnpm smoke
+
       - name: Tests
         run: pnpm test
