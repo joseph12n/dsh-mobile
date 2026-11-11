@@ -140,7 +140,12 @@ export const HistoryOkMessage = message('history.ok', {
 
 export const ReplyOkMessage = message('reply.ok', {
   sessionId: SessionId,
-  seq: z.number().int().nonnegative(),
+  /**
+   * Cursor tras aceptar el mensaje, si el host lo conoce. El `prompt` de DSH
+   * confirma la aceptación pero no devuelve la posición en el registro: el
+   * cliente se queda con lo que llegue por el flujo de eventos.
+   */
+  seq: z.number().int().nonnegative().optional(),
 });
 
 export const AnswerOkMessage = message('answer.ok', {

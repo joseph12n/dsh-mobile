@@ -72,6 +72,11 @@ export interface ServerDeps {
   ) => { stop(): void };
   /** Cancela el turno en curso. */
   cancelRun?: (sessionId: string) => boolean;
+  /** Envía texto a una sesión. */
+  sendReply?: (
+    sessionId: string,
+    text: string,
+  ) => Promise<{ ok: boolean; message?: string; code?: 'not-found' | 'bad-request' | 'internal' }>;
 }
 
 export interface RunningServer {
@@ -435,6 +440,38 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
           at: Date.now(),
           type: 'answer.ok',
           callId: message.callId,
+        });
+        return;
+      }
+
+      if (message.type === 'reply.send') {
+        if (!deps.sendReply) {
+          send(socket, errorMessage(message.id, 'bad-request', 'Este host no puede escribir.'));
+          return;
+        }
+
+        const outcome = await deps.sendReply(message.sessionId, message.text);
+        if (socket.readyState !== socket.OPEN) return;
+
+        if (!outcome.ok) {
+          send(
+            socket,
+            errorMessage(
+              message.id,
+              outcome.code ?? 'internal',
+              outcome.message ?? 'No pude enviar el mensaje.',
+            ),
+          );
+          return;
+        }
+
+        // Sin `seq`: `prompt` confirma la aceptación, no la posición.
+        send(socket, {
+          v: PROTOCOL_VERSION,
+          id: message.id,
+          at: Date.now(),
+          type: 'reply.ok',
+          sessionId: message.sessionId,
         });
         return;
       }

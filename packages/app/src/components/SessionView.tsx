@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { HistoryEntry, SessionSummary, TranscriptEvent } from '@dsh-mobile/protocol';
 
 /**
@@ -59,6 +60,7 @@ export function SessionView({
   onBack,
   onLoadMore,
   onCancel,
+  onSend,
 }: {
   session: SessionSummary;
   entries: HistoryEntry[];
@@ -67,7 +69,17 @@ export function SessionView({
   onBack: () => void;
   onLoadMore: () => void;
   onCancel: () => void;
+  onSend: (text: string) => void;
 }) {
+  const [draft, setDraft] = useState('');
+
+  const send = (): void => {
+    const text = draft.trim();
+    if (!text) return;
+    onSend(text);
+    setDraft('');
+  };
+
   return (
     <section className="card session-view">
       <div className="row">
@@ -97,6 +109,27 @@ export function SessionView({
           ))}
         </ul>
       )}
+
+      {/* Composer fijo al final: se escribe sin perder de vista la conversación. */}
+      <div className="composer">
+        <textarea
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+          onKeyDown={(event) => {
+            // Enter envía; Shift+Enter hace salto de línea.
+            if (event.key === 'Enter' && !event.shiftKey) {
+              event.preventDefault();
+              send();
+            }
+          }}
+          placeholder="Escribe al agente…"
+          rows={2}
+          autoCapitalize="sentences"
+        />
+        <button type="button" onClick={send} disabled={!draft.trim()}>
+          Enviar
+        </button>
+      </div>
     </section>
   );
 }
