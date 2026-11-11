@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { HistoryEntry, SessionSummary, TranscriptEvent } from '@dsh-mobile/protocol';
+import { groupTurns, toolEntries, visibleEntries, type Turn } from '../lib/turns.js';
 
 /**
  * Transcripción de una sesión.
@@ -49,6 +50,75 @@ function EventRow({ entry }: { entry: HistoryEntry }) {
       <span>{STATE_LABEL[event.state] ?? event.state}</span>
       <span className="muted small">{timeOf(entry.at)}</span>
     </li>
+  );
+}
+
+/**
+ * Un turno: lo que pidió el humano y lo que provocó.
+ *
+ * Las herramientas van **plegadas** porque son muchas y ruidosas; lo que cuenta
+ * qué pasó —mensajes y cambios de estado— siempre se ve. La primera pregunta de
+ * cada turno hace de encabezado, así que no se repite abajo.
+ */
+function TurnBlock({ turn, number }: { turn: Turn; number: number }) {
+  const [showTools, setShowTools] = useState(false);
+
+  const prompts = turn.entries.filter(
+    (entry) => entry.event.kind === 'message' && entry.event.role === 'user',
+  );
+  const rest = turn.entries.filter((entry) => !prompts.includes(entry));
+  const tools = toolEntries(turn);
+  const visible = visibleEntries(turn).filter((entry) => !prompts.includes(entry));
+
+  return (
+    <section className="turn">
+      <header className="turn-head">
+        <span className="turn-number">Turno {number}</span>
+        <span className="muted small">{timeOf(turn.at)}</span>
+      </header>
+
+      <ul className="transcript">
+        {prompts.map((entry) => (
+          <EventRow key={entry.seq} entry={entry} />
+        ))}
+
+        {visible.map((entry) => (
+          <EventRow key={`${entry.seq}-${entry.event.kind}`} entry={entry} />
+        ))}
+
+        {tools.length > 0 && (
+          <li className="tool-group">
+            <button
+              type="button"
+              className="ghost tiny"
+              onClick={() => setShowTools((previous) => !previous)}
+              aria-expanded={showTools}
+              aria-controls={`herramientas-${turn.id}`}
+            >
+              {tools.length} herramienta{tools.length > 1 ? 's' : ''}
+              {showTools ? ' · ocultar' : ''}
+            </button>
+
+            {showTools && (
+              <ul className="transcript nested" id={`herramientas-${turn.id}`}>
+                {tools.map((entry) => (
+                  <EventRow key={`${entry.seq}-${entry.event.kind}`} entry={entry} />
+                ))}
+              </ul>
+            )}
+          </li>
+        )}
+
+        {/* Entradas que no son ni pregunta, ni mensaje visible, ni herramienta:
+            no debería quedar ninguna, pero si queda se pinta en vez de perderse. */}
+        {rest
+          .filter((entry) => entry.event.kind !== 'tool')
+          .filter((entry) => !visible.includes(entry))
+          .map((entry) => (
+            <EventRow key={`resto-${entry.seq}`} entry={entry} />
+          ))}
+      </ul>
+    </section>
   );
 }
 
@@ -103,11 +173,11 @@ export function SessionView({
       {entries.length === 0 ? (
         <p className="muted">{loading ? 'Cargando…' : 'Todavía no hay nada que mostrar.'}</p>
       ) : (
-        <ul className="transcript">
-          {entries.map((entry) => (
-            <EventRow key={`${entry.seq}-${entry.event.kind}`} entry={entry} />
+        <div className="transcript">
+          {groupTurns(entries).map((turn, index) => (
+            <TurnBlock key={turn.id} turn={turn} number={index + 1} />
           ))}
-        </ul>
+        </div>
       )}
 
       {/* Composer fijo al final: se escribe sin perder de vista la conversación. */}
