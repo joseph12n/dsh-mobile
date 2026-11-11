@@ -125,13 +125,15 @@ https://<host>/#/pair?v=1&c=<código>&e=<endpoint>
 - El canje crea un **token de dispositivo** de 32 bytes que se entrega **una vez**. En
   disco solo queda su **SHA-256**, comparado en tiempo constante.
 
-El endpoint de conexión es editable **sin re-emparejar**: el token es del dispositivo, no de
-la red.
+El token es del dispositivo, no de la red: **el protocolo no ata la conexión a una dirección**.
 
-Aclaración importante: hoy el plugin escucha **solo en loopback**, así que la LAN directa no
-funciona. Se publica por el nombre del tailnet con `tailscale serve`, que sí llega al loopback
-y además aporta HTTPS. Que el endpoint sea editable es una propiedad del diseño, no una
-promesa de que cualquier red funcione hoy.
+Dicho eso, con honestidad: **la app todavía no ofrece cambiar el endpoint**. Hoy, para
+apuntar a otra dirección hay que volver a emparejar. Que el token no esté atado a la red es
+una propiedad del diseño, no una función disponible. El ajuste está en el issue #22.
+
+Y hoy el plugin escucha **solo en loopback**, así que la LAN directa no funciona. Se publica
+por el nombre del tailnet con `tailscale serve`, que sí llega al loopback y además aporta
+HTTPS.
 
 ## 9. Preguntas: el lote es la unidad
 
@@ -153,8 +155,9 @@ host responde `not-found` diciéndolo.
 
 ## 11. Seguridad
 
-- **Loopback por defecto.** El listener no se expone a la red hasta que hay autenticación
-  por dispositivo.
+- **Loopback por defecto.** El listener se enlaza a `127.0.0.1` y no acepta conexiones
+  directas desde la LAN. Se publica por el nombre del tailnet con `tailscale serve`, porque
+  la autenticación por dispositivo ya existe y no se quiere un puerto abierto.
 - **Token por dispositivo**, guardado en hash; revocar uno no afecta a los demás.
 - **Alcance acotado**: sesiones, preguntas y ejecuciones. Nada de ajustes, credenciales ni
   gestión de plugins.
