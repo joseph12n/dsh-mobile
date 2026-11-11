@@ -113,6 +113,15 @@ El plugin escucha en `127.0.0.1:6768` y expone:
 | `GET /health` | Estado, versión de protocolo, capacidades y dispositivos |
 | `WS /ws`      | El contrato `dsh-mobile/1`                               |
 
+### El comando `/mobile`
+
+Dentro de DSH, `/mobile` imprime **el enlace de emparejamiento, el código y su caducidad**,
+sin tener que abrir `/pair` a mano ni copiar una URL de la consola. `/mobile estado` muestra
+el sondeo de diagnóstico.
+
+El enlace sale con el nombre del tailnet si Tailscale está instalado, así que se puede abrir
+directamente desde el teléfono. Si no lo está, avisa de que el enlace apunta a loopback.
+
 Variables de entorno: `DSH_MOBILE_PORT`, `DSH_MOBILE_PUBLIC_URL`, `DSH_MOBILE_WEB_ROOT`.
 `DSH_MOBILE_LOG_FILE=0` desactiva el archivo de evidencia del plugin (lo usan las pruebas y
 las herramientas de vista previa para no ensuciar el log del usuario).

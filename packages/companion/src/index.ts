@@ -4,14 +4,16 @@ import { PairingService } from './core/pairing.js';
 import { DevicesFile } from './persist/devices-file.js';
 import { join } from 'node:path';
 import { findWebRoot } from './routes/web-root.js';
+import { resolvePublicOrigin, type ResolvedOrigin } from './public-origin.js';
 import { listSessions } from './dsh/session-source.js';
 import { answerQuestion, listPendingQuestions } from './dsh/questions.js';
 import { cancelRun, readHistory, subscribeSession } from './dsh/transcript.js';
 import { injectText } from './dsh/prompt.js';
+import { buildPairingMessage } from './pairing-message.js';
 import { resolveSessionId } from './dsh/sessions.js';
 import type { HostContext } from './host-api.js';
 import { reportToLog, reportToText, runProbe, type ProbeReport } from './probe.js';
-import { startCompanionServer } from './server.js';
+import { DEFAULT_PORT, startCompanionServer } from './server.js';
 
 /**
  * dsh-mobile companion — plugin host.
@@ -31,8 +33,7 @@ export const name = 'dsh-mobile-companion';
  */
 export const inject = ['sessions', 'sessionProjections', 'commands'];
 
-const COMMAND_DESCRIPTION =
-  'Sondeo del compañero móvil: sesiones, preguntas pendientes y listener (Fase 0)';
+const COMMAND_DESCRIPTION = 'Empareja el teléfono o consulta el estado del compañero móvil';
 
 export function apply(ctx: HostContext): void {
   log(`plugin cargado · evidencia en ${PROBE_LOG_PATH}`);
@@ -45,22 +46,65 @@ export function apply(ctx: HostContext): void {
     return report;
   };
 
-  // --- Comando /mobile: el sondeo bajo demanda ---------------------------------
+  // --- Emparejamiento bajo demanda ---------------------------------------------
+  // El origen público se resuelve en segundo plano: consultar Tailscale no debe
+  // bloquear la carga del plugin.
+  let origin: ResolvedOrigin | undefined;
+  let listeningPort: number | undefined;
+  let listenerError: string | undefined;
+
+  /** Resuelve el origen público. No lanza: un fallo deja el nivel anterior. */
+  const detectOrigin = async (port: number): Promise<void> => {
+    try {
+      origin = await resolvePublicOrigin(publicUrl, port);
+      log(`origen público para el emparejamiento: ${origin.origin} (${origin.source})`);
+    } catch {
+      // Sin detección, el comando ya cae a loopback y lo avisa.
+    }
+  };
+
+  // --- Comando /mobile: emparejamiento; /mobile estado: sondeo ------------------
   if (ctx.commands) {
     const register = (): (() => void) =>
       ctx.commands!.register({
         name: 'mobile',
         description: COMMAND_DESCRIPTION,
         input: { hint: '[estado]' },
-        handler: () => {
+        handler: (invocation) => {
+          const argument = (invocation.rawInput ?? '').trim().toLowerCase();
+
+          // `estado` mantiene el sondeo de desarrollo, que ya no estorba en la
+          // ruta principal.
+          if (argument === 'estado' || argument === 'probe') {
+            try {
+              const report = probe();
+              return {
+                kind: 'success',
+                text: `${reportToText(report)}\n\nEvidencia completa: ${PROBE_LOG_PATH}`,
+              };
+            } catch (error) {
+              return { kind: 'error', text: `El sondeo falló: ${String(error)}` };
+            }
+          }
+
           try {
-            const report = probe();
+            const current = pairing.pending()[0] ?? pairing.issue();
+            const message = buildPairingMessage({
+              code: current.code,
+              expiresAt: current.expiresAt,
+              origin,
+              port: listeningPort,
+              listenerError,
+              fallbackPort: DEFAULT_PORT,
+            });
+
+            // Sin listener no hay éxito posible: que se vea como fallo.
             return {
-              kind: 'success',
-              text: `${reportToText(report)}\n\nEvidencia completa: ${PROBE_LOG_PATH}`,
+              kind: message.compromised && listenerError ? 'error' : 'success',
+              text: message.text,
             };
           } catch (error) {
-            return { kind: 'error', text: `El sondeo falló: ${String(error)}` };
+            return { kind: 'error', text: `No pude preparar el emparejamiento: ${String(error)}` };
           }
         },
       });
@@ -153,10 +197,18 @@ export function apply(ctx: HostContext): void {
       disposers.push(() => {
         void running.close().catch(() => undefined);
       });
+
+      listeningPort = running.port;
       log(`listener listo en el puerto ${running.port} (prueba: GET /health)`);
+
+      // Se resuelve después de escuchar: así hay puerto para el último nivel.
+      void detectOrigin(running.port);
     })
     .catch((error: unknown) => {
-      log(`no pude abrir el listener: ${String(error)}`);
+      // Sin listener no hay a dónde emparejar, y el comando tiene que decirlo en
+      // vez de enseñar un enlace muerto.
+      listenerError = String(error);
+      log(`no pude abrir el listener: ${listenerError}`);
     });
 
   // --- Sondeo de arranque ------------------------------------------------------
