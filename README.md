@@ -138,6 +138,8 @@ la calle.
 
 ## Documentación
 
+- [`docs/phone-setup.md`](docs/phone-setup.md) — **cómo usarlo desde el teléfono**, paso a
+  paso, con Tailscale y los problemas típicos.
 - [`docs/architecture.md`](docs/architecture.md) — **por qué** está construido así: capas,
   protocolo, emparejamiento y decisiones descartadas.
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) — cómo trabajar en el repo.
