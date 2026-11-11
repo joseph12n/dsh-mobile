@@ -308,6 +308,7 @@ export function App() {
         <>
           <QuestionsCard
             questions={questions}
+            titleFor={(id) => view.sessions.find((item) => item.id === id)?.title ?? id}
             onSubmit={(callId, sessionId, answers) => void answer(callId, sessionId, answers)}
           />
 

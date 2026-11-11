@@ -1,12 +1,81 @@
+/* ---------------------------------------------------------------------------
+ * Tokens de diseño.
+ *
+ * No son inventados: salen del tema oscuro real de DeepSeek Harness
+ * (`@deepseek-ai/dsh-client-ui-theme`), donde los alias `--dsw-alias-*` apuntan a
+ * primitivos `--dsw-static-*`. Aquí están ya resueltos a su valor final.
+ *
+ * Para regenerarlos: node scripts/extract-dsh-tokens.mjs <ruta al client.js del tema>
+ *
+ * La idea es que este cliente no parezca otra app: misma base, mismas capas,
+ * mismos bordes y mismo texto que el escritorio.
+ * ------------------------------------------------------------------------- */
+
+@font-face {
+  font-family: 'Montserrat';
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+  src: url(/fonts/montserrat-light.woff2) format('woff2');
+}
+
+@font-face {
+  font-family: 'Montserrat';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url(/fonts/montserrat-regular.woff2) format('woff2');
+}
+
+@font-face {
+  font-family: 'Montserrat';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url(/fonts/montserrat-medium.woff2) format('woff2');
+}
+
 :root {
-  --bg: #0b0f14;
-  --surface: #131a23;
-  --line: #22303d;
-  --text: #e6edf3;
-  --muted: #8b9bab;
-  --accent: #4ade80;
-  --warn: #fbbf24;
-  --danger: #f87171;
+  /* Superficies */
+  --bg: #151517; /* dsw-alias-bg-base */
+  --surface: #232324; /* dsw-alias-bg-layer-1 */
+  --surface-2: #2c2c2e; /* dsw-alias-bg-layer-2 */
+  --surface-3: #353638; /* dsw-alias-bg-layer-3 */
+  --code-bg: #1b1b1c; /* dsw-alias-markdown-code-block */
+  --code-block-banner: #2c2c2e; /* dsw-alias-markdown-code-block-banner */
+
+  /* Bordes */
+  --line: #ffffff0f; /* dsw-alias-border-l1 */
+  --line-strong: #ffffff1f; /* dsw-alias-border-l2 */
+  --line-emphasis: #ffffff29; /* dsw-alias-border-l3 */
+
+  /* Texto */
+  --text: #f9fafb; /* dsw-alias-label-primary */
+  --text-secondary: #cfd3d6; /* dsw-alias-label-secondary */
+  --muted: #adb2b8; /* dsw-alias-label-tertiary */
+  --caption: #81858c; /* dsw-alias-label-caption */
+  --dimmed: #43454a; /* dsw-alias-label-dimmed */
+
+  /* Acción. Ojo: en DSH el botón primario es claro, no de color. */
+  --accent: #f9fafb; /* dsw-alias-button-primary-fill */
+  --accent-text: #0f1115; /* dsw-alias-label-primary-foreground */
+  --accent-hover: #ebeef2; /* dsw-alias-button-primary-hover */
+  --hover: #ffffff14; /* dsw-alias-interactive-bg-hover */
+  --link: #7aaaff; /* dsw-alias-link */
+
+  /* Estado */
+  --success: #22c55e; /* dsw-alias-state-success-primary */
+  --warn: #f59e0b; /* dsw-alias-state-warn-primary */
+  --danger: #f25a5a; /* dsw-alias-state-error-primary */
+  --business: #7aaaff; /* dsw-alias-state-business-primary */
+  --done: #a78bfa; /* dsw-alias-state-done-primary */
+  --idle: #545557; /* dsw-alias-state-idle-primary */
+
+  --radius: 12px;
+  --radius-lg: 16px;
+  --font: 'Montserrat', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+
   color-scheme: dark;
 }
 
@@ -20,12 +89,8 @@ body {
   padding: 0;
   background: var(--bg);
   color: var(--text);
-  font-family:
-    system-ui,
-    -apple-system,
-    'Segoe UI',
-    Roboto,
-    sans-serif;
+  font-family: var(--font);
+  font-weight: 400;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -48,16 +113,27 @@ body {
 
 .head h1 {
   margin: 0;
-  font-size: 28px;
-  letter-spacing: -0.02em;
+  font-size: 26px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.head p {
+  margin: 4px 0 0;
 }
 
 .muted {
   color: var(--muted);
   font-size: 14px;
+  font-weight: 400;
 }
 
 .small {
+  font-size: 12px;
+}
+
+.caption {
+  color: var(--caption);
   font-size: 12px;
 }
 
@@ -67,20 +143,17 @@ body {
   margin: 12px 0 0;
 }
 
-.head p {
-  margin: 4px 0 0;
-}
-
 .card {
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   padding: 20px;
 }
 
 .card h2 {
   margin: 0 0 8px;
-  font-size: 18px;
+  font-size: 17px;
+  font-weight: 500;
 }
 
 .card p {
@@ -117,11 +190,18 @@ body {
   width: 100%;
   min-height: 44px;
   padding: 10px 14px;
-  border-radius: 12px;
-  border: 1px solid var(--line);
-  background: #0e141b;
+  border-radius: var(--radius);
+  border: 1px solid var(--line-strong);
+  background: var(--surface-2);
   color: var(--text);
+  font-family: var(--font);
   font-size: 16px; /* 16px evita el zoom automático en iOS */
+}
+
+.field input::placeholder,
+.composer textarea::placeholder,
+.custom::placeholder {
+  color: var(--caption);
 }
 
 button {
@@ -129,27 +209,38 @@ button {
   min-height: 44px;
   width: 100%;
   padding: 12px 16px;
-  border-radius: 12px;
-  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  border: 1px solid transparent;
   background: var(--accent);
-  color: #04140a;
-  font-size: 16px;
-  font-weight: 600;
+  color: var(--accent-text);
+  font-family: var(--font);
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  background: var(--accent-hover);
 }
 
 button:disabled {
-  background: var(--line);
-  color: var(--muted);
+  background: var(--surface-3);
+  color: var(--caption);
+  cursor: default;
 }
 
 button.ghost {
   background: transparent;
-  color: var(--text);
-  border-color: var(--line);
-  font-weight: 500;
+  color: var(--text-secondary);
+  border-color: var(--line-strong);
+  font-weight: 400;
   width: auto;
   padding: 8px 14px;
   font-size: 14px;
+}
+
+button.ghost:hover:not(:disabled) {
+  background: var(--hover);
 }
 
 .sessions {
@@ -158,7 +249,7 @@ button.ghost {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .sessions li {
@@ -167,8 +258,8 @@ button.ghost {
   gap: 8px;
   padding: 14px;
   border: 1px solid var(--line);
-  border-radius: 12px;
-  background: #0e141b;
+  border-radius: var(--radius);
+  background: var(--bg);
 }
 
 .session-main {
@@ -180,7 +271,7 @@ button.ghost {
 
 .session-title {
   font-size: 15px;
-  font-weight: 600;
+  font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -196,18 +287,24 @@ button.ghost {
   font-size: 12px;
   padding: 3px 9px;
   border-radius: 999px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-strong);
   color: var(--muted);
+  font-weight: 400;
 }
 
 .badge.working {
-  color: var(--accent);
-  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  color: var(--business);
+  border-color: color-mix(in srgb, var(--business) 40%, transparent);
 }
 
 .badge.waiting {
   color: var(--warn);
   border-color: color-mix(in srgb, var(--warn) 40%, transparent);
+}
+
+.badge.done {
+  color: var(--done);
+  border-color: color-mix(in srgb, var(--done) 40%, transparent);
 }
 
 .badge.error {
@@ -253,17 +350,17 @@ button.ghost {
 .question-detail {
   margin: 0 0 12px;
   padding: 10px 12px;
-  border-radius: 10px;
-  background: #0b1118;
+  border-radius: var(--radius);
+  background: var(--code-bg);
   border: 1px solid var(--line);
-  color: var(--muted);
+  color: var(--text-secondary);
   font-size: 12.5px;
   line-height: 1.5;
   white-space: pre-wrap;
   word-break: break-word;
   max-height: 220px;
   overflow: auto;
-  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  font-family: var(--font-mono);
 }
 
 .options {
@@ -278,25 +375,27 @@ button.ghost {
   min-height: 44px;
   padding: 10px 16px;
   background: transparent;
-  color: var(--text);
-  border-color: var(--line);
-  font-weight: 500;
+  color: var(--text-secondary);
+  border-color: var(--line-strong);
+  font-weight: 400;
 }
 
 .option.chosen {
   background: var(--accent);
-  color: #04140a;
+  color: var(--accent-text);
   border-color: var(--accent);
+  font-weight: 500;
 }
 
 .custom {
   width: 100%;
   min-height: 44px;
   padding: 10px 14px;
-  border-radius: 12px;
-  border: 1px solid var(--line);
-  background: #0e141b;
+  border-radius: var(--radius);
+  border: 1px solid var(--line-strong);
+  background: var(--surface-2);
   color: var(--text);
+  font-family: var(--font);
   font-size: 16px;
 }
 
@@ -308,13 +407,14 @@ button.ghost {
 
 .session-row:hover,
 .session-row:focus-visible {
-  border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
+  border-color: var(--line-emphasis);
   outline: none;
 }
 
 .session-heading {
   margin: 12px 0 4px;
   font-size: 17px;
+  font-weight: 500;
   line-height: 1.3;
   overflow-wrap: anywhere;
 }
@@ -338,29 +438,29 @@ button.ghost {
   flex-direction: column;
   gap: 4px;
   padding: 12px 14px;
-  border-radius: 12px;
+  border-radius: var(--radius);
   border: 1px solid var(--line);
 }
 
 .msg.user {
-  background: #101a16;
-  border-color: color-mix(in srgb, var(--accent) 25%, var(--line));
+  background: var(--surface-2);
 }
 
 .msg.assistant {
-  background: #0e141b;
+  background: var(--bg);
 }
 
 .msg-role {
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--muted);
+  color: var(--caption);
+  font-weight: 500;
 }
 
 .msg p {
   margin: 0;
-  line-height: 1.5;
+  line-height: 1.55;
   color: var(--text);
   font-size: 14.5px;
   white-space: pre-wrap;
@@ -373,16 +473,16 @@ button.ghost {
   align-items: baseline;
   flex-wrap: wrap;
   padding: 8px 12px;
-  border-radius: 10px;
-  background: #0b1118;
+  border-radius: var(--radius);
+  background: var(--code-bg);
   border: 1px solid var(--line);
   font-size: 12.5px;
   color: var(--muted);
 }
 
 .tool-name {
-  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
-  color: var(--text);
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
 }
 
 .tool-summary {
@@ -403,7 +503,7 @@ button.ghost {
   gap: 12px;
   padding: 4px 2px;
   font-size: 12px;
-  color: var(--muted);
+  color: var(--caption);
 }
 
 /* --- Composer ------------------------------------------------------------- */
@@ -424,11 +524,11 @@ button.ghost {
   min-height: 44px;
   max-height: 140px;
   padding: 11px 14px;
-  border-radius: 12px;
-  border: 1px solid var(--line);
-  background: #0e141b;
+  border-radius: var(--radius);
+  border: 1px solid var(--line-strong);
+  background: var(--surface-2);
   color: var(--text);
-  font-family: inherit;
+  font-family: var(--font);
   /* 16px evita el zoom automático de iOS al enfocar. */
   font-size: 16px;
   line-height: 1.4;

@@ -11,9 +11,12 @@ import type { QuestionAnswerItem, QuestionBatch } from '@dsh-mobile/protocol';
  */
 export function QuestionsCard({
   questions,
+  titleFor,
   onSubmit,
 }: {
   questions: QuestionBatch[];
+  /** Título legible de la sesión; el id crudo no le dice nada a nadie. */
+  titleFor?: (sessionId: string) => string;
   onSubmit: (callId: string, sessionId: string, answers: QuestionAnswerItem[]) => void;
 }) {
   const [selected, setSelected] = useState<Record<string, string[]>>({});
@@ -54,7 +57,7 @@ export function QuestionsCard({
 
       {questions.map((batch) => (
         <div key={batch.callId} className="question-batch">
-          <p className="muted small">{batch.sessionId}</p>
+          <p className="muted small">{titleFor?.(batch.sessionId) ?? batch.sessionId}</p>
 
           {batch.items.map((item) => {
             const key = `${batch.callId}:${item.id}`;
