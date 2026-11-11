@@ -49,7 +49,9 @@ export function SessionList({
                   className="ghost tiny"
                   onClick={() => setShowStale((previous) => !previous)}
                   aria-expanded={showStale}
-                  aria-controls={`grupo-${section.kind}`}
+                  // Solo apunta al grupo cuando existe: un `aria-controls` que
+                  // cuelga de un elemento no renderizado es una referencia rota.
+                  aria-controls={showStale ? `grupo-${section.kind}` : undefined}
                 >
                   {showStale ? 'Ocultar' : 'Mostrar'}
                 </button>

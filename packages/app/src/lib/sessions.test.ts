@@ -113,7 +113,7 @@ describe('tiempo relativo', () => {
 });
 
 describe('bordes del corte de antigüedad', () => {
-  it('justo en siete días todavía no es "Más antiguas"', () => {
+  it('justo en siete días ya es "Más antiguas"', () => {
     // El límite es inclusivo por abajo: a los 7 días exactos ya es antigua, y el
     // texto no debe decir "hace 6 d" mientras está en ese grupo.
     const exacto = session({ id: 'exacto', updatedAt: NOW - STALE_AFTER_MS });
@@ -130,5 +130,15 @@ describe('bordes del corte de antigüedad', () => {
     // Decía "hace 7 d" estando todavía en "En reposo", que se contradice.
     const seisYMedio = NOW - 6.5 * 86_400_000;
     expect(relativeTime(seisYMedio, NOW)).toBe('hace 6 d');
+  });
+
+  it('el texto dice 6 días en el último instante antes del corte', () => {
+    // El redondeo de segundos hacía que el texto dijera "hace 7 d" medio segundo
+    // antes de entrar en el grupo.
+    expect(relativeTime(NOW - (STALE_AFTER_MS - 1), NOW)).toBe('hace 6 d');
+  });
+
+  it('el texto dice 7 días en cuanto entra en el grupo', () => {
+    expect(relativeTime(NOW - STALE_AFTER_MS, NOW)).toBe('hace 7 d');
   });
 });

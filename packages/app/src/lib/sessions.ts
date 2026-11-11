@@ -85,7 +85,9 @@ export function groupSessions(
 export function relativeTime(timestamp: number, now: number = Date.now()): string {
   if (!timestamp) return '';
 
-  const seconds = Math.max(0, Math.round((now - timestamp) / 1000));
+  // Suelo en segundos, no redondeo: redondear hacia arriba hacía que el texto
+  // dijera "hace 7 d" medio segundo antes de que la sesión entrara en ese grupo.
+  const seconds = Math.max(0, Math.floor((now - timestamp) / 1000));
   if (seconds < 60) return 'ahora';
 
   const minutes = Math.floor(seconds / 60);

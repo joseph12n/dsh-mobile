@@ -460,11 +460,8 @@ button.ghost.tiny {
   border-color: var(--line-emphasis);
 }
 
-/* Quitar el contorno sin poner otro dejaba el foco invisible: 1,63:1. */
-.session-row:focus-visible {
-  outline: 2px solid var(--link);
-  outline-offset: 2px;
-}
+/* Quitar el contorno sin poner otro dejaba el foco invisible: 1,63:1. La regla
+   global de `[role='button']:focus-visible` ya cubre este caso. */
 
 .session-heading {
   margin: 12px 0 4px;
