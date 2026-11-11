@@ -1,5 +1,6 @@
 import { once } from 'node:events';
 import { mkdtempSync, writeFileSync } from 'node:fs';
+import { request as httpRequest } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -106,6 +107,33 @@ function hello(extra: Record<string, unknown> = {}): Record<string, unknown> {
   return { v: PROTOCOL_VERSION, id: 'hello', at: Date.now(), type: 'hello', proto: 1, ...extra };
 }
 
+/**
+ * Petición GET con una cabecera `Host` concreta.
+ *
+ * `fetch` no deja fijarla porque es una cabecera reservada, así que aquí se usa
+ * `node:http` directamente. Sirve para simular el proxy del tailnet.
+ */
+function getWithHost(
+  port: number,
+  path: string,
+  host: string,
+  extraHeaders: Record<string, string> = {},
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const request = httpRequest(
+      { host: '127.0.0.1', port, path, method: 'GET', headers: { ...extraHeaders, host } },
+      (response) => {
+        let body = '';
+        response.setEncoding('utf8');
+        response.on('data', (chunk: string) => (body += chunk));
+        response.on('end', () => resolve(body));
+      },
+    );
+    request.on('error', reject);
+    request.end();
+  });
+}
+
 describe('superficie HTTP', () => {
   it('responde /health con el protocolo y los dispositivos', async () => {
     const response = await fetch(`http://${base}/health`);
@@ -150,6 +178,86 @@ describe('superficie HTTP', () => {
     expect(html).toContain('data:image/png;base64,');
     expect(html).toContain('#/pair');
     expect(html).toContain('https://maquina.tailnet.ts.net');
+  });
+
+  it('el QR toma la dirección por la que se entró, y avisa si es loopback', async () => {
+    // Sin URL pública el origen sale del Host; este servidor no tiene ninguna fijada.
+    const server = await startCompanionServer({
+      pairing: new PairingService(),
+      devices: new DeviceRegistry({ persistence: new MemoryPersistence() }),
+      port: 0,
+    });
+
+    try {
+      const localHtml = await (await fetch(`http://127.0.0.1:${server.port}/pair`)).text();
+      expect(localHtml).toContain('http://127.0.0.1:');
+      expect(localHtml).toContain('no va a funcionar desde el teléfono');
+
+      // `fetch` prohíbe fijar Host (es cabecera reservada), así que se usa http
+      // crudo: es la única forma de simular el proxy del tailnet.
+      const remoteHtml = await getWithHost(server.port, '/pair', 'maquina.tailnet.ts.net');
+      expect(remoteHtml).toContain('https://maquina.tailnet.ts.net');
+      expect(remoteHtml).not.toContain('no va a funcionar desde el teléfono');
+
+      const healthRaw = await getWithHost(server.port, '/health', '127.0.0.1');
+      const health = JSON.parse(healthRaw) as {
+        origin?: string;
+        warning?: string;
+        warningSeverity?: string;
+      };
+      expect(health.origin).toContain('127.0.0.1');
+      expect(health.warning).toContain('teléfono');
+      expect(health.warningSeverity).toBe('blocking');
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('un Host inválido no tumba /pair ni deja la petición sin respuesta', async () => {
+    // Hallazgo de revisión: el `Host` lo controla el cliente y llegaba hasta
+    // `new URL()`, que lanzaba. Sin respuesta, y sin manejador global, caía el host.
+    const server = await startCompanionServer({
+      pairing: new PairingService(),
+      devices: new DeviceRegistry({ persistence: new MemoryPersistence() }),
+      port: 0,
+    });
+
+    try {
+      // Solo valores que el cliente HTTP de Node acepte enviar: un carácter NUL
+      // lo rechaza él mismo antes de salir, y ese caso ya lo cubre la prueba
+      // unitaria de `publicOriginFor`.
+      for (const host of ['a b', 'ejemplo:99999', '[::1', 'http://']) {
+        const html = await getWithHost(server.port, '/pair', host);
+        expect(html, host).toContain('data:image/png;base64,');
+        // Cae al listener y lo dice, en vez de reventar.
+        expect(html, host).toContain('http://127.0.0.1:');
+      }
+
+      // El servidor sigue vivo después de los intentos.
+      const health = await fetch(`http://127.0.0.1:${server.port}/health`);
+      expect(health.status).toBe(200);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('avisa sin bloquear cuando el proxy declara http', async () => {
+    const server = await startCompanionServer({
+      pairing: new PairingService(),
+      devices: new DeviceRegistry({ persistence: new MemoryPersistence() }),
+      port: 0,
+    });
+
+    try {
+      const html = await getWithHost(server.port, '/pair', 'maquina.tailnet.ts.net', {
+        'x-forwarded-proto': 'http',
+      });
+      expect(html).toContain('http://maquina.tailnet.ts.net');
+      expect(html).toContain('no podrás instalarla');
+      expect(html).not.toContain('no va a funcionar desde el teléfono');
+    } finally {
+      await server.close();
+    }
   });
 
   it('devuelve 404 en una ruta desconocida', async () => {
