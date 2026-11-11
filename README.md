@@ -6,9 +6,9 @@ Controla tus sesiones desde el teléfono: mira el estado, lee la transcripción,
 aprueba preguntas y lanza o cancela ejecuciones. El PC sigue siendo el que ejecuta todo;
 el móvil es un control remoto, no un segundo agente.
 
-> **Estado: fase 2 en curso.** El emparejamiento por QR, los tokens de dispositivo, el
-> listado de sesiones y la PWA que los consume funcionan y están probados. Falta la
-> transcripción y el puente de preguntas.
+> **Estado: fase 2 funcional.** Emparejar por QR, listar sesiones, leer la transcripción en
+> vivo, responder preguntas y aprobaciones, escribir y cancelar ejecuciones. Faltan las
+> tareas de despliegue y pulido, que están como issues en GitHub.
 
 ---
 
@@ -110,6 +110,13 @@ El plugin escucha en `127.0.0.1:6768` y expone:
 
 Variables de entorno: `DSH_MOBILE_PORT`, `DSH_MOBILE_PUBLIC_URL`, `DSH_MOBILE_WEB_ROOT`.
 
+### Qué puedes hacer desde el teléfono
+
+- Ver las sesiones vivas con su estado y cuántas preguntas esperan.
+- Abrir una sesión y leer la transcripción, con historial paginado y eventos en vivo.
+- **Responder preguntas y aprobaciones**, con el texto completo y las opciones.
+- **Escribir** al agente y **cancelar** el turno en curso.
+
 ---
 
 ## Seguridad
@@ -131,6 +138,8 @@ la calle.
 
 ## Documentación
 
+- [`docs/architecture.md`](docs/architecture.md) — **por qué** está construido así: capas,
+  protocolo, emparejamiento y decisiones descartadas.
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) — cómo trabajar en el repo.
 - [`packages/protocol/src/messages.ts`](packages/protocol/src/messages.ts) — el contrato,
   como código y como fuente de verdad.
