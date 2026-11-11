@@ -39,24 +39,38 @@ function contentTypeFor(file: string): string {
 }
 
 /**
- * Un recurso merece caché larga solo si Vite le puso hash en el nombre
- * (`index-a1b2c3.js`). Todo lo demás — el índice, el manifest, los iconos — debe
- * revalidarse, o una actualización del plugin dejaría al móvil con la versión
- * anterior pegada.
+ * Política de caché.
  *
- * Se decide sobre la **URL**, no sobre la ruta del archivo: en Windows esta
- * última lleva barras invertidas y nunca coincidiría.
+ * - Assets con hash en el nombre (los emite Vite): inmutables para siempre.
+ * - Fuentes: nombres estables, sin hash. Un día de caché reduce la descarga
+ *   repetida de ~180 KB sin arriesgar quedarse con una fuente vieja para siempre.
+ * - Todo lo demás, incluido `index.html`: revalidar siempre, o una actualización
+ *   del plugin dejaría al móvil con la versión anterior pegada.
  */
-export function isImmutable(urlPath: string): boolean {
+export function cacheControlFor(urlPath: string): string {
   const normalized = urlPath.split('?')[0]?.replace(/\\/g, '/') ?? '';
-  return /\/assets\/[^/]+-[A-Za-z0-9_-]{8,}\.[a-z0-9]+$/i.test(normalized);
+
+  if (/\/assets\/[^/]+-[A-Za-z0-9_-]{8,}\.[a-z0-9]+$/i.test(normalized)) {
+    return 'public, max-age=31536000, immutable';
+  }
+
+  if (/^\/fonts\/[^/]+\.(woff2?|ttf)$/i.test(normalized)) {
+    return 'public, max-age=86400';
+  }
+
+  return 'no-cache';
 }
 
-function headersFor(file: string, size: number, immutable: boolean): Record<string, string> {
+/** `true` si el recurso merece caché larga e inmutable. */
+export function isImmutable(urlPath: string): boolean {
+  return cacheControlFor(urlPath).includes('immutable');
+}
+
+function headersFor(file: string, size: number, cacheControl: string): Record<string, string> {
   return {
     'content-type': contentTypeFor(file),
     'content-length': String(size),
-    'cache-control': immutable ? 'public, max-age=31536000, immutable' : 'no-cache',
+    'cache-control': cacheControl,
     'x-content-type-options': 'nosniff',
   };
 }
@@ -111,7 +125,11 @@ export function serveStatic(root: string | undefined, urlPath: string): StaticRe
 
   try {
     const body = readFileSync(file);
-    return { status: 200, body, headers: headersFor(file, body.length, isImmutable(urlPath)) };
+    return {
+      status: 200,
+      body,
+      headers: headersFor(file, body.length, cacheControlFor(urlPath)),
+    };
   } catch {
     return { status: 404 };
   }

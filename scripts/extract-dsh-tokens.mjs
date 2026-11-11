@@ -6,10 +6,12 @@
 // una paleta hay que leer la suya. Los alias (`--dsw-alias-*`) apuntan a
 // primitivos (`--dsw-static-*`); esto sigue la cadena.
 //
-// Detalle que costó encontrar: el tema oscuro **no está en un solo bloque**. Hay
-// varias reglas `body[data-ds-dark-theme]{…}` repartidas por el archivo, y una
-// de ellas, la primera, solo redefine primitivos. Buscar la primera aparición
-// devuelve colores claros.
+// Detalles que costaron encontrar:
+//
+//  - El tema oscuro **no está en un solo bloque**. Hay varias reglas
+//    `body[data-ds-dark-theme]{…}` repartidas, y de ellas la primera solo
+//    redefine primitivos. Buscar la primera aparición devuelve colores claros.
+//  - En una cascada gana la **última** declaración, no la primera.
 import { readFileSync } from 'node:fs';
 
 const file = process.argv[2];
@@ -19,52 +21,68 @@ if (!file) {
 }
 
 const raw = readFileSync(file, 'utf8');
-const SELECTOR = 'body[data-ds-dark-theme]';
 
-/** Devuelve el contenido de todas las reglas del selector, concatenado. */
+// Se permite espacio antes de la llave: un `body[data-ds-dark-theme] {` con
+// espacio devolvía cero bloques y el script salía con éxito, sin avisar.
+const SELECTOR = /body\[data-ds-dark-theme\]\s*\{/g;
+
+/** Contenido de todas las reglas del selector, concatenado. */
 function darkBlocks(source) {
   const parts = [];
-  let from = 0;
 
-  for (;;) {
-    const start = source.indexOf(`${SELECTOR}{`, from);
-    if (start < 0) break;
-
-    const open = source.indexOf('{', start);
+  for (const match of source.matchAll(SELECTOR)) {
+    const open = match.index + match[0].length - 1;
     let depth = 0;
     let index = open;
 
     for (; index < source.length; index += 1) {
-      const character = source[index];
-      if (character === '{') depth += 1;
-      else if (character === '}') {
+      if (source[index] === '{') depth += 1;
+      else if (source[index] === '}') {
         depth -= 1;
         if (depth === 0) break;
       }
     }
 
     parts.push(source.slice(open + 1, index));
-    from = index + 1;
   }
 
   return parts.join(';');
 }
 
-/** Recoge `nombre: valor` de todas las declaraciones de un prefijo. */
-function collect(source, prefix) {
-  const pattern = new RegExp(`(${prefix}[a-z0-9-]+)\\s*:\\s*([^;{}]{1,80});`, 'gi');
+/**
+ * Declaraciones de un prefijo, en orden de cascada.
+ *
+ * Una sola expresión literal para los dos prefijos: construir el patrón con una
+ * variable es lo que marcaba el análisis estático.
+ */
+const DECLARATION = /(--dsw-(?:alias|static)-[a-z0-9-]+)\s*:\s*([^;{}]{1,200});/gi;
+
+function collect(source) {
   const out = new Map();
-  for (const match of source.matchAll(pattern)) {
-    if (!out.has(match[1])) out.set(match[1], match[2].trim());
+  for (const match of source.matchAll(DECLARATION)) {
+    // El valor más reciente gana: es lo que hace un navegador.
+    out.set(match[1], match[2].trim());
   }
   return out;
 }
 
+/** Solo las de un prefijo concreto. */
+function only(declarations, prefix) {
+  return new Map([...declarations].filter(([name]) => name.startsWith(prefix)));
+}
+
 const darkCss = darkBlocks(raw);
 
-// Los primitivos del tema oscuro mandan sobre los del claro cuando difieren.
-const statics = new Map([...collect(raw, '--dsw-static-'), ...collect(darkCss, '--dsw-static-')]);
-const aliases = collect(darkCss, '--dsw-alias-');
+if (darkCss.length === 0) {
+  console.error('no encontré ningún bloque del tema oscuro: ¿cambió el formato del paquete?');
+  process.exit(1);
+}
+
+// Los primitivos del tema oscuro mandan sobre los claros cuando difieren.
+const statics = new Map(
+  [...collect(raw), ...collect(darkCss)].filter(([name]) => name.startsWith('--dsw-static-')),
+);
+const aliases = only(collect(darkCss), '--dsw-alias-');
 
 /** Resuelve `var(--x)` hasta un valor literal. */
 function resolve(value, seen = new Set()) {
@@ -114,4 +132,9 @@ for (const group of groups) {
 
   console.log(`[${group.source.replace('^', '').replace('-', '')}]`);
   for (const [name, value] of entries) console.log(`  ${name} = ${value}`);
+}
+
+if (unresolved > 0) {
+  console.error(`\n${unresolved} alias sin resolver: revisa si el paquete cambió`);
+  process.exit(1);
 }

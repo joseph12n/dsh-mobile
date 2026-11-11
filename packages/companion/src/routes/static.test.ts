@@ -2,7 +2,7 @@ import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
-import { resolveAsset, serveStatic } from './static.js';
+import { cacheControlFor, resolveAsset, serveStatic } from './static.js';
 
 /**
  * El servido de la PWA. Lo que importa aquí no es que sirva archivos, sino que
@@ -104,5 +104,29 @@ describe('respuestas', () => {
   it('devuelve 404 si no hay índice', () => {
     const empty = mkdtempSync(join(tmpdir(), 'dsh-mobile-empty-'));
     expect(serveStatic(empty, '/').status).toBe(404);
+  });
+});
+
+describe('política de caché', () => {
+  it('los assets con hash son inmutables', () => {
+    expect(cacheControlFor('/assets/index-a1b2c3d4.js')).toContain('immutable');
+  });
+
+  it('las fuentes se cachean un día, sin immutable', () => {
+    // Sin hash en el nombre, immutables sería arriesgado: cambiar la fuente
+    // dejaría al móvil con la vieja para siempre.
+    const value = cacheControlFor('/fonts/montserrat-regular.woff2');
+    expect(value).toBe('public, max-age=86400');
+    expect(value).not.toContain('immutable');
+  });
+
+  it('el índice y el manifest siempre revalidan', () => {
+    expect(cacheControlFor('/')).toBe('no-cache');
+    expect(cacheControlFor('/manifest.webmanifest')).toBe('no-cache');
+    expect(cacheControlFor('/icon-192.png')).toBe('no-cache');
+  });
+
+  it('una fuente fuera de /fonts/ no recibe la caché de fuentes', () => {
+    expect(cacheControlFor('/assets/montserrat.woff2')).toBe('no-cache');
   });
 });

@@ -42,7 +42,6 @@
   --surface-2: #2c2c2e; /* dsw-alias-bg-layer-2 */
   --surface-3: #353638; /* dsw-alias-bg-layer-3 */
   --code-bg: #1b1b1c; /* dsw-alias-markdown-code-block */
-  --code-block-banner: #2c2c2e; /* dsw-alias-markdown-code-block-banner */
 
   /* Bordes */
   --line: #ffffff0f; /* dsw-alias-border-l1 */
@@ -53,8 +52,6 @@
   --text: #f9fafb; /* dsw-alias-label-primary */
   --text-secondary: #cfd3d6; /* dsw-alias-label-secondary */
   --muted: #adb2b8; /* dsw-alias-label-tertiary */
-  --caption: #81858c; /* dsw-alias-label-caption */
-  --dimmed: #43454a; /* dsw-alias-label-dimmed */
 
   /* Acción. Ojo: en DSH el botón primario es claro, no de color. */
   --accent: #f9fafb; /* dsw-alias-button-primary-fill */
@@ -64,12 +61,10 @@
   --link: #7aaaff; /* dsw-alias-link */
 
   /* Estado */
-  --success: #22c55e; /* dsw-alias-state-success-primary */
   --warn: #f59e0b; /* dsw-alias-state-warn-primary */
   --danger: #f25a5a; /* dsw-alias-state-error-primary */
   --business: #7aaaff; /* dsw-alias-state-business-primary */
   --done: #a78bfa; /* dsw-alias-state-done-primary */
-  --idle: #545557; /* dsw-alias-state-idle-primary */
 
   --radius: 12px;
   --radius-lg: 16px;
@@ -129,11 +124,6 @@ body {
 }
 
 .small {
-  font-size: 12px;
-}
-
-.caption {
-  color: var(--caption);
   font-size: 12px;
 }
 
@@ -201,7 +191,7 @@ body {
 .field input::placeholder,
 .composer textarea::placeholder,
 .custom::placeholder {
-  color: var(--caption);
+  color: var(--muted);
 }
 
 button {
@@ -219,13 +209,13 @@ button {
   cursor: pointer;
 }
 
-button:hover:not(:disabled) {
+button:hover:not(:disabled):not(.option) {
   background: var(--accent-hover);
 }
 
 button:disabled {
   background: var(--surface-3);
-  color: var(--caption);
+  color: var(--muted);
   cursor: default;
 }
 
@@ -405,10 +395,14 @@ button.ghost:hover:not(:disabled) {
   cursor: pointer;
 }
 
-.session-row:hover,
-.session-row:focus-visible {
+.session-row:hover {
   border-color: var(--line-emphasis);
-  outline: none;
+}
+
+/* Quitar el contorno sin poner otro dejaba el foco invisible: 1,63:1. */
+.session-row:focus-visible {
+  outline: 2px solid var(--link);
+  outline-offset: 2px;
 }
 
 .session-heading {
@@ -454,7 +448,7 @@ button.ghost:hover:not(:disabled) {
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--caption);
+  color: var(--muted);
   font-weight: 500;
 }
 
@@ -503,7 +497,7 @@ button.ghost:hover:not(:disabled) {
   gap: 12px;
   padding: 4px 2px;
   font-size: 12px;
-  color: var(--caption);
+  color: var(--muted);
 }
 
 /* --- Composer ------------------------------------------------------------- */

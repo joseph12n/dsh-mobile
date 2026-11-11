@@ -2,13 +2,18 @@
 //
 //   node scripts/preview-server.mjs [puerto]
 //
-// Sirve la PWA compilada con las piezas de host reales (emparejamiento,
-// dispositivos en memoria) y datos de ejemplo, para poder mirar la interfaz en
-// un navegador. No toca DSH ni el disco.
-import { startCompanionServer } from '../packages/companion/dist/server.js';
-import { findWebRoot } from '../packages/companion/dist/routes/web-root.js';
-import { PairingService } from '../packages/companion/dist/core/pairing.js';
-import { DeviceRegistry } from '../packages/companion/dist/core/devices.js';
+// Sirve la PWA compilada con datos de ejemplo en un puerto local, para poder
+// mirar la interfaz en un navegador.
+//
+// **No escribe en el log del plugin**: el módulo de log añade líneas a
+// `$DSH_HOME/companion/probe.log`, así que aquí se desactiva antes de importarlo.
+// La variable se lee al cargar el módulo, de ahí el import dinámico.
+process.env.DSH_MOBILE_LOG_FILE = '0';
+
+const { startCompanionServer } = await import('../packages/companion/dist/server.js');
+const { findWebRoot } = await import('../packages/companion/dist/routes/web-root.js');
+const { PairingService } = await import('../packages/companion/dist/core/pairing.js');
+const { DeviceRegistry } = await import('../packages/companion/dist/core/devices.js');
 
 const port = Number(process.argv[2] ?? 6799);
 const memory = {

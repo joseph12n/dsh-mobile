@@ -154,18 +154,28 @@ function pairingPage(
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Emparejar DSH Mobile</title>
 <style>
+  /* Mismos tokens que la app, sacados del tema oscuro de DSH. */
+  @font-face {
+    font-family: 'Montserrat';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url(/fonts/montserrat-regular.woff2) format('woff2');
+  }
   :root { color-scheme: dark; }
-  body { margin:0; min-height:100dvh; display:grid; place-items:center; background:#0b0f14; color:#e6edf3;
-         font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  body { margin:0; min-height:100dvh; display:grid; place-items:center; background:#151517; color:#f9fafb;
+         font-family: 'Montserrat', system-ui, -apple-system, "Segoe UI", sans-serif; font-weight:400; }
   main { text-align:center; padding:32px 24px; max-width:560px; }
-  h1 { font-size:20px; margin:0 0 8px; }
-  p { color:#8b9bab; margin:0 0 24px; font-size:14px; }
+  h1 { font-size:20px; font-weight:500; margin:0 0 8px; }
+  p { color:#adb2b8; margin:0 0 24px; font-size:14px; }
   .warn { text-align:left; margin:0 0 20px; padding:12px 14px; border-radius:12px;
-          border:1px solid #7f1d1d; background:#1f1013; color:#fca5a5; font-size:13px; line-height:1.5; }
-  .warn.warning { border-color:#78350f; background:#1c1508; color:#fcd34d; }
+          border:1px solid color-mix(in srgb, #f25a5a 55%, transparent); background:#1f1416; color:#f25a5a;
+          font-size:13px; line-height:1.5; }
+  .warn.warning { border-color: color-mix(in srgb, #f59e0b 55%, transparent); background:#1c1508; color:#f59e0b; }
   img { width:min(320px,80vw); height:auto; background:#fff; border-radius:16px; padding:12px; }
-  code { display:block; margin:20px auto 0; font-size:15px; letter-spacing:2px; color:#4ade80; word-break:break-all; }
-  small { display:block; margin-top:12px; color:#8b9bab; }
+  code { display:block; margin:20px auto 0; font-size:15px; letter-spacing:2px; color:#f9fafb;
+         font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace; word-break:break-all; }
+  small { display:block; margin-top:12px; color:#adb2b8; }
   small.link { word-break:break-all; }
 </style>
 <main>
