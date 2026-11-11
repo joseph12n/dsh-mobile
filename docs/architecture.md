@@ -125,8 +125,13 @@ https://<host>/#/pair?v=1&c=<código>&e=<endpoint>
 - El canje crea un **token de dispositivo** de 32 bytes que se entrega **una vez**. En
   disco solo queda su **SHA-256**, comparado en tiempo constante.
 
-Cambiar de red (LAN ↔ tailnet) es editar el endpoint **sin re-emparejar**: el token es del
-dispositivo, no de la red.
+El endpoint de conexión es editable **sin re-emparejar**: el token es del dispositivo, no de
+la red.
+
+Aclaración importante: hoy el plugin escucha **solo en loopback**, así que la LAN directa no
+funciona. Se publica por el nombre del tailnet con `tailscale serve`, que sí llega al loopback
+y además aporta HTTPS. Que el endpoint sea editable es una propiedad del diseño, no una
+promesa de que cualquier red funcione hoy.
 
 ## 9. Preguntas: el lote es la unidad
 

@@ -48,7 +48,9 @@ Un solo escaneo resuelve _a dónde_ conectarse y _quién_ eres. El código va en
 de la URL, así que no viaja al servidor ni queda en logs. Caduca a los 10 minutos, es de
 un solo uso y el canje crea un **token de dispositivo** guardado en hash.
 
-Cambiar de red (LAN ↔ tailnet) se hace editando el endpoint, **sin re-emparejar**.
+El endpoint de conexión es editable **sin re-emparejar**: el token es del dispositivo, no de
+la red. Hoy el único camino que llega al plugin es el **nombre del tailnet**, porque escucha
+solo en loopback; la LAN directa no está implementada.
 
 ---
 
@@ -121,8 +123,8 @@ Variables de entorno: `DSH_MOBILE_PORT`, `DSH_MOBILE_PUBLIC_URL`, `DSH_MOBILE_WE
 
 ## Seguridad
 
-- **Loopback por defecto.** El listener no se expone a la red hasta que existe
-  autenticación por dispositivo.
+- **Loopback por defecto.** El plugin escucha en `127.0.0.1` y se publica por el nombre del
+  tailnet con `tailscale serve`. No acepta conexiones directas desde la LAN.
 - **Nunca a internet sin autenticación sólida.** Esto es un cliente que puede ejecutar
   acciones en tu máquina. LAN y tailnet primero.
 - **Token por dispositivo, guardado en hash.** Revocar uno no afecta a los demás.

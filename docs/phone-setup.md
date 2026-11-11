@@ -31,6 +31,19 @@ En la consola de administración de Tailscale (`login.tailscale.com/admin/dns`):
 
 ## Paso a paso
 
+### 0. Antes de nada
+
+**DSH tiene que estar abierto.** El plugin vive dentro de su proceso: si DSH está cerrado, no
+hay nada escuchando en el puerto y tanto el health check como la app fallan.
+
+Este manual usa `<maquina>.<tailnet>.ts.net` como marcador. Para saber el tuyo:
+
+```powershell
+tailscale status --json | Select-String '"DNSName"'
+```
+
+O míralo en la consola de Tailscale, en la lista de dispositivos.
+
 ### 1. En el PC
 
 Instala Tailscale y entra a tu tailnet. Luego publica el plugin:
@@ -47,8 +60,13 @@ Comprueba que responde **desde la dirección del tailnet**, no desde localhost:
 (Invoke-WebRequest https://<maquina>.<tailnet>.ts.net/health -UseBasicParsing).Content
 ```
 
-La respuesta incluye `origin` y, si esa dirección no sirve para el teléfono, un `warning`
-con su gravedad (`blocking` o `warning`).
+La respuesta incluye `origin` y, si esa dirección no sirve para el teléfono, dos campos:
+
+- `warningSeverity: "blocking"` — el enlace no lleva a ninguna parte. Ocurre con `127.0.0.1`.
+- `warningSeverity: "warning"` — carga, pero el navegador no dejará instalarla. Ocurre con
+  HTTP plano.
+
+Si no aparece ninguno de los dos, la dirección es correcta.
 
 > No uses `curl` en PowerShell 5.1: ahí es un alias de `Invoke-WebRequest` y no devuelve el
 > JSON crudo.
@@ -82,13 +100,14 @@ pantalla que tienes que escanear.
 
 ## Problemas típicos
 
-| Síntoma                          | Causa                                                                |
-| -------------------------------- | -------------------------------------------------------------------- |
-| "Conexión rechazada" al escanear | El QR apunta a `127.0.0.1`: abre `/pair` desde el nombre del tailnet |
-| El teléfono no ve el PC          | Falta instalar Tailscale en el teléfono o está con otra cuenta       |
-| Carga pero no se puede instalar  | Estás en HTTP, no en HTTPS                                           |
-| `tailscale serve --https` falla  | Falta activar _HTTPS Certificates_ en la consola                     |
-| El QR sale con aviso rojo        | La dirección desde la que abriste `/pair` no sirve para el teléfono  |
+| Síntoma                          | Causa                                                                 |
+| -------------------------------- | --------------------------------------------------------------------- |
+| "Conexión rechazada" al escanear | El QR apunta a `127.0.0.1`: abre `/pair` desde el nombre del tailnet  |
+| El teléfono no ve el PC          | Falta instalar Tailscale en el teléfono o está con otra cuenta        |
+| El health check no responde      | **DSH está cerrado**: sin el plugin no hay nada escuchando            |
+| Carga pero no se puede instalar  | Entraste por una dirección que no es HTTPS: usa el nombre del tailnet |
+| `tailscale serve --https` falla  | Falta activar _HTTPS Certificates_ en la consola                      |
+| El QR sale con aviso rojo        | La dirección desde la que abriste `/pair` no sirve para el teléfono   |
 
 ## Si quieres forzar la dirección
 
@@ -101,8 +120,9 @@ al arrancar el plugin**, así que hay que definirla antes de abrir DSH:
 [Environment]::SetEnvironmentVariable('DSH_MOBILE_PUBLIC_URL', 'https://<maquina>.<tailnet>.ts.net', 'User')
 ```
 
-Después hay que **reiniciar DSH** para que la recoja. `$env:DSH_MOBILE_PUBLIC_URL = ...` solo
-afecta a la sesión actual de PowerShell y no la verá un DSH ya abierto.
+Después hay que **reiniciar DSH** para que la recoja. Y hazlo desde una **terminal nueva**: la
+que ya estaba abierta conserva el entorno anterior y no verá la variable. `$env:DSH_MOBILE_PUBLIC_URL = ...`
+solo afecta a la sesión actual de PowerShell y no la verá un DSH ya abierto.
 
 ## Fuera de alcance
 
