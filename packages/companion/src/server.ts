@@ -297,6 +297,11 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
     maxPayload: MAX_FRAME_BYTES,
   });
 
+  // Sin manejador, un `error` del servidor de WebSocket (por ejemplo EADDRINUSE
+  // al compartir el socket HTTP) es una excepción no capturada y se lleva por
+  // delante el proceso del host.
+  wss.on('error', (error: Error) => log(`error del servidor WebSocket: ${error.message}`));
+
   wss.on('connection', (socket: WebSocket) => {
     const connection: Connection = {
       device: undefined,
