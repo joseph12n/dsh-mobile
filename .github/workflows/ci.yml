@@ -14,7 +14,11 @@ jobs:
     name: build · lint · test
     runs-on: ubuntu-latest
     steps:
+      # Historia completa: commitlint compara un rango entre el SHA base y el de
+      # la rama, y un clon superficial solo trae el commit de la fusión.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: pnpm/action-setup@v4
         with:
@@ -28,6 +32,25 @@ jobs:
 
       - name: Instalar dependencias
         run: pnpm install --frozen-lockfile
+
+      # El historial se había llenado de mensajes sin tipo. Esto lo corta antes de
+      # fusionar, que es donde todavía se puede arreglar.
+      - name: Mensajes de commit
+        if: github.event_name == 'pull_request'
+        run: >
+          pnpm exec commitlint
+          --from ${{ github.event.pull_request.base.sha }}
+          --to ${{ github.event.pull_request.head.sha }}
+          --verbose
+
+      # Se fusiona con squash, así que el título del PR es el mensaje final del
+      # commit. Si no se valida aquí, entraría sin pasar por el paso anterior.
+      - name: Título del pull request
+        if: github.event_name == 'pull_request'
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          printf '%s\n' "$PR_TITLE" | pnpm exec commitlint --verbose
 
       - name: Formato
         run: pnpm format:check
