@@ -13,6 +13,7 @@ import { CompanionClient, endpointFromLocation, normalizeEndpoint } from './lib/
 import { storage } from './lib/storage.js';
 import { QuestionsCard } from './components/Questions.js';
 import { SessionView } from './components/SessionView.js';
+import { SessionList } from './components/SessionList.js';
 
 type View =
   | { kind: 'checking' }
@@ -20,26 +21,6 @@ type View =
   | { kind: 'connecting'; endpoint: string }
   | { kind: 'sessions'; endpoint: string; host: HostInfo; sessions: SessionSummary[] }
   | { kind: 'error'; endpoint: string; message: string };
-
-/** "hace 3 min", suficiente para ordenar mentalmente la lista. */
-function relativeTime(timestamp: number): string {
-  if (!timestamp) return '';
-  const seconds = Math.max(0, Math.round((Date.now() - timestamp) / 1000));
-  if (seconds < 60) return 'ahora';
-  const minutes = Math.round(seconds / 60);
-  if (minutes < 60) return `hace ${minutes} min`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return `hace ${hours} h`;
-  return `hace ${Math.round(hours / 24)} d`;
-}
-
-const STATE_LABEL: Record<SessionSummary['state'], string> = {
-  working: 'trabajando',
-  waiting: 'espera respuesta',
-  idle: 'en reposo',
-  done: 'terminada',
-  error: 'error',
-};
 
 export function App() {
   const [view, setView] = useState<View>({ kind: 'checking' });
@@ -335,40 +316,7 @@ export function App() {
                 </button>
               </div>
 
-              {view.sessions.length === 0 ? (
-                <p className="muted">No hay sesiones vivas en el host.</p>
-              ) : (
-                <ul className="sessions">
-                  {view.sessions.map((session) => (
-                    <li
-                      key={session.id}
-                      className="session-row"
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => void open(session)}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter' || event.key === ' ') void open(session);
-                      }}
-                    >
-                      <div className="session-main">
-                        <span className="session-title">{session.title}</span>
-                        <span className="muted small">{relativeTime(session.updatedAt)}</span>
-                      </div>
-                      <div className="session-meta">
-                        <span className={`badge ${session.state}`}>
-                          {STATE_LABEL[session.state]}
-                        </span>
-                        {session.pendingQuestions > 0 && (
-                          <span className="badge waiting">
-                            {session.pendingQuestions} pregunta
-                            {session.pendingQuestions > 1 ? 's' : ''}
-                          </span>
-                        )}
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
+              <SessionList sessions={view.sessions} onOpen={(session) => void open(session)} />
 
               <button type="button" className="ghost" onClick={forget}>
                 Olvidar este dispositivo

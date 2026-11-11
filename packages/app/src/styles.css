@@ -227,6 +227,53 @@ button.ghost:hover:not(:disabled) {
   background: var(--hover);
 }
 
+/* --- Secciones de la lista ------------------------------------------------ */
+
+.group + .group {
+  margin-top: 20px;
+}
+
+.group-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.group-head h3 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* La sección que espera respuesta es la única que llama la atención a propósito. */
+.group.waiting .group-head h3 {
+  color: var(--warn);
+}
+
+.count {
+  font-size: 11px;
+  min-width: 20px;
+  text-align: center;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  color: var(--muted);
+}
+
+.group-head .ghost {
+  margin-left: auto;
+}
+
+button.ghost.tiny {
+  min-height: 32px;
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
 .sessions {
   list-style: none;
   margin: 0 0 16px;
