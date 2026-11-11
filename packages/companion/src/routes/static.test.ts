@@ -91,8 +91,9 @@ describe('respuestas', () => {
     expect(result.headers?.['cache-control']).toContain('immutable');
   });
 
-  it('no cachea un asset sin hash', () => {
-    const result = serveStatic(root, '/assets/styles.css');
+  it('no cachea un archivo que no está en /assets/', () => {
+    // La política ya no adivina por el nombre: la carpeta decide.
+    const result = serveStatic(root, '/styles.css');
     expect(result.headers?.['cache-control']).toBe('no-cache');
   });
 
@@ -127,6 +128,59 @@ describe('política de caché', () => {
   });
 
   it('una fuente fuera de /fonts/ no recibe la caché de fuentes', () => {
-    expect(cacheControlFor('/assets/montserrat.woff2')).toBe('no-cache');
+    expect(cacheControlFor('/montserrat.woff2')).toBe('no-cache');
+  });
+});
+
+describe('assets del build', () => {
+  it('todo lo de /assets/ es inmutable', () => {
+    // La carpeta la genera Vite: cada archivo lleva hash de contenido, así que la
+    // URL cambia cuando cambia el contenido.
+    expect(cacheControlFor('/assets/index-B9xjfS-v.js')).toContain('immutable');
+    expect(cacheControlFor('/assets/index-CF_NO8rz.js')).toContain('immutable');
+    expect(cacheControlFor('/assets/index-BdfqLpJ5.css')).toContain('immutable');
+  });
+
+  it('no intenta adivinar por el nombre: el kebab-case también es inmutable', () => {
+    // Antes se confundía `arrow-down-circle.js` con un asset con hash y se
+    // servía un año; y un asset hasheado con guiones se quedaba sin caché. Ya no
+    // se mira el nombre.
+    expect(cacheControlFor('/assets/arrow-down-circle.js')).toContain('immutable');
+    expect(cacheControlFor('/assets/my-component-name.js')).toContain('immutable');
+  });
+
+  it('la consulta no cambia la decisión', () => {
+    expect(cacheControlFor('/assets/index-B9xjfS-v.js?v=2')).toContain('immutable');
+  });
+
+  it('es constante aunque la ruta sea enorme', () => {
+    // Antes el barrido por guiones era cuadrático: una ruta de 16 KB tardaba
+    // cientos de milisegundos por petición, en una ruta pública.
+    const hostil = '/assets/' + 'a-'.repeat(8000) + '!.js';
+    const started = performance.now();
+    expect(cacheControlFor(hostil)).toContain('immutable');
+    expect(performance.now() - started).toBeLessThan(50);
+  });
+});
+
+describe('el fallback de la SPA no se cachea como un asset', () => {
+  it('una ruta inexistente bajo /assets/ sirve el índice y revalida', () => {
+    // Antes se decidía por la URL: `/assets/loquesea` recibía el índice con caché
+    // inmutable de un año. Es justo la versión pegada que la política evita.
+    const result = serveStatic(root, '/assets/no-existe.js');
+    expect(result.status).toBe(200);
+    expect(result.headers?.['cache-control']).toBe('no-cache');
+  });
+
+  it('un intento de salir de /assets/ tampoco se cachea', () => {
+    for (const urlPath of ['/assets/../index.html', '/assets/%2e%2e/index.html', '/assets/']) {
+      const result = serveStatic(root, urlPath);
+      expect(result.headers?.['cache-control']).toBe('no-cache');
+    }
+  });
+
+  it('un asset que sí existe conserva la caché inmutable', () => {
+    const result = serveStatic(root, '/assets/index-a1b2c3d4.js');
+    expect(result.headers?.['cache-control']).toContain('immutable');
   });
 });

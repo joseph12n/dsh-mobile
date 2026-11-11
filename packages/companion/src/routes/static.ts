@@ -41,22 +41,28 @@ function contentTypeFor(file: string): string {
 /**
  * Política de caché.
  *
- * - Assets con hash en el nombre (los emite Vite): inmutables para siempre.
- * - Fuentes: nombres estables, sin hash. Un día de caché reduce la descarga
- *   repetida de ~120 KB sin arriesgar quedarse con una fuente vieja para siempre.
- * - Todo lo demás, incluido `index.html`: revalidar siempre, o una actualización
- *   del plugin dejaría al móvil con la versión anterior pegada.
+ * - **`/assets/`: inmutable un año.** Todo lo que Vite escribe ahí lleva hash de
+ *   contenido en el nombre, así que un cambio de código produce otro nombre y la
+ *   URL vieja nunca puede quedar obsoleta. Es la recomendación de Vite y lo que
+ *   hace cualquier servidor estático con una carpeta de build.
+ * - **Fuentes: un día.** Sus nombres son estables, sin hash; un año las dejaría
+ *   pegadas para siempre si algún día cambian.
+ * - **Todo lo demás, incluido `index.html`: revalidar siempre.** Si el índice se
+ *   cacheara, una actualización del plugin dejaría al móvil con la versión vieja.
  *
- * La comprobación evita un cuantificador anidado sobre la ruta completa —eso
- * produce retroceso superlineal— y trabaja solo sobre el nombre del archivo.
+ * Antes se intentaba adivinar mirando el nombre (`nombre-<hash>.ext`). Era frágil
+ * por los dos lados: el hash de Vite puede llevar guiones (`index-B9xjfS-v.js`) y
+ * un nombre en kebab-case se confundía con un hash (`arrow-down-circle.js`), así
+ * que assets mutables se servían como inmutables. Además el barrido era cuadrático
+ * con entradas adversarias, en una ruta pública.
+ *
+ * **Invariante que hay que respetar:** nada sin hash en `public/assets/`. Vite
+ * copia esa carpeta tal cual, y un archivo estable ahí se quedaría cacheado un año.
  */
 export function cacheControlFor(urlPath: string): string {
   const normalized = urlPath.split('?')[0]?.replace(/\\/g, '/') ?? '';
 
-  if (normalized.startsWith('/assets/')) {
-    const name = normalized.slice(normalized.lastIndexOf('/') + 1);
-    if (isHashedAsset(name)) return 'public, max-age=31536000, immutable';
-  }
+  if (normalized.startsWith('/assets/')) return 'public, max-age=31536000, immutable';
 
   if (normalized.startsWith('/fonts/') && FONT_FILE.test(normalized.slice(7))) {
     return 'public, max-age=86400';
@@ -64,32 +70,6 @@ export function cacheControlFor(urlPath: string): string {
 
   return 'no-cache';
 }
-
-/**
- * `nombre-<hash>.ext`, que es como Vite nombra lo que puede cachearse.
- *
- * Se parte por el último guion en vez de usar una expresión con dos clases
- * solapadas (`[\w.-]+-[hash]`): esas dos pueden repartirse la misma cadena de
- * muchas formas y el retroceso crece muy por encima de lo lineal.
- */
-function isHashedAsset(name: string): boolean {
-  const dot = name.lastIndexOf('.');
-  if (dot <= 0) return false;
-
-  const stem = name.slice(0, dot);
-  const extension = name.slice(dot + 1);
-  const dash = stem.lastIndexOf('-');
-  if (dash <= 0) return false;
-
-  const hash = stem.slice(dash + 1);
-  return HASH.test(hash) && EXTENSION.test(extension);
-}
-
-/** Sufijo con pinta de hash de Vite. */
-const HASH = /^[A-Za-z0-9_-]{8,}$/;
-
-/** Extensión alfanumérica corta. */
-const EXTENSION = /^[a-z0-9]+$/i;
 
 /** Una fuente dentro de `/fonts/`, sin subdirectorios. */
 const FONT_FILE = /^[^/]+\.(woff2?|ttf)$/i;
@@ -156,9 +136,19 @@ export function serveStatic(root: string | undefined, urlPath: string): StaticRe
     return {
       status: 200,
       body,
-      headers: headersFor(file, body.length, cacheControlFor(urlPath)),
+      // La política se decide por el **archivo servido**, no por la URL pedida.
+      // Con la URL, el fallback de la SPA (`/assets/loquesea`, `/assets/../`) servía
+      // `index.html` con caché inmutable de un año: justo la versión pegada que la
+      // política dice evitar. Es el único sitio donde importa la diferencia.
+      headers: headersFor(file, body.length, cacheControlFor(pathFor(file, root))),
     };
   } catch {
     return { status: 404 };
   }
+}
+
+/** Ruta relativa a la raíz, con la forma que espera `cacheControlFor`. */
+function pathFor(file: string, root: string): string {
+  const relative = file.slice(resolve(root).length).replace(/\\/g, '/');
+  return relative.startsWith('/') ? relative : `/${relative}`;
 }
