@@ -1079,54 +1079,30 @@ describe('session actions over the WebSocket', () => {
     expect(response['code']).toBe('bad-request');
   });
 
-  it('reports a running session as denied, not as an internal failure', async () => {
-    // El usuario puede resolver esto parando el turno, así que la app necesita un
-    // código propio. Con `internal` no podía distinguirlo de una avería real.
+  // Cada negativa del adaptador tiene su código en el contrato. La tabla evita cuatro
+  // pruebas idénticas, que además el análisis estático contaba como duplicación.
+  it.each([
+    ['active', 'denied'],
+    ['failed', 'internal'],
+    ['not-found', 'not-found'],
+    ['no-service', 'bad-request'],
+  ])('maps the archive refusal %s to %s', async (refusal, expected) => {
+    const response = await exchange(
+      { archiveSession: async () => archiveResult(refusal) },
+      { type: 'workspace.archive', sessionId: 's1' },
+    );
+    expect(response['type']).toBe('error');
+    expect(response['code']).toBe(expected);
+  });
+
+  it('keeps `denied` for the running turn, so the app can say "stop it first"', async () => {
+    // El código existe para que la app distinga una negativa resoluble de una avería:
+    // `denied` se traduce a "para el turno", y nada más lo hace.
     const response = await exchange(
       { archiveSession: async () => archiveResult('active') },
-      {
-        type: 'workspace.archive',
-        sessionId: 's1',
-      },
+      { type: 'workspace.archive', sessionId: 's1' },
     );
-    expect(response['type']).toBe('error');
     expect(response['code']).toBe('denied');
-  });
-
-  it('keeps a genuine failure internal', async () => {
-    const response = await exchange(
-      { archiveSession: async () => archiveResult('failed') },
-      {
-        type: 'workspace.archive',
-        sessionId: 's1',
-      },
-    );
-    expect(response['type']).toBe('error');
-    expect(response['code']).toBe('internal');
-  });
-
-  it('answers not-found when archiving a session that is already gone', async () => {
-    const response = await exchange(
-      { archiveSession: async () => archiveResult('not-found') },
-      {
-        type: 'workspace.archive',
-        sessionId: 's1',
-      },
-    );
-    expect(response['type']).toBe('error');
-    expect(response['code']).toBe('not-found');
-  });
-
-  it('treats a host without the archive controller as a missing capability', async () => {
-    const response = await exchange(
-      { archiveSession: async () => archiveResult('no-service') },
-      {
-        type: 'workspace.archive',
-        sessionId: 's1',
-      },
-    );
-    expect(response['type']).toBe('error');
-    expect(response['code']).toBe('bad-request');
   });
 
   /** Una negativa del adaptador con el código dado. */
