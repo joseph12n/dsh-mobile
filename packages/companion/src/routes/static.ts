@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, statSync } from 'node:fs';
+import { readFileSync, realpathSync, statSync } from 'node:fs';
 import { extname, join, normalize, resolve, sep } from 'node:path';
 
 /**
@@ -89,11 +89,17 @@ function headersFor(file: string, size: number, cacheControl: string): Record<st
  * Devuelve `index.html` para la raíz y para cualquier ruta sin extensión, porque
  * la app enruta por fragmento y no tiene rutas de servidor.
  *
- * Cualquier intento de salir de la raíz (`..`, rutas absolutas, enlaces
- * simbólicos resueltos) devuelve `undefined` en vez de leerse.
+ * Cualquier intento de salir de la raíz devuelve `undefined` en vez de leerse. Y no
+ * basta con mirar la ruta pedida: un **enlace simbólico** dentro de la raíz puede
+ * apuntar fuera de ella, así que lo que se comprueba es la ruta **real** de lo que se
+ * va a leer. Esa era la trampa: la comprobación miraba el camino lógico y el enlace
+ * se seguía igual.
  */
 export function resolveAsset(root: string, urlPath: string): string | undefined {
   const cleanRoot = resolve(root);
+  const realRoot = realOrUndefined(cleanRoot);
+  // Sin raíz real no hay nada que servir, y sin ella no hay nada con qué comparar.
+  if (!realRoot) return undefined;
 
   let decoded: string;
   try {
@@ -107,21 +113,82 @@ export function resolveAsset(root: string, urlPath: string): string | undefined 
   const relative = normalize(decoded).replace(/^([/\\])+/, '');
   if (relative.includes('\0')) return undefined;
 
-  let candidate = resolve(join(cleanRoot, relative || 'index.html'));
+  const candidate = resolve(join(cleanRoot, relative || 'index.html'));
 
-  if (candidate !== cleanRoot && !candidate.startsWith(cleanRoot + sep)) return undefined;
+  // La comprobación barata primero: si el camino lógico ya se sale, no hay nada que
+  // resolver contra el disco.
+  if (!isInside(cleanRoot, candidate)) return undefined;
 
-  if (existsSync(candidate) && statSync(candidate).isDirectory()) {
-    candidate = join(candidate, 'index.html');
+  const realCandidate = realOrUndefined(candidate);
+  if (realCandidate === undefined) return spaIndex(cleanRoot, realRoot);
+
+  // La ruta existe. Si su forma real sale de la raíz, es un enlace que escapa: no se
+  // sirve, y tampoco se cae al índice, porque lo que se pidió existe. Vale igual para
+  // un archivo y para un directorio: servir el índice de una carpeta ajena era una
+  // respuesta incoherente, aunque no filtrara nada.
+  if (!isInside(realRoot, realCandidate)) return undefined;
+
+  const stats = statOrUndefined(realCandidate);
+  if (stats?.isDirectory()) {
+    const index = join(candidate, 'index.html');
+    const realIndex = realOrUndefined(index);
+    return realIndex && isInside(realRoot, realIndex) && statOrUndefined(realIndex)?.isFile()
+      ? index
+      : spaIndex(cleanRoot, realRoot);
   }
 
-  // Sin extensión: es una ruta de la SPA, se sirve el índice.
-  if (!extname(candidate) || !existsSync(candidate)) {
-    const fallback = join(cleanRoot, 'index.html');
-    return existsSync(fallback) ? fallback : undefined;
-  }
+  // Un FIFO o un dispositivo con extensión no se lee: `readFileSync` se quedaría
+  // esperando y el servidor no respondería nunca.
+  if (!stats?.isFile()) return undefined;
 
+  if (!extname(candidate)) return spaIndex(cleanRoot, realRoot);
   return candidate;
+}
+
+/** La ruta real, o `undefined` si no existe o no se puede resolver. */
+function realOrUndefined(path: string): string | undefined {
+  try {
+    return realpathSync.native(path);
+  } catch {
+    return undefined;
+  }
+}
+
+/** `statSync` sin lanzar: entre la comprobación y la lectura el archivo puede irse. */
+function statOrUndefined(path: string): ReturnType<typeof statSync> | undefined {
+  try {
+    return statSync(path);
+  } catch {
+    return undefined;
+  }
+}
+
+/** La ruta con separador final, para que un hermano `raiz-algo` no cuele como hijo. */
+function withSep(path: string): string {
+  return path.endsWith(sep) ? path : path + sep;
+}
+
+/**
+ * `true` si la ruta real cae dentro de la raíz real.
+ *
+ * En Windows no distingue mayúsculas; en el resto sí, y bajar todo a minúsculas
+ * dejaría pasar un hermano que solo difiere en mayúsculas. La raíz de un volumen
+ * (`/`, `C:\`) ya termina en separador: añadir otro dejaría todo fuera.
+ */
+function isInside(realRoot: string, path: string): boolean {
+  const [base, target] =
+    process.platform === 'win32' ? [realRoot.toLowerCase(), path.toLowerCase()] : [realRoot, path];
+
+  return target === base || target.startsWith(withSep(base));
+}
+
+/** El índice de la SPA, si la raíz tiene uno de verdad. */
+function spaIndex(cleanRoot: string, realRoot: string): string | undefined {
+  const index = join(cleanRoot, 'index.html');
+  const realIndex = realOrUndefined(index);
+  return realIndex && isInside(realRoot, realIndex) && statOrUndefined(realIndex)?.isFile()
+    ? index
+    : undefined;
 }
 
 /** Respuesta para una ruta de la PWA. `status: 404` si no hay nada que servir. */

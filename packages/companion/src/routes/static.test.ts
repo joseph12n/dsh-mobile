@@ -1,6 +1,6 @@
-import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve, sep } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 import { cacheControlFor, resolveAsset, serveStatic } from './static.js';
 
@@ -52,8 +52,7 @@ describe('resolución de rutas', () => {
       '/..%2f..%2fsecreto.txt',
       '/assets/../../../secreto.txt',
     ]) {
-      const resolved = resolveAsset(root, attempt);
-      expect(resolved === undefined || resolved.startsWith(root)).toBe(true);
+      expect(insideRoot(resolveAsset(root, attempt))).toBe(true);
     }
   });
 
@@ -68,9 +67,89 @@ describe('resolución de rutas', () => {
   it('nunca devuelve un archivo de fuera de la raíz', () => {
     const outsideFile = join(outside, 'secreto.txt');
     for (const attempt of ['/../secreto.txt', outsideFile, `/..${outsideFile}`]) {
-      const resolved = resolveAsset(root, attempt);
-      expect(resolved === undefined || resolved.startsWith(root)).toBe(true);
+      expect(insideRoot(resolveAsset(root, attempt))).toBe(true);
     }
+  });
+});
+
+/**
+ * `true` si la ruta resuelta es la raíz o algo dentro de ella.
+ *
+ * Con `startsWith(root)` a secas un hermano `raiz-algo` pasaría, que es justo lo que no
+ * se quiere: por eso se compara con el separador.
+ */
+function insideRoot(resolved: string | undefined): boolean {
+  if (resolved === undefined) return true;
+  const base = resolve(root);
+  return resolved === base || resolved.startsWith(base.endsWith(sep) ? base : base + sep);
+}
+
+describe('enlaces simbólicos', () => {
+  // Una junction dentro de la raíz que apunta fuera. Es el vector real: la ruta pedida
+  // está dentro, y el archivo que se leería no.
+  const linkType = process.platform === 'win32' ? 'junction' : 'dir';
+
+  let linked = false;
+  try {
+    symlinkSync(outside, join(root, 'escape'), linkType);
+    linked = true;
+  } catch {
+    // Crear enlaces requiere permisos en algunos sistemas; entonces no se prueba.
+  }
+
+  // Un hermano cuyo nombre empieza igual que la raíz: si la comprobación fuera por
+  // prefijo de texto sin separador, pasaría por dentro.
+  const sibling = `${resolve(root)}-evil`;
+  let siblingLinked = false;
+  try {
+    mkdirSync(sibling, { recursive: true });
+    writeFileSync(join(sibling, 'vecino.txt'), 'no deberías poder leer esto');
+    symlinkSync(sibling, join(root, 'vecino'), linkType);
+    siblingLinked = true;
+  } catch {
+    // Igual que arriba.
+  }
+
+  // Un enlace que apunta dentro de la raíz **sí** se sirve: bloquearlo de más rompería
+  // un despliegue que usa enlaces para compartir assets.
+  let insideLinked = false;
+  try {
+    symlinkSync(join(root, 'assets'), join(root, 'assets-enlazados'), linkType);
+    insideLinked = true;
+  } catch {
+    // Igual que arriba.
+  }
+
+  it('no sigue un enlace que sale de la raíz', (context) => {
+    if (!linked) context.skip();
+
+    // Se comprueba lo que de verdad importa: que no se sirve el secreto.
+    const result = serveStatic(root, '/escape/secreto.txt');
+    expect(result.status).toBe(404);
+    expect(result.body?.toString() ?? '').not.toContain('no deberías poder leer esto');
+  });
+
+  it('no devuelve una ruta de fuera a través del enlace', (context) => {
+    if (!linked) context.skip();
+    expect(resolveAsset(root, '/escape/secreto.txt')).toBeUndefined();
+  });
+
+  it('tampoco sirve el índice a través de una carpeta enlazada fuera', (context) => {
+    if (!linked) context.skip();
+    // Un directorio que escapa no es una ruta de la SPA: lo pedido existe y no es nuestro.
+    expect(serveStatic(root, '/escape').status).toBe(404);
+  });
+
+  it('no confunde un hermano que empieza igual que la raíz', (context) => {
+    if (!siblingLinked) context.skip();
+    expect(serveStatic(root, '/vecino/vecino.txt').status).toBe(404);
+  });
+
+  it('sigue sirviendo un enlace que apunta dentro de la raíz', (context) => {
+    if (!insideLinked) context.skip();
+    const result = serveStatic(root, '/assets-enlazados/styles.css');
+    expect(result.status).toBe(200);
+    expect(result.body?.toString()).toBe('body{margin:0}');
   });
 });
 
