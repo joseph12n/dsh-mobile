@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { HostContext } from '../host-api.js';
-import { hasWorkspaces, listWorkspaces, rowsOf, toWorkspace } from './workspaces.js';
+import {
+  hasWorkspaces,
+  listArchivedSessions,
+  listWorkspaces,
+  rowsOf,
+  toWorkspace,
+} from './workspaces.js';
 
 /**
  * The folder adapter.
@@ -181,5 +187,47 @@ describe('availability', () => {
 
     expect(() => hasWorkspaces(hostile)).not.toThrow();
     expect(hasWorkspaces(hostile)).toBe(false);
+  });
+});
+
+describe('archived sessions', () => {
+  it('reads them from the same baseline as the folders', async () => {
+    // `{ type: 'baseline', value: { items, archivedSessionIds } }`: el host no las quita
+    // de la lista, solo las marca, así que el móvil tiene que hacerlo.
+    const controller = {
+      async *follow() {
+        yield {
+          type: 'baseline',
+          value: { items: [row], archivedSessionIds: ['s1', 's2'], pinnedSessionIds: [] },
+        };
+      },
+    };
+
+    expect([...(await listArchivedSessions(ctxWith(controller)))].sort()).toEqual(['s1', 's2']);
+  });
+
+  it('reads them from a bare list() too', async () => {
+    const controller = { list: () => ({ items: [row], archivedSessionIds: ['s9'] }) };
+    expect([...(await listArchivedSessions(ctxWith(controller)))]).toEqual(['s9']);
+  });
+
+  it('hides nothing when the host has no workspaces', async () => {
+    // Sin dato, es peor esconder una sesión viva que mostrar una cerrada.
+    expect((await listArchivedSessions({} as HostContext)).size).toBe(0);
+    expect((await listArchivedSessions(ctxWith({}))).size).toBe(0);
+  });
+
+  it('hides nothing when the host throws', async () => {
+    const controller = {
+      list: () => {
+        throw new Error('boom');
+      },
+    };
+    expect((await listArchivedSessions(ctxWith(controller))).size).toBe(0);
+  });
+
+  it('drops ids that are not strings', async () => {
+    const controller = { list: () => ({ archivedSessionIds: ['a', '', 3, null, 'b'] }) };
+    expect([...(await listArchivedSessions(ctxWith(controller)))].sort()).toEqual(['a', 'b']);
   });
 });
