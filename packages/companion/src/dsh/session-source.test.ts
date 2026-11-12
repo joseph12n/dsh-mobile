@@ -143,6 +143,28 @@ describe('listado de sesiones', () => {
     expect(records.map((record) => record.id)).toEqual(['s2']);
   });
 
+  it('las marca en vez de quitarlas cuando la lista las pide', async () => {
+    const ctx: HostContext = {
+      sessionController: {
+        list: () =>
+          Promise.resolve({
+            items: [summary({ sessionId: 's1' }), summary({ sessionId: 's2' })],
+          }),
+      },
+      workspaceController: {
+        list: () => Promise.resolve({ items: [], archivedSessionIds: ['s1'] }),
+      },
+    };
+
+    const records = await listSessions(ctx, { includeArchived: true });
+    expect(records.map((record) => [record.id, record.archived ?? false])).toEqual([
+      ['s1', true],
+      ['s2', false],
+    ]);
+    expect(toWireSession(records[0]!).archived).toBe(true);
+    expect('archived' in toWireSession(records[1]!)).toBe(false);
+  });
+
   it('lee el modelo de la proyección, prefiriendo el que se aplicará', async () => {
     const records = await listSessions(
       ctxWith([

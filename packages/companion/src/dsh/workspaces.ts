@@ -38,6 +38,8 @@ export interface WorkspaceController {
   follow?: (signal: AbortSignal) => AsyncIterable<unknown>;
   /** Takes a session out of the list. Refuses if it has running work, unless told not to. */
   archiveSession?: (request: { sessionId: string; stopActivity?: boolean }) => Promise<unknown>;
+  /** Brings an archived session back into the list. */
+  unarchiveSession?: (request: { sessionId: string }) => Promise<unknown>;
 }
 
 /** How long to wait for a baseline before giving up. Never hang the command. */

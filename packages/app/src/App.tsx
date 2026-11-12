@@ -78,6 +78,10 @@ export function App() {
   const [creatingIn, setCreatingIn] = useState<string | undefined>(undefined);
   /** Session whose archive is in flight: a second tap would answer not-found. */
   const [archiving, setArchiving] = useState<string | undefined>(undefined);
+  /** Session whose restore is in flight, for the same reason. */
+  const [restoring, setRestoring] = useState<string | undefined>(undefined);
+  /** Whether the list shows the archived sessions too. */
+  const [showArchived, setShowArchived] = useState(false);
   const [endpointInput, setEndpointInput] = useState('');
   /** Catalog the host offers, when it announced `model.select`. */
   const [catalog, setCatalog] = useState<ModelCatalog | undefined>(undefined);
@@ -533,7 +537,7 @@ export function App() {
       setActionError(undefined);
 
       // Crear sin ver el resultado parece que no hizo nada: se abre la sesión.
-      const sessions = await refresh();
+      const sessions = await refresh(showArchived);
       const created = sessions.find((session) => session.id === sessionId);
       // Sin `await`: el botón de la carpeta se libera ya, y la sesión se abre sola.
       if (created) void open(created);
@@ -578,7 +582,7 @@ export function App() {
       }
     } finally {
       try {
-        await refresh();
+        await refresh(showArchived);
       } catch (error) {
         setActionError({ text: messageOf(error) });
       } finally {
@@ -603,12 +607,12 @@ export function App() {
    * showing the list, so after archiving from the phone a network blip left the row
    * there with no message at all. Callers decide whether to report or ignore.
    */
-  const refresh = async (): Promise<SessionSummary[]> => {
+  const refresh = async (includeArchived = false): Promise<SessionSummary[]> => {
     const connection = client.current;
     if (!connection) return [];
 
     const generation = ++refreshSeq.current;
-    const sessions = await connection.listSessions();
+    const sessions = await connection.listSessions(includeArchived);
     const admiteCarpetas = connection.capabilities().includes('workspace.list');
     const workspaces = admiteCarpetas ? await connection.listWorkspaces().catch(() => []) : [];
 
@@ -620,12 +624,46 @@ export function App() {
   };
 
   /** El botón "Actualizar": un fallo aquí se dice en vez de fingir que no pasó nada. */
-  const reload = async () => {
+  const reload = async (includeArchived = showArchived) => {
     try {
-      await refresh();
+      await refresh(includeArchived);
       setActionError(undefined);
     } catch (error) {
       setActionError({ text: messageOf(error) });
+    }
+  };
+
+  /** Enseña u oculta las archivadas, y recarga con la elección nueva. */
+  const toggleArchived = async () => {
+    const next = !showArchived;
+    setShowArchived(next);
+    await reload(next);
+  };
+
+  /**
+   * Devuelve una sesión archivada a la lista.
+   *
+   * No se quita la fila antes: si el host la rechaza, la sesión sigue archivada y la
+   * lista tiene que decirlo tal cual.
+   */
+  const restore = async (session: SessionSummary) => {
+    const connection = client.current;
+    if (!connection || restoring) return;
+
+    setRestoring(session.id);
+    try {
+      await connection.unarchive(session.id);
+      setActionError(undefined);
+    } catch (error) {
+      setActionError({ text: messageOf(error) });
+    } finally {
+      try {
+        await refresh(showArchived);
+      } catch (error) {
+        setActionError({ text: messageOf(error) });
+      } finally {
+        setRestoring(undefined);
+      }
     }
   };
 
@@ -776,6 +814,17 @@ export function App() {
                 </button>
               </div>
 
+              <div className="row">
+                <button
+                  type="button"
+                  className="ghost tiny"
+                  aria-pressed={showArchived}
+                  onClick={() => void toggleArchived()}
+                >
+                  {t('sessions.archived')}
+                </button>
+              </div>
+
               {actionError && (
                 <p className="error" role="alert">
                   {'key' in actionError ? t(actionError.key) : actionError.text}
@@ -796,10 +845,13 @@ export function App() {
                 onOpen={(session) => void open(session)}
                 onCreate={(workspaceId) => void createInFolder(workspaceId)}
                 onArchive={(session) => void archive(session)}
+                onUnarchive={(session) => void restore(session)}
                 canCreate={view.host.capabilities.includes('session.create')}
                 canArchive={view.host.capabilities.includes('workspace.archive')}
+                canUnarchive={view.host.capabilities.includes('workspace.unarchive')}
                 {...(creatingIn ? { createPending: creatingIn } : {})}
                 {...(archiving ? { archivePending: archiving } : {})}
+                {...(restoring ? { restorePending: restoring } : {})}
                 preferences={preferences}
               />
 

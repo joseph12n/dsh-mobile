@@ -48,6 +48,16 @@ export function canArchiveSession(ctx: HostContext): boolean {
   }
 }
 
+/** `true` if an archived session can be brought back on this host. */
+export function canUnarchiveSession(ctx: HostContext): boolean {
+  try {
+    const controller = service<WorkspaceController>(ctx, 'workspaceController');
+    return typeof controller?.unarchiveSession === 'function';
+  } catch {
+    return false;
+  }
+}
+
 export type CreateResult =
   | { ok: true; sessionId: string }
   | { ok: false; code: 'no-service' | 'no-folder' | 'failed'; message: string };
@@ -79,6 +89,36 @@ export async function createSession(
     const code = codeOf(error);
     if (code === 'workspace/not-found' || code === 'session/not-found') {
       return { ok: false, code: 'no-folder', message: 'That folder no longer exists.' };
+    }
+    return { ok: false, code: 'failed', message: messageOf(error) };
+  }
+}
+
+export type UnarchiveResult =
+  { ok: true } | { ok: false; code: 'no-service' | 'not-found' | 'failed'; message: string };
+
+/**
+ * Brings an archived session back into the list.
+ *
+ * The same controller method the desktop uses, so a restored session reappears in both
+ * places with no extra step.
+ */
+export async function unarchiveSession(
+  ctx: HostContext,
+  request: { sessionId: string },
+): Promise<UnarchiveResult> {
+  const controller = service<WorkspaceController>(ctx, 'workspaceController');
+  if (!controller || typeof controller.unarchiveSession !== 'function') {
+    return { ok: false, code: 'no-service', message: 'This host cannot unarchive sessions.' };
+  }
+
+  try {
+    await controller.unarchiveSession({ sessionId: request.sessionId });
+    return { ok: true };
+  } catch (error) {
+    const code = codeOf(error);
+    if (code === 'session/not-found' || code === 'workspace/not-found') {
+      return { ok: false, code: 'not-found', message: 'That session no longer exists.' };
     }
     return { ok: false, code: 'failed', message: messageOf(error) };
   }

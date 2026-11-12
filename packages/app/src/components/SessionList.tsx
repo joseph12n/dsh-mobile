@@ -39,10 +39,13 @@ export function SessionList({
   onOpen,
   onCreate,
   onArchive,
+  onUnarchive,
   canCreate = false,
   canArchive = false,
+  canUnarchive = false,
   createPending,
   archivePending,
+  restorePending,
   preferences,
 }: {
   sessions: SessionSummary[];
@@ -51,12 +54,17 @@ export function SessionList({
   /** Creates a session in that folder. Absent when the host cannot. */
   onCreate?: (workspaceId: string) => void;
   onArchive?: (session: SessionSummary) => void;
+  /** Brings an archived session back. Absent when the host cannot. */
+  onUnarchive?: (session: SessionSummary) => void;
   canCreate?: boolean;
   canArchive?: boolean;
+  canUnarchive?: boolean;
   /** Folder whose create is in flight. Its button is disabled until it settles. */
   createPending?: string;
   /** Session whose archive is in flight, for the same reason. */
   archivePending?: string;
+  /** Session whose restore is in flight. */
+  restorePending?: string;
   /** How the user wants the folders shown. Without them, the host order. */
   preferences?: FolderPreferences;
 }) {
@@ -123,8 +131,11 @@ export function SessionList({
                       session={session}
                       onOpen={onOpen}
                       {...(onArchive ? { onArchive } : {})}
+                      {...(onUnarchive ? { onUnarchive } : {})}
                       canArchive={canArchive}
+                      canUnarchive={canUnarchive}
                       {...(archivePending ? { archivePending } : {})}
+                      {...(restorePending ? { restorePending } : {})}
                     />
                   ))}
                 </ul>
@@ -169,8 +180,11 @@ export function SessionList({
                     session={session}
                     onOpen={onOpen}
                     {...(onArchive ? { onArchive } : {})}
+                    {...(onUnarchive ? { onUnarchive } : {})}
                     canArchive={canArchive}
+                    canUnarchive={canUnarchive}
                     {...(archivePending ? { archivePending } : {})}
+                    {...(restorePending ? { restorePending } : {})}
                   />
                 ))}
               </ul>
@@ -187,24 +201,32 @@ function SessionRow({
   session,
   onOpen,
   onArchive,
+  onUnarchive,
   canArchive,
+  canUnarchive,
   archivePending,
+  restorePending,
 }: {
   session: SessionSummary;
   onOpen: (session: SessionSummary) => void;
   onArchive?: (session: SessionSummary) => void;
+  onUnarchive?: (session: SessionSummary) => void;
   canArchive: boolean;
+  canUnarchive: boolean;
   /** Sesión cuyo archivo está en vuelo: su botón se deshabilita. */
   archivePending?: string;
+  /** Sesión cuya restauración está en vuelo. */
+  restorePending?: string;
 }) {
   const { t } = useI18n();
   const age = elapsed(session.updatedAt);
   const stateId = useId();
+  const archived = session.archived === true;
 
   return (
     <li className="session-row">
       {/* Un botón de verdad, no un `li` con `role="button"`: dentro vive otro botón
-          (Archivar) y las interacciones anidadas confundían a los lectores de pantalla.
+          y las interacciones anidadas confundían a los lectores de pantalla.
           Además, la tecla Enter sobre Archivar burbujeaba al `li` y abría la sesión. */}
       <button
         type="button"
@@ -223,17 +245,32 @@ function SessionRow({
         <span id={stateId} className={`badge ${session.state}`}>
           {t(STATE_KEY[session.state])}
         </span>
-        {canArchive && onArchive && (
-          <button
-            type="button"
-            className="ghost tiny"
-            aria-label={`${t('action.archive')}: ${session.title}`}
-            disabled={archivePending !== undefined}
-            onClick={() => onArchive(session)}
-          >
-            {t('action.archive')}
-          </button>
-        )}
+        {archived
+          ? canUnarchive &&
+            onUnarchive && (
+              <button
+                type="button"
+                className="ghost tiny"
+                aria-label={`${t('action.restore')}: ${session.title}`}
+                disabled={restorePending !== undefined}
+                onClick={() => onUnarchive(session)}
+              >
+                {t('action.restore')}
+              </button>
+            )
+          : canArchive &&
+            onArchive && (
+              <button
+                type="button"
+                className="ghost tiny"
+                aria-label={`${t('action.archive')}: ${session.title}`}
+                disabled={archivePending !== undefined}
+                onClick={() => onArchive(session)}
+              >
+                {t('action.archive')}
+              </button>
+            )}
+        {archived && <span className="badge archived">{t('sessions.archived')}</span>}
         {session.pendingQuestions > 0 && (
           <span className="badge waiting">
             {plural(t, 'session.questionCount', session.pendingQuestions)}

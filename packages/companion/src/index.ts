@@ -19,7 +19,9 @@ import {
   archiveSession,
   canArchiveSession,
   canCreateSession,
+  canUnarchiveSession,
   createSession,
+  unarchiveSession,
 } from './dsh/lifecycle.js';
 import { canListModels, canSelectModel, listModels, selectModel } from './dsh/models.js';
 import type { HostContext } from './host-api.js';
@@ -228,6 +230,7 @@ export function apply(ctx: HostContext): void {
     if (hasWorkspaces(ctx)) list.push('workspace.list');
     if (canCreateSession(ctx)) list.push('session.create');
     if (canArchiveSession(ctx)) list.push('workspace.archive');
+    if (canUnarchiveSession(ctx)) list.push('workspace.unarchive');
     // Las dos mitades o ninguna: un selector que no puede cambiar el modelo no
     // debería siquiera ofrecerse.
     if (canListModels(ctx) && canSelectModel(ctx)) list.push('model.select');
@@ -242,11 +245,12 @@ export function apply(ctx: HostContext): void {
     ...(publicUrl ? { publicUrl } : {}),
     ...(webRoot ? { webRoot } : {}),
     // Sesiones: la misma fuente que usa la lista del escritorio.
-    listSessions: () => listSessions(ctx),
+    listSessions: (options) => listSessions(ctx, options),
     // Carpetas: la proyección de workspaces del escritorio, o vacío si no existe.
     listWorkspaces: () => listWorkspaces(ctx),
     createSession: (request) => createSession(ctx, request),
     archiveSession: (request) => archiveSession(ctx, request),
+    unarchiveSession: (request) => unarchiveSession(ctx, request),
     // Modelos: el catálogo y el cambio salen del mismo controlador que el escritorio.
     listModels: () => listModels(ctx),
     selectModel: (request) => selectModel(ctx, request),

@@ -85,9 +85,15 @@ export interface ServerDeps {
     message?: string;
   }>;
 
+  /** Devuelve una sesión archivada a la lista. Sin ella, `workspace.unarchive` se rechaza. */
+  unarchiveSession?: (request: { sessionId: string }) => Promise<{
+    ok: boolean;
+    code?: 'no-service' | 'not-found' | 'failed';
+    message?: string;
+  }>;
+
   /** Catálogo de modelos del host. Sin ella, `models.list` se rechaza. */
   listModels?: () => Promise<ModelCatalog>;
-
   /** Cambia el modelo de una sesión. Sin ella, `model.select` se rechaza. */
   selectModel?: (request: {
     sessionId: string;
@@ -102,7 +108,7 @@ export interface ServerDeps {
   }>;
 
   /** Source of sessions. Without it `sessions.list` returns an empty list. */
-  listSessions?: () => Promise<SessionRecord[]>;
+  listSessions?: (options: { includeArchived?: boolean }) => Promise<SessionRecord[]>;
   /** Lotes de preguntas pendientes. Se empujan tras listar sesiones. */
   listQuestions?: () => QuestionBatch[];
   /** Responde un lote. Sin ella `question.answer` no está disponible. */
@@ -659,8 +665,50 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
         return;
       }
 
+      if (message.type === 'workspace.unarchive') {
+        if (!deps.unarchiveSession) {
+          send(
+            socket,
+            errorMessage(message.id, 'bad-request', 'This host cannot unarchive sessions.'),
+          );
+          return;
+        }
+
+        const restored = await deps.unarchiveSession({ sessionId: message.sessionId });
+        if (socket.readyState !== socket.OPEN) return;
+
+        if (!restored.ok) {
+          send(
+            socket,
+            errorMessage(
+              message.id,
+              restored.code === 'no-service'
+                ? 'bad-request'
+                : restored.code === 'not-found'
+                  ? 'not-found'
+                  : 'internal',
+              restored.message ?? 'The session could not be restored.',
+            ),
+          );
+          return;
+        }
+
+        send(socket, {
+          v: PROTOCOL_VERSION,
+          id: message.id,
+          at: Date.now(),
+          type: 'workspace.unarchived',
+          sessionId: message.sessionId,
+        });
+        return;
+      }
+
       if (message.type === 'sessions.list') {
-        const records = deps.listSessions ? await deps.listSessions() : [];
+        const records = deps.listSessions
+          ? await deps.listSessions({
+              ...(message.includeArchived === true ? { includeArchived: true } : {}),
+            })
+          : [];
         if (socket.readyState !== socket.OPEN) return;
 
         send(socket, {

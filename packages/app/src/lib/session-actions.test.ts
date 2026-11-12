@@ -87,6 +87,46 @@ describe('archivar una sesión', () => {
   });
 });
 
+describe('archivadas', () => {
+  it('pide la lista con las archivadas cuando se le dice', async () => {
+    stubSocket();
+    const { socket, client } = await connected();
+
+    const listing = client.listSessions(true);
+    await flush();
+    expect(lastSent(socket)).toMatchObject({ type: 'sessions.list', includeArchived: true });
+
+    answer(socket, { type: 'sessions.ok', sessions: [] });
+    await expect(listing).resolves.toEqual([]);
+  });
+
+  it('restaura y exige la confirmación', async () => {
+    stubSocket();
+    const { socket, client } = await connected(['workspace.unarchive']);
+
+    const restoring = client.unarchive('session-1');
+    await flush();
+    expect(lastSent(socket)).toMatchObject({
+      type: 'workspace.unarchive',
+      sessionId: 'session-1',
+    });
+
+    answer(socket, { type: 'workspace.unarchived', sessionId: 'session-1' });
+    await expect(restoring).resolves.toBeUndefined();
+  });
+
+  it('rechaza una respuesta que no sea la confirmación', async () => {
+    stubSocket();
+    const { socket, client } = await connected(['workspace.unarchive']);
+
+    const restoring = client.unarchive('session-1');
+    await flush();
+    answer(socket, { type: 'sessions.ok', sessions: [] });
+
+    await expect(restoring).rejects.toBeInstanceOf(ConnectionError);
+  });
+});
+
 describe('modelos', () => {
   const catalog = {
     default: { provider: 'deepseek', model: 'chat' },
