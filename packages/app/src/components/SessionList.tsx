@@ -36,10 +36,19 @@ export function SessionList({
   sessions,
   workspaces,
   onOpen,
+  onCreate,
+  onArchive,
+  canCreate = false,
+  canArchive = false,
 }: {
   sessions: SessionSummary[];
   workspaces: Workspace[];
   onOpen: (session: SessionSummary) => void;
+  /** Creates a session in that folder. Absent when the host cannot. */
+  onCreate?: (workspaceId: string) => void;
+  onArchive?: (session: SessionSummary) => void;
+  canCreate?: boolean;
+  canArchive?: boolean;
 }) {
   const { t } = useI18n();
   const [showStale, setShowStale] = useState(false);
@@ -68,6 +77,15 @@ export function SessionList({
                   {section.workspace ? displayTitle(section.workspace) : t('group.noFolder')}
                 </h3>
                 <span className="count">{section.sessions.length}</span>
+                {section.workspace && canCreate && onCreate && (
+                  <button
+                    type="button"
+                    className="ghost tiny"
+                    onClick={() => onCreate(section.workspace!.id)}
+                  >
+                    {t('action.newSession')}
+                  </button>
+                )}
               </header>
 
               {empty ? (
@@ -75,7 +93,13 @@ export function SessionList({
               ) : (
                 <ul className="sessions" id={`folder-${index}`}>
                   {section.sessions.map((session) => (
-                    <SessionRow key={session.id} session={session} onOpen={onOpen} />
+                    <SessionRow
+                      key={session.id}
+                      session={session}
+                      onOpen={onOpen}
+                      {...(onArchive ? { onArchive } : {})}
+                      canArchive={canArchive}
+                    />
                   ))}
                 </ul>
               )}
@@ -114,7 +138,13 @@ export function SessionList({
             {collapsed ? null : (
               <ul className="sessions" id={`group-${section.kind}`}>
                 {section.sessions.map((session) => (
-                  <SessionRow key={session.id} session={session} onOpen={onOpen} />
+                  <SessionRow
+                    key={session.id}
+                    session={session}
+                    onOpen={onOpen}
+                    {...(onArchive ? { onArchive } : {})}
+                    canArchive={canArchive}
+                  />
                 ))}
               </ul>
             )}
@@ -129,9 +159,13 @@ export function SessionList({
 function SessionRow({
   session,
   onOpen,
+  onArchive,
+  canArchive,
 }: {
   session: SessionSummary;
   onOpen: (session: SessionSummary) => void;
+  onArchive?: (session: SessionSummary) => void;
+  canArchive: boolean;
 }) {
   const { t } = useI18n();
   const age = elapsed(session.updatedAt);
@@ -157,6 +191,20 @@ function SessionRow({
       </div>
       <div className="session-meta">
         <span className={`badge ${session.state}`}>{t(STATE_KEY[session.state])}</span>
+        {canArchive && onArchive && (
+          <button
+            type="button"
+            className="ghost tiny"
+            aria-label={`${t('action.archive')}: ${session.title}`}
+            onClick={(event) => {
+              // Sin esto, archivar abriría la sesión en el mismo toque.
+              event.stopPropagation();
+              onArchive(session);
+            }}
+          >
+            {t('action.archive')}
+          </button>
+        )}
         {session.pendingQuestions > 0 && (
           <span className="badge waiting">
             {plural(t, 'session.questionCount', session.pendingQuestions)}
