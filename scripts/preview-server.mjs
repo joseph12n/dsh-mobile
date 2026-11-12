@@ -28,7 +28,13 @@ const memory = {
 
 const now = Date.now();
 
-const devices = new DeviceRegistry({ persistence: memory });
+// Token fijo opcional: permite reiniciar el servidor y comprobar que la PWA se
+// reconecta sola, sin volver a emparejar (DSH_MOBILE_PREVIEW_TOKEN=...).
+const previewToken = process.env.DSH_MOBILE_PREVIEW_TOKEN;
+const devices = new DeviceRegistry({
+  persistence: memory,
+  ...(previewToken ? { generateToken: () => previewToken } : {}),
+});
 
 // Dispositivo ya emparejado: el token se imprime para poder inyectarlo en el
 // navegador y mirar las pantallas sin pasar por el QR.
