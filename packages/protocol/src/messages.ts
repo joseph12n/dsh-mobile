@@ -112,8 +112,6 @@ export const PingMessage = message('ping', {});
  */
 export const SessionCreateMessage = message('session.create', {
   workspaceId: z.string().min(1),
-  /** First instruction, if the user typed one. */
-  prompt: z.string().optional(),
 });
 
 /** Archives a session: it leaves the list and can be recovered on the desktop. */
@@ -162,8 +160,6 @@ export const PairOkMessage = message('pair.ok', {
 
 export const SessionCreatedMessage = message('session.created', {
   sessionId: SessionId,
-  /** Last known sequence of the new session. */
-  seq: z.number().int().nonnegative(),
 });
 
 export const WorkspaceArchivedMessage = message('workspace.archived', {

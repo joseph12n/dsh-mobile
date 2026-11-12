@@ -1,37 +1,57 @@
 /**
  * Session lifecycle from the phone: create inside a folder, archive.
  *
- * Both live behind host services the plugin does not inject, so they are reached
- * through the reflection proxy and every one of them may be missing. Shapes come from
- * the packaged app, not from guessing:
+ * Every shape here was read from the packaged app after a review proved my first version
+ * was wrong on all of them. Written down so the next reader does not repeat it:
  *
- *  - `sessionController.createSession({ cwd })` — a session needs a **directory**, which
- *    is why creating one means creating it in a folder.
- *  - `workspaceController.archiveSession(sessionId, { stopActivity })` — the desktop
- *    refuses to archive a session with running work unless told to stop it first.
+ *  - `ctx.sessionController` exposes **`create(request)`**, not `createSession`. The name
+ *    `createSession` exists, but it is private on an internal controller.
+ *  - `create` returns **`{ sessionId, agentPreset? }`**, flat — there is no `session` field.
+ *  - `create` accepts **`workspaceId` XOR `cwd`**, and only the `workspaceId` form calls
+ *    `workspace.attachSession()`. With `cwd` the session is created but **not** a member of
+ *    the folder, which would silently defeat the whole feature.
+ *  - `archiveSession` takes **one request object**, not `(id, options)`.
+ *  - the refusal for running work carries its code on **`error.code`** as
+ *    `workspace/session-active`; the message text does not contain it.
  */
 import { service, type HostContext } from '../host-api.js';
-import { listWorkspaces, type WorkspaceController } from './workspaces.js';
+import type { WorkspaceController } from './workspaces.js';
 
 /** The part of the session controller we use. */
 interface SessionLifecycleController {
-  createSession?: (request: {
-    sessionId?: string;
-    cwd: string;
+  create?: (request: {
+    workspaceId?: string;
+    cwd?: string;
     agentPreset?: string;
     reusable?: boolean;
-  }) => Promise<{ session?: { sessionId?: unknown }; preset?: unknown }>;
+  }) => Promise<{ sessionId?: unknown; agentPreset?: unknown }>;
 }
 
-export type CreateResult =
-  | { ok: true; sessionId: string; seq: number }
-  | { ok: false; code: 'no-folder' | 'no-service' | 'failed'; message: string };
+/** An error that carries a stable code, which is how the host reports refusals. */
+interface CodedError {
+  code?: unknown;
+  message?: unknown;
+}
 
-/** `true` if a session can be created at all on this host. */
+function codeOf(error: unknown): string | undefined {
+  if (typeof error !== 'object' || error === null) return undefined;
+  const { code } = error as CodedError;
+  return typeof code === 'string' ? code : undefined;
+}
+
+function messageOf(error: unknown): string {
+  if (typeof error === 'object' && error !== null) {
+    const { message } = error as CodedError;
+    if (typeof message === 'string') return message;
+  }
+  return String(error);
+}
+
+/** `true` if a session can be created on this host. */
 export function canCreateSession(ctx: HostContext): boolean {
   try {
     const controller = service<SessionLifecycleController>(ctx, 'sessionController');
-    return typeof controller?.createSession === 'function';
+    return typeof controller?.create === 'function';
   } catch {
     return false;
   }
@@ -47,50 +67,52 @@ export function canArchiveSession(ctx: HostContext): boolean {
   }
 }
 
+export type CreateResult =
+  | { ok: true; sessionId: string }
+  | { ok: false; code: 'no-service' | 'no-folder' | 'failed'; message: string };
+
 /**
- * Creates a session in an existing folder.
+ * Creates a session inside an existing folder.
  *
- * The folder is looked up first: a session is born in a directory, so a workspace id
- * that does not exist is a failure, not something to invent a directory for.
+ * `workspaceId` is passed, **not** `cwd`: only that form makes the session a member of the
+ * folder. The host validates the id, so a folder that no longer exists comes back as its
+ * own error instead of being guessed at here.
  */
 export async function createSession(
   ctx: HostContext,
-  request: { workspaceId: string; prompt?: string },
+  request: { workspaceId: string },
 ): Promise<CreateResult> {
   const controller = service<SessionLifecycleController>(ctx, 'sessionController');
-  if (!controller || typeof controller.createSession !== 'function') {
+  if (!controller || typeof controller.create !== 'function') {
     return { ok: false, code: 'no-service', message: 'This host cannot create sessions.' };
   }
 
-  const workspaces = await listWorkspaces(ctx);
-  const workspace = workspaces.find((candidate) => candidate.id === request.workspaceId);
-  if (!workspace) {
-    return { ok: false, code: 'no-folder', message: 'That folder no longer exists.' };
-  }
-
   try {
-    const created = await controller.createSession({ cwd: workspace.directory });
-    const sessionId = created?.session?.sessionId;
+    const created = await controller.create({ workspaceId: request.workspaceId });
+    const sessionId = created?.sessionId;
     if (typeof sessionId !== 'string' || !sessionId) {
       return { ok: false, code: 'failed', message: 'The host did not return a session.' };
     }
-
-    // `seq` starts at zero: a brand new session has no events to catch up on.
-    return { ok: true, sessionId, seq: 0 };
+    return { ok: true, sessionId };
   } catch (error) {
-    return { ok: false, code: 'failed', message: String(error) };
+    const code = codeOf(error);
+    if (code === 'workspace/not-found' || code === 'session/not-found') {
+      return { ok: false, code: 'no-folder', message: 'That folder no longer exists.' };
+    }
+    return { ok: false, code: 'failed', message: messageOf(error) };
   }
 }
 
 export type ArchiveResult =
-  { ok: true } | { ok: false; code: 'no-service' | 'active' | 'failed'; message: string };
+  | { ok: true }
+  | { ok: false; code: 'no-service' | 'active' | 'not-found' | 'failed'; message: string };
 
 /**
  * Archives a session.
  *
- * `stopActivity` matters: the desktop refuses to archive a session with a running turn
- * unless it is told to stop it, and that refusal is useful — the phone shows it instead
- * of silently killing work.
+ * `stopActivity` matters: the host refuses to archive a session with a running turn, and
+ * that refusal is surfaced as `active` so the phone can say "stop it first" instead of
+ * killing work behind the user's back.
  */
 export async function archiveSession(
   ctx: HostContext,
@@ -102,21 +124,25 @@ export async function archiveSession(
   }
 
   try {
-    await controller.archiveSession(
-      request.sessionId,
-      request.stopActivity === true ? { stopActivity: true } : {},
-    );
+    // Un solo objeto: la firma real es `archiveSession(request)`.
+    await controller.archiveSession({
+      sessionId: request.sessionId,
+      ...(request.stopActivity === true ? { stopActivity: true } : {}),
+    });
     return { ok: true };
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    // El host usa un código estable para «tiene trabajo en marcha».
-    if (/session-active/.test(message)) {
+    // El código va en `error.code`, no en el texto: buscar en el mensaje no acertaba nunca.
+    const code = codeOf(error);
+    if (code === 'workspace/session-active') {
       return {
         ok: false,
         code: 'active',
         message: 'That session has work running. Stop it first.',
       };
     }
-    return { ok: false, code: 'failed', message };
+    if (code === 'session/not-found' || code === 'workspace/not-found') {
+      return { ok: false, code: 'not-found', message: 'That session no longer exists.' };
+    }
+    return { ok: false, code: 'failed', message: messageOf(error) };
   }
 }
