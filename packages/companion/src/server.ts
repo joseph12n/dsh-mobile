@@ -68,6 +68,21 @@ export interface ServerDeps {
    */
   listWorkspaces?: () => Promise<Workspace[]>;
 
+  /** Crea una sesión en una carpeta existente. Sin ella, `session.create` se rechaza. */
+  createSession?: (request: { workspaceId: string }) => Promise<{
+    ok: boolean;
+    code?: 'no-service' | 'no-folder' | 'failed';
+    message?: string;
+    sessionId?: string;
+  }>;
+
+  /** Archiva una sesión. Sin ella, `workspace.archive` se rechaza. */
+  archiveSession?: (request: { sessionId: string; stopActivity?: boolean }) => Promise<{
+    ok: boolean;
+    code?: 'no-service' | 'active' | 'not-found' | 'failed';
+    message?: string;
+  }>;
+
   /** Source of sessions. Without it `sessions.list` returns an empty list. */
   listSessions?: () => Promise<SessionRecord[]>;
   /** Lotes de preguntas pendientes. Se empujan tras listar sesiones. */
@@ -471,6 +486,77 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
           at: Date.now(),
           type: 'workspace.ok',
           workspaces,
+        });
+        return;
+      }
+
+      if (message.type === 'session.create') {
+        if (!deps.createSession) {
+          send(
+            socket,
+            errorMessage(message.id, 'bad-request', 'This host cannot create sessions.'),
+          );
+          return;
+        }
+
+        const created = await deps.createSession({ workspaceId: message.workspaceId });
+        if (socket.readyState !== socket.OPEN) return;
+
+        if (!created.ok || !created.sessionId) {
+          send(
+            socket,
+            errorMessage(
+              message.id,
+              created.code === 'no-folder' ? 'not-found' : 'internal',
+              created.message ?? 'The session could not be created.',
+            ),
+          );
+          return;
+        }
+
+        send(socket, {
+          v: PROTOCOL_VERSION,
+          id: message.id,
+          at: Date.now(),
+          type: 'session.created',
+          sessionId: created.sessionId,
+        });
+        return;
+      }
+
+      if (message.type === 'workspace.archive') {
+        if (!deps.archiveSession) {
+          send(
+            socket,
+            errorMessage(message.id, 'bad-request', 'This host cannot archive sessions.'),
+          );
+          return;
+        }
+
+        const archived = await deps.archiveSession({
+          sessionId: message.sessionId,
+          ...(message.stopActivity === true ? { stopActivity: true } : {}),
+        });
+        if (socket.readyState !== socket.OPEN) return;
+
+        if (!archived.ok) {
+          send(
+            socket,
+            errorMessage(
+              message.id,
+              archived.code === 'not-found' ? 'not-found' : 'internal',
+              archived.message ?? 'The session could not be archived.',
+            ),
+          );
+          return;
+        }
+
+        send(socket, {
+          v: PROTOCOL_VERSION,
+          id: message.id,
+          at: Date.now(),
+          type: 'workspace.archived',
+          sessionId: message.sessionId,
         });
         return;
       }

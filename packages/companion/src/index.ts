@@ -15,6 +15,12 @@ import { buildPairingUrl } from '@dsh-mobile/protocol';
 import { openInBrowser } from './open-browser.js';
 import { resolveSessionId } from './dsh/sessions.js';
 import { hasWorkspaces, listWorkspaces } from './dsh/workspaces.js';
+import {
+  archiveSession,
+  canArchiveSession,
+  canCreateSession,
+  createSession,
+} from './dsh/lifecycle.js';
 import type { HostContext } from './host-api.js';
 import { reportToLog, reportToText, runProbe, type ProbeReport } from './probe.js';
 import { DEFAULT_PORT, startCompanionServer } from './server.js';
@@ -216,7 +222,13 @@ export function apply(ctx: HostContext): void {
   // Se anuncia solo lo que este host sabe hacer, y se **evalúa en cada hello**: el
   // controlador de workspaces puede montarse después del arranque, y una bandera
   // congelada mentiría en las dos direcciones.
-  const limits = (): Capability[] => (hasWorkspaces(ctx) ? ['workspace.list'] : []);
+  const limits = (): Capability[] => {
+    const list: Capability[] = [];
+    if (hasWorkspaces(ctx)) list.push('workspace.list');
+    if (canCreateSession(ctx)) list.push('session.create');
+    if (canArchiveSession(ctx)) list.push('workspace.archive');
+    return list;
+  };
 
   void startCompanionServer({
     pairing,
@@ -229,6 +241,8 @@ export function apply(ctx: HostContext): void {
     listSessions: () => listSessions(ctx),
     // Carpetas: la proyección de workspaces del escritorio, o vacío si no existe.
     listWorkspaces: () => listWorkspaces(ctx),
+    createSession: (request) => createSession(ctx, request),
+    archiveSession: (request) => archiveSession(ctx, request),
     // Preguntas: proyección `userQuestions` y respuesta por lote.
     listQuestions: () => listPendingQuestions(ctx),
     answerQuestion: (input) => answerQuestion(ctx, input),

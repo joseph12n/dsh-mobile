@@ -955,3 +955,108 @@ describe('folders over the WebSocket', () => {
     }
   });
 });
+
+describe('session actions over the WebSocket', () => {
+  /** A server whose session actions are whatever the test needs. */
+  async function acting(
+    deps: {
+      createSession?: () => Promise<{
+        ok: boolean;
+        code?: string;
+        message?: string;
+        sessionId?: string;
+      }>;
+      archiveSession?: () => Promise<{ ok: boolean; code?: string; message?: string }>;
+    },
+    run: (client: TestClient) => Promise<void>,
+  ): Promise<void> {
+    const registry = new DeviceRegistry({ persistence: new MemoryPersistence() });
+    const { token } = registry.enroll('Pixel', 'android');
+
+    const server = await startCompanionServer({
+      pairing: new PairingService(),
+      devices: registry,
+      port: 0,
+      listSessions: () => Promise.resolve([]),
+      ...(deps.createSession ? { createSession: deps.createSession as never } : {}),
+      ...(deps.archiveSession ? { archiveSession: deps.archiveSession as never } : {}),
+    });
+
+    try {
+      const client = await openClient(server.port);
+      client.send(hello({ deviceToken: token }));
+      expect((await client.next())['type']).toBe('hello.ok');
+      await run(client);
+      client.close();
+    } finally {
+      await server.close();
+    }
+  }
+
+  it('creates a session and answers with its id', async () => {
+    await acting(
+      { createSession: async () => ({ ok: true, sessionId: 'new-1' }) },
+      async (client) => {
+        client.send({
+          v: PROTOCOL_VERSION,
+          id: 'c1',
+          at: Date.now(),
+          type: 'session.create',
+          workspaceId: 'ws-1',
+        } as never);
+        const response = await client.next();
+        expect(response['type']).toBe('session.created');
+        expect(response['sessionId']).toBe('new-1');
+      },
+    );
+  });
+
+  it('answers not-found when the folder is gone', async () => {
+    await acting(
+      { createSession: async () => ({ ok: false, code: 'no-folder', message: 'gone' }) },
+      async (client) => {
+        client.send({
+          v: PROTOCOL_VERSION,
+          id: 'c2',
+          at: Date.now(),
+          type: 'session.create',
+          workspaceId: 'gone',
+        } as never);
+        const response = await client.next();
+        expect(response['type']).toBe('error');
+        expect(response['code']).toBe('not-found');
+      },
+    );
+  });
+
+  it('archives and confirms', async () => {
+    await acting({ archiveSession: async () => ({ ok: true }) }, async (client) => {
+      client.send({
+        v: PROTOCOL_VERSION,
+        id: 'a1',
+        at: Date.now(),
+        type: 'workspace.archive',
+        sessionId: 's1',
+      } as never);
+      const response = await client.next();
+      expect(response['type']).toBe('workspace.archived');
+      expect(response['sessionId']).toBe('s1');
+    });
+  });
+
+  it('refuses to answer when the host has no handler wired', async () => {
+    // Sin dependencia inyectada el mensaje no puede responderse, y `bad-request` lo dice.
+    await acting({}, async (client) => {
+      client.send({
+        v: PROTOCOL_VERSION,
+        id: 'a2',
+        at: Date.now(),
+        type: 'workspace.archive',
+        sessionId: 's1',
+      } as never);
+      const response = await client.next();
+      expect(response['type']).toBe('error');
+      expect(response['code']).toBe('bad-request');
+    });
+  });
+});
