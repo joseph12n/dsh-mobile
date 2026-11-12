@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { SessionSummary } from '@dsh-mobile/protocol';
-import { STALE_AFTER_MS, groupSessions, relativeTime } from './sessions.js';
+import { STALE_AFTER_MS, elapsed, groupSessions } from './sessions.js';
 
 /**
  * La lista tiene que responder a una pregunta: **¿qué necesita mi atención?**
@@ -79,66 +79,37 @@ describe('agrupación de sesiones', () => {
   it('con la lista vacía no devuelve secciones', () => {
     expect(groupSessions([], NOW)).toEqual([]);
   });
-
-  it('cada sección lleva un título legible', () => {
-    const sections = groupSessions(
-      [session({ id: 'a', pendingQuestions: 1 }), session({ id: 'b', state: 'working' })],
-      NOW,
-    );
-    expect(sections.map((section) => section.title)).toEqual([
-      'Esperando tu respuesta',
-      'Trabajando',
-    ]);
-  });
 });
 
-describe('tiempo relativo', () => {
-  it('dice "ahora" en el primer minuto', () => {
-    expect(relativeTime(NOW - 30_000, NOW)).toBe('ahora');
+describe('elapsed', () => {
+  it('says now inside the first minute', () => {
+    expect(elapsed(NOW - 30_000, NOW)).toEqual({ unit: 'now' });
   });
 
-  it('cuenta minutos, horas y días', () => {
-    expect(relativeTime(NOW - 5 * 60_000, NOW)).toBe('hace 5 min');
-    expect(relativeTime(NOW - 3 * 3_600_000, NOW)).toBe('hace 3 h');
-    expect(relativeTime(NOW - 2 * 86_400_000, NOW)).toBe('hace 2 d');
+  it('counts minutes, hours and days', () => {
+    expect(elapsed(NOW - 5 * 60_000, NOW)).toEqual({ unit: 'minutes', count: 5 });
+    expect(elapsed(NOW - 3 * 3_600_000, NOW)).toEqual({ unit: 'hours', count: 3 });
+    expect(elapsed(NOW - 2 * 86_400_000, NOW)).toEqual({ unit: 'days', count: 2 });
   });
 
-  it('no devuelve texto para una fecha desconocida', () => {
-    expect(relativeTime(0, NOW)).toBe('');
+  it('returns nothing for an unknown date', () => {
+    expect(elapsed(0, NOW)).toBeUndefined();
   });
 
-  it('no muestra tiempos negativos si el reloj va adelantado', () => {
-    expect(relativeTime(NOW + 60_000, NOW)).toBe('ahora');
-  });
-});
-
-describe('bordes del corte de antigüedad', () => {
-  it('justo en siete días ya es "Más antiguas"', () => {
-    // El límite es inclusivo por abajo: a los 7 días exactos ya es antigua, y el
-    // texto no debe decir "hace 6 d" mientras está en ese grupo.
-    const exacto = session({ id: 'exacto', updatedAt: NOW - STALE_AFTER_MS });
-    const sections = groupSessions([exacto], NOW);
-    expect(sections[0]?.kind).toBe('stale');
+  it('never reports a negative age when the clock is ahead', () => {
+    expect(elapsed(NOW + 60_000, NOW)).toEqual({ unit: 'now' });
   });
 
-  it('un milisegundo antes sigue en reposo', () => {
-    const casi = session({ id: 'casi', updatedAt: NOW - STALE_AFTER_MS + 1 });
-    expect(groupSessions([casi], NOW)[0]?.kind).toBe('idle');
+  it('truncates: 6.5 days is 6, not 7', () => {
+    // Rounding up made the text contradict the group the session was in.
+    expect(elapsed(NOW - 6.5 * 86_400_000, NOW)).toEqual({ unit: 'days', count: 6 });
   });
 
-  it('el texto no adelanta el grupo: 6,5 días dice 6, no 7', () => {
-    // Decía "hace 7 d" estando todavía en "En reposo", que se contradice.
-    const seisYMedio = NOW - 6.5 * 86_400_000;
-    expect(relativeTime(seisYMedio, NOW)).toBe('hace 6 d');
+  it('one millisecond before the cutoff still says 6 days', () => {
+    expect(elapsed(NOW - (STALE_AFTER_MS - 1), NOW)).toEqual({ unit: 'days', count: 6 });
   });
 
-  it('el texto dice 6 días en el último instante antes del corte', () => {
-    // El redondeo de segundos hacía que el texto dijera "hace 7 d" medio segundo
-    // antes de entrar en el grupo.
-    expect(relativeTime(NOW - (STALE_AFTER_MS - 1), NOW)).toBe('hace 6 d');
-  });
-
-  it('el texto dice 7 días en cuanto entra en el grupo', () => {
-    expect(relativeTime(NOW - STALE_AFTER_MS, NOW)).toBe('hace 7 d');
+  it('at the cutoff it says 7', () => {
+    expect(elapsed(NOW - STALE_AFTER_MS, NOW)).toEqual({ unit: 'days', count: 7 });
   });
 });

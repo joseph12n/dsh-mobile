@@ -17,16 +17,8 @@ export type SectionKind = 'waiting' | 'working' | 'idle' | 'stale';
 
 export interface SessionSection {
   kind: SectionKind;
-  title: string;
   sessions: SessionSummary[];
 }
-
-const TITLES: Record<SectionKind, string> = {
-  waiting: 'Esperando tu respuesta',
-  working: 'Trabajando',
-  idle: 'En reposo',
-  stale: 'Más antiguas',
-};
 
 /** `true` si la sesión espera algo del humano. */
 function waits(session: SessionSummary): boolean {
@@ -73,28 +65,31 @@ export function groupSessions(
 
   return (['waiting', 'working', 'idle', 'stale'] as const)
     .filter((kind) => buckets[kind].length > 0)
-    .map((kind) => ({ kind, title: TITLES[kind], sessions: buckets[kind] }));
+    .map((kind) => ({ kind, sessions: buckets[kind] }));
 }
 
 /**
- * "hace 5 min", "hace 3 h", "hace 2 d". Vacío si no se conoce la fecha.
+ * Elapsed time as data, not as text.
  *
- * Se trunca en vez de redondear: si dijera "hace 7 d" a los 6,5 días, el texto
- * contradiría al grupo (esa sesión todavía no está en "Más antiguas").
+ * It used to return a Spanish sentence. Language belongs to the view, so this
+ * returns the unit and the amount and the catalogue turns it into words.
+ *
+ * It truncates instead of rounding: saying "7 d" at 6.5 days contradicted the
+ * folder that session was still in.
  */
-export function relativeTime(timestamp: number, now: number = Date.now()): string {
-  if (!timestamp) return '';
+export type Elapsed = { unit: 'now' } | { unit: 'minutes' | 'hours' | 'days'; count: number };
 
-  // Suelo en segundos, no redondeo: redondear hacia arriba hacía que el texto
-  // dijera "hace 7 d" medio segundo antes de que la sesión entrara en ese grupo.
+export function elapsed(timestamp: number, now: number = Date.now()): Elapsed | undefined {
+  if (!timestamp) return undefined;
+
   const seconds = Math.max(0, Math.floor((now - timestamp) / 1000));
-  if (seconds < 60) return 'ahora';
+  if (seconds < 60) return { unit: 'now' };
 
   const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `hace ${minutes} min`;
+  if (minutes < 60) return { unit: 'minutes', count: minutes };
 
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `hace ${hours} h`;
+  if (hours < 24) return { unit: 'hours', count: hours };
 
-  return `hace ${Math.floor(hours / 24)} d`;
+  return { unit: 'days', count: Math.floor(hours / 24) };
 }

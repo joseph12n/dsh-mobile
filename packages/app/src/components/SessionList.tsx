@@ -1,22 +1,30 @@
 import { useState } from 'react';
 import type { SessionSummary } from '@dsh-mobile/protocol';
-import { groupSessions, relativeTime } from '../lib/sessions.js';
+import { groupSessions, elapsed } from '../lib/sessions.js';
+import { plural, useI18n } from '../i18n/index.js';
 
 /**
- * Lista de sesiones agrupada por estado.
+ * Session list, grouped by state.
  *
- * El orden de las secciones lo decide `groupSessions`; aquí solo se pinta. La de
- * "más antiguas" arranca plegada porque no es lo que se mira al coger el
- * teléfono, y las demás no se pueden plegar: si están, importan.
+ * The order of the sections comes from `groupSessions`; this file only draws. The
+ * "older" group starts collapsed because it is not what you look at when you pick up
+ * the phone, and the others cannot be collapsed: if they are there, they matter.
  */
 
-const STATE_LABEL: Record<SessionSummary['state'], string> = {
-  working: 'trabajando',
-  waiting: 'espera respuesta',
-  idle: 'en reposo',
-  done: 'terminada',
-  error: 'error',
-};
+const STATE_KEY = {
+  working: 'session.working',
+  waiting: 'session.waiting',
+  idle: 'session.idle',
+  done: 'session.done',
+  error: 'session.error',
+} as const;
+
+const SECTION_KEY = {
+  waiting: 'group.waiting',
+  working: 'group.working',
+  idle: 'group.idle',
+  stale: 'group.stale',
+} as const;
 
 export function SessionList({
   sessions,
@@ -25,10 +33,11 @@ export function SessionList({
   sessions: SessionSummary[];
   onOpen: (session: SessionSummary) => void;
 }) {
+  const { t } = useI18n();
   const [showStale, setShowStale] = useState(false);
 
   if (sessions.length === 0) {
-    return <p className="muted">No hay sesiones vivas en el host.</p>;
+    return <p className="muted">{t('sessions.empty')}</p>;
   }
 
   const sections = groupSessions(sessions);
@@ -41,7 +50,7 @@ export function SessionList({
         return (
           <section key={section.kind} className={`group ${section.kind}`}>
             <header className="group-head">
-              <h3>{section.title}</h3>
+              <h3>{t(SECTION_KEY[section.kind])}</h3>
               <span className="count">{section.sessions.length}</span>
               {section.kind === 'stale' && (
                 <button
@@ -49,46 +58,53 @@ export function SessionList({
                   className="ghost tiny"
                   onClick={() => setShowStale((previous) => !previous)}
                   aria-expanded={showStale}
-                  // Solo apunta al grupo cuando existe: un `aria-controls` que
-                  // cuelga de un elemento no renderizado es una referencia rota.
-                  aria-controls={showStale ? `grupo-${section.kind}` : undefined}
+                  // Only points at the group when it exists: an `aria-controls`
+                  // referencing an unrendered element is a broken reference.
+                  aria-controls={showStale ? `group-${section.kind}` : undefined}
                 >
-                  {showStale ? 'Ocultar' : 'Mostrar'}
+                  {showStale ? t('group.hide') : t('group.show')}
                 </button>
               )}
             </header>
 
             {collapsed ? null : (
-              <ul className="sessions" id={`grupo-${section.kind}`}>
-                {section.sessions.map((session) => (
-                  <li
-                    key={session.id}
-                    className="session-row"
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => onOpen(session)}
-                    onKeyDown={(event) => {
-                      if (event.key !== 'Enter' && event.key !== ' ') return;
-                      // Sin esto, Espacio además desplaza la página.
-                      event.preventDefault();
-                      onOpen(session);
-                    }}
-                  >
-                    <div className="session-main">
-                      <span className="session-title">{session.title}</span>
-                      <span className="muted small">{relativeTime(session.updatedAt)}</span>
-                    </div>
-                    <div className="session-meta">
-                      <span className={`badge ${session.state}`}>{STATE_LABEL[session.state]}</span>
-                      {session.pendingQuestions > 0 && (
-                        <span className="badge waiting">
-                          {session.pendingQuestions} pregunta
-                          {session.pendingQuestions > 1 ? 's' : ''}
+              <ul className="sessions" id={`group-${section.kind}`}>
+                {section.sessions.map((session) => {
+                  const age = elapsed(session.updatedAt);
+
+                  return (
+                    <li
+                      key={session.id}
+                      className="session-row"
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => onOpen(session)}
+                      onKeyDown={(event) => {
+                        if (event.key !== 'Enter' && event.key !== ' ') return;
+                        // Without this, Space also scrolls the page.
+                        event.preventDefault();
+                        onOpen(session);
+                      }}
+                    >
+                      <div className="session-main">
+                        <span className="session-title">{session.title}</span>
+                        <span className="muted small">
+                          {age ? t(unitKey(age), { count: 'count' in age ? age.count : 0 }) : ''}
                         </span>
-                      )}
-                    </div>
-                  </li>
-                ))}
+                      </div>
+                      <div className="session-meta">
+                        <span className={`badge ${session.state}`}>
+                          {t(STATE_KEY[session.state])}
+                        </span>
+                        {session.pendingQuestions > 0 && (
+                          <span className="badge waiting">
+                            {plural(t, 'session.questionCount', session.pendingQuestions)}
+                          </span>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </section>
@@ -96,4 +112,14 @@ export function SessionList({
       })}
     </>
   );
+}
+
+/** Catalogue key for an elapsed value. */
+function unitKey(age: {
+  unit: 'now' | 'minutes' | 'hours' | 'days';
+}): 'time.now' | 'time.minutes' | 'time.hours' | 'time.days' {
+  if (age.unit === 'minutes') return 'time.minutes';
+  if (age.unit === 'hours') return 'time.hours';
+  if (age.unit === 'days') return 'time.days';
+  return 'time.now';
 }
