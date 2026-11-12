@@ -119,8 +119,7 @@ export async function listSessions(ctx: HostContext): Promise<SessionRecord[]> {
 
       return {
         id,
-        title:
-          typeof titleValue === 'string' && titleValue.trim() ? titleValue.trim() : 'Sin título',
+        title: typeof titleValue === 'string' && titleValue.trim() ? titleValue.trim() : 'Untitled',
         updatedAt: typeof item.updatedAt === 'number' ? item.updatedAt : 0,
         seq: typeof item.projections?.asOfSeq === 'number' ? item.projections.asOfSeq : 0,
         agentAvailable: item.agentAvailable === true,

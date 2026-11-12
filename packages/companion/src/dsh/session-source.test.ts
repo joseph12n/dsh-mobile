@@ -68,7 +68,7 @@ describe('listado de sesiones', () => {
 
   it('pone un título legible cuando la proyección viene vacía', async () => {
     const records = await listSessions(ctxWith([summary({ sessionId: 's1', title: null })]));
-    expect(records[0]?.title).toBe('Sin título');
+    expect(records[0]?.title).toBe('Untitled');
   });
 
   it('cuenta las preguntas pendientes de la proyección', async () => {

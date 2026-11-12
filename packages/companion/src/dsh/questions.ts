@@ -176,7 +176,11 @@ export function answerQuestion(
 ): AnswerOutcome {
   const userQuestions = service<UserQuestionsService>(ctx, 'userQuestions');
   if (!userQuestions) {
-    return { ok: false, code: 'internal', message: 'El host no expone el servicio de preguntas.' };
+    return {
+      ok: false,
+      code: 'internal',
+      message: 'The host does not expose the questions service.',
+    };
   }
 
   const agents = service<AgentRegistry>(ctx, 'agents');
@@ -185,7 +189,7 @@ export function answerQuestion(
     return {
       ok: false,
       code: 'not-found',
-      message: 'La sesión no está cargada en el host. Abrila en el escritorio y volvé a intentar.',
+      message: 'The session is not loaded on the host. Open it on the desktop and try again.',
     };
   }
 
@@ -195,7 +199,7 @@ export function answerQuestion(
       return {
         ok: false,
         code: 'bad-request',
-        message: 'La pregunta ya no admite respuesta: quizá la respondió el escritorio.',
+        message: 'That question no longer accepts an answer: the desktop may have answered it.',
       };
     }
     return { ok: true };

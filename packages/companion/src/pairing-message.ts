@@ -8,10 +8,10 @@ import { buildPairingUrl } from '@dsh-mobile/protocol';
 import type { ResolvedOrigin } from './public-origin.js';
 
 const ORIGIN_LABEL: Record<string, string> = {
-  config: 'la dirección configurada',
-  tailscale: 'el nombre del tailnet',
-  loopback: 'solo esta máquina',
-  detectando: 'averiguándolo',
+  config: 'the configured address',
+  tailscale: 'the tailnet name',
+  loopback: 'this machine only',
+  detectando: 'working it out',
 };
 
 export interface PairingView {
@@ -25,6 +25,8 @@ export interface PairingView {
   listenerError?: string | undefined;
   /** Puerto por defecto, para el caso en que aún no se sabe nada. */
   fallbackPort: number;
+  /** QR ya pintado en texto, si se pudo generar. */
+  qr?: string | undefined;
 }
 
 export interface PairingLink {
@@ -37,17 +39,20 @@ export interface PairingLink {
  * Construye el mensaje.
  *
  * Nunca presenta como bueno un enlace con loopback: o hay origen real, o lo dice.
+ *
+ * Con `qr`, el código se pinta para escanearlo desde el propio chat. Sin él, se
+ * enumera el enlace y el código, que es lo que había antes y obligaba a copiar.
  */
 export function buildPairingMessage(view: PairingView): PairingLink {
   if (view.listenerError) {
     return {
       compromised: true,
       text: [
-        'El plugin no pudo abrir el listener, así que no hay a dónde emparejar.',
+        'The plugin could not open its listener, so there is nowhere to pair.',
         '',
         view.listenerError,
         '',
-        'Revisa que el puerto no esté ocupado y vuelve a iniciar DSH.',
+        'Check that the port is free and start DSH again.',
       ].join('\n'),
     };
   }
@@ -59,24 +64,33 @@ export function buildPairingMessage(view: PairingView): PairingLink {
   const link = buildPairingUrl(base, view.code);
   const compromised = view.origin === undefined || view.origin.loopback;
 
-  const lines = [
-    'Emparejar el teléfono',
-    '',
-    link,
-    '',
-    `Código: ${view.code}`,
-    `Caduca a las ${new Date(view.expiresAt).toLocaleTimeString()} · un solo uso`,
-  ];
+  const lines = ['Pair your phone', ''];
+
+  if (view.qr) {
+    // Explicitly requested (`/mobile qr`). With a caveat: a text QR only scans
+    // when line height equals font size, which is not true in the DSH chat.
+    lines.push(
+      'Scan this with your phone camera. It only works where line height equals',
+      'font size; if it does not scan, open the pairing page instead:',
+      '',
+      view.qr,
+      '',
+    );
+  }
+
+  // The link appears exactly once, labelled.
+  lines.push(`Link: ${link}`, `Code: ${view.code}`);
+  lines.push(`Expires at ${new Date(view.expiresAt).toLocaleTimeString()} · single use`);
 
   if (compromised) {
     lines.push(
       '',
-      'Aviso: este enlace apunta a loopback, que en el teléfono es el propio teléfono.',
-      'Ábrelo desde el nombre del tailnet o configura DSH_MOBILE_PUBLIC_URL.',
+      'Heads up: this link points at loopback, which on a phone is the phone itself.',
+      'Open it through the tailnet name, or set DSH_MOBILE_PUBLIC_URL.',
     );
   }
 
   const source = view.origin?.source ?? 'detectando';
-  lines.push('', `Origen: ${ORIGIN_LABEL[source] ?? source}`);
+  lines.push('', `Origin: ${ORIGIN_LABEL[source] ?? source}`);
   return { text: lines.join('\n'), compromised };
 }

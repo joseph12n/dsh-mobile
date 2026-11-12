@@ -191,13 +191,13 @@ describe('superficie HTTP', () => {
     try {
       const localHtml = await (await fetch(`http://127.0.0.1:${server.port}/pair`)).text();
       expect(localHtml).toContain('http://127.0.0.1:');
-      expect(localHtml).toContain('no va a funcionar desde el teléfono');
+      expect(localHtml).toContain('will not work from a phone');
 
       // `fetch` prohíbe fijar Host (es cabecera reservada), así que se usa http
       // crudo: es la única forma de simular el proxy del tailnet.
       const remoteHtml = await getWithHost(server.port, '/pair', 'maquina.tailnet.ts.net');
       expect(remoteHtml).toContain('https://maquina.tailnet.ts.net');
-      expect(remoteHtml).not.toContain('no va a funcionar desde el teléfono');
+      expect(remoteHtml).not.toContain('will not work from a phone');
 
       const healthRaw = await getWithHost(server.port, '/health', '127.0.0.1');
       const health = JSON.parse(healthRaw) as {
@@ -206,7 +206,7 @@ describe('superficie HTTP', () => {
         warningSeverity?: string;
       };
       expect(health.origin).toContain('127.0.0.1');
-      expect(health.warning).toContain('teléfono');
+      expect(health.warning).toContain('phone');
       expect(health.warningSeverity).toBe('blocking');
     } finally {
       await server.close();
@@ -253,8 +253,8 @@ describe('superficie HTTP', () => {
         'x-forwarded-proto': 'http',
       });
       expect(html).toContain('http://maquina.tailnet.ts.net');
-      expect(html).toContain('no podrás instalarla');
-      expect(html).not.toContain('no va a funcionar desde el teléfono');
+      expect(html).toContain('will not be able to install it');
+      expect(html).not.toContain('will not work from a phone');
     } finally {
       await server.close();
     }

@@ -155,15 +155,15 @@ describe('avisos para la página de emparejamiento', () => {
     const notice = originNotice('http://127.0.0.1:6768');
     expect(notice?.severity).toBe('blocking');
     expect(notice?.message).toContain('127.0.0.1:6768');
-    expect(notice?.message).toContain('teléfono');
+    expect(notice?.message).toContain('phone');
   });
 
   it('es solo un aviso cuando va por HTTP sin ser loopback: la app carga', () => {
     const notice = originNotice('http://192.168.1.50:6768');
     expect(notice?.severity).toBe('warning');
-    expect(notice?.message).toContain('cargará');
-    expect(notice?.message).toContain('instalarse');
-    expect(noticeHeadline(notice!)).toContain('no podrás instalarla');
+    expect(notice?.message).toContain('will load');
+    expect(notice?.message).toContain('install it');
+    expect(noticeHeadline(notice!)).toContain('will not be able to install it');
   });
 
   it('no avisa en un destino correcto por HTTPS', () => {
@@ -173,11 +173,11 @@ describe('avisos para la página de emparejamiento', () => {
   it('es bloqueante si la dirección no es válida', () => {
     const notice = originNotice('no es una url');
     expect(notice?.severity).toBe('blocking');
-    expect(notice?.message).toContain('no es válida');
+    expect(notice?.message).toContain('is not valid');
   });
 
   it('el titular depende de la gravedad', () => {
-    expect(noticeHeadline({ severity: 'blocking', message: '' })).toContain('no va a funcionar');
-    expect(noticeHeadline({ severity: 'warning', message: '' })).toContain('instalarla');
+    expect(noticeHeadline({ severity: 'blocking', message: '' })).toContain('will not work');
+    expect(noticeHeadline({ severity: 'warning', message: '' })).toContain('install it');
   });
 });
