@@ -25,6 +25,8 @@ export interface PairingView {
   listenerError?: string | undefined;
   /** Puerto por defecto, para el caso en que aún no se sabe nada. */
   fallbackPort: number;
+  /** QR ya pintado en texto, si se pudo generar. */
+  qr?: string | undefined;
 }
 
 export interface PairingLink {
@@ -37,6 +39,9 @@ export interface PairingLink {
  * Construye el mensaje.
  *
  * Nunca presenta como bueno un enlace con loopback: o hay origen real, o lo dice.
+ *
+ * Con `qr`, el código se pinta para escanearlo desde el propio chat. Sin él, se
+ * enumera el enlace y el código, que es lo que había antes y obligaba a copiar.
  */
 export function buildPairingMessage(view: PairingView): PairingLink {
   if (view.listenerError) {
@@ -59,14 +64,23 @@ export function buildPairingMessage(view: PairingView): PairingLink {
   const link = buildPairingUrl(base, view.code);
   const compromised = view.origin === undefined || view.origin.loopback;
 
-  const lines = [
-    'Emparejar el teléfono',
-    '',
-    link,
-    '',
-    `Código: ${view.code}`,
-    `Caduca a las ${new Date(view.expiresAt).toLocaleTimeString()} · un solo uso`,
-  ];
+  const lines = ['Empareja el teléfono', ''];
+
+  if (view.qr) {
+    lines.push(
+      'Escanea este código con la cámara del teléfono:',
+      '',
+      view.qr,
+      '',
+      'Si no se lee, la fuente del chat no es monoespaciada: abre el enlace o usa',
+      '`/mobile abrir` para verlo en el navegador.',
+    );
+  } else {
+    lines.push(link);
+  }
+
+  lines.push('', `Enlace: ${link}`, `Código: ${view.code}`);
+  lines.push(`Caduca a las ${new Date(view.expiresAt).toLocaleTimeString()} · un solo uso`);
 
   if (compromised) {
     lines.push(

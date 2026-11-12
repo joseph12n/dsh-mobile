@@ -10,6 +10,9 @@ import { answerQuestion, listPendingQuestions } from './dsh/questions.js';
 import { cancelRun, readHistory, subscribeSession } from './dsh/transcript.js';
 import { injectText } from './dsh/prompt.js';
 import { buildPairingMessage } from './pairing-message.js';
+import { qrText } from './qr-text.js';
+import { buildPairingUrl } from '@dsh-mobile/protocol';
+import { openInBrowser } from './open-browser.js';
 import { resolveSessionId } from './dsh/sessions.js';
 import type { HostContext } from './host-api.js';
 import { reportToLog, reportToText, runProbe, type ProbeReport } from './probe.js';
@@ -53,6 +56,35 @@ export function apply(ctx: HostContext): void {
   let listeningPort: number | undefined;
   let listenerError: string | undefined;
 
+  /** Enlace de emparejamiento del código actual. */
+  const linkFor = (code: string): string => {
+    const port = listeningPort ?? DEFAULT_PORT;
+    return buildPairingUrl(origin?.origin ?? `http://127.0.0.1:${port}`, code);
+  };
+
+  /**
+   * QR del enlace, ya pintado. Devuelve `undefined` si algo falla: el comando
+   * tiene que salir igual, con el enlace, aunque no se pueda pintar el código.
+   */
+  const qrFor = (code: string): string | undefined => {
+    try {
+      return qrText(linkFor(code));
+    } catch {
+      return undefined;
+    }
+  };
+
+  /** Abre `/pair` en el navegador y cuenta lo que pasó, sin lanzar. */
+  const openPairingPage = (): string => {
+    const page = `${origin?.origin ?? `http://127.0.0.1:${listeningPort ?? DEFAULT_PORT}`}/pair`;
+
+    void openInBrowser(page).then((abierto) => {
+      if (!abierto) log(`no pude abrir el navegador en ${page}`);
+    });
+
+    return `Abriendo ${page} en el navegador del PC.`;
+  };
+
   /** Resuelve el origen público. No lanza: un fallo deja el nivel anterior. */
   const detectOrigin = async (port: number): Promise<void> => {
     try {
@@ -69,7 +101,7 @@ export function apply(ctx: HostContext): void {
       ctx.commands!.register({
         name: 'mobile',
         description: COMMAND_DESCRIPTION,
-        input: { hint: '[estado]' },
+        input: { hint: '[estado|abrir]' },
         handler: (invocation) => {
           const argument = (invocation.rawInput ?? '').trim().toLowerCase();
 
@@ -89,6 +121,7 @@ export function apply(ctx: HostContext): void {
 
           try {
             const current = pairing.pending()[0] ?? pairing.issue();
+
             const message = buildPairingMessage({
               code: current.code,
               expiresAt: current.expiresAt,
@@ -96,12 +129,19 @@ export function apply(ctx: HostContext): void {
               port: listeningPort,
               listenerError,
               fallbackPort: DEFAULT_PORT,
+              qr: qrFor(current.code),
             });
 
-            // Sin listener no hay éxito posible: que se vea como fallo.
+            // `/mobile abrir` pinta el QR en el navegador, por si la fuente del
+            // chat no es monoespaciada y el QR en texto no se lee.
+            const wantsBrowser = argument === 'abrir' || argument === 'open';
+
             return {
               kind: message.compromised && listenerError ? 'error' : 'success',
-              text: message.text,
+              text:
+                wantsBrowser && !listenerError
+                  ? `${message.text}\n\n${openPairingPage()}`
+                  : message.text,
             };
           } catch (error) {
             return { kind: 'error', text: `No pude preparar el emparejamiento: ${String(error)}` };

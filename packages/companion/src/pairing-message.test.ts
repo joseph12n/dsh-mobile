@@ -79,3 +79,32 @@ describe('mensaje de emparejamiento', () => {
     expect(text).not.toContain('#/pair');
   });
 });
+
+describe('el QR sustituye al código copiado a mano', () => {
+  it('con QR, el mensaje lo pinta y no obliga a copiar nada', () => {
+    const { text } = buildPairingMessage({
+      ...base,
+      origin: TAILNET,
+      port: 6768,
+      qr: '  █▀▀▀█\n  █   █\n  █▄▄▄█',
+    });
+
+    expect(text).toContain('Escanea');
+    expect(text).toContain('█▀▀▀█');
+  });
+
+  it('sin QR sigue dando el enlace, para no dejarte sin salida', () => {
+    // El QR puede fallar (por ejemplo si la librería no puede con el texto). El
+    // comando tiene que seguir sirviendo.
+    const { text } = buildPairingMessage({ ...base, origin: TAILNET, port: 6768 });
+    expect(text).toContain('https://maquina.tailnet.ts.net/#/pair?v=1&c=ABCD1234EFGH5678');
+    expect(text).not.toContain('Escanea');
+  });
+
+  it('el enlace aparece siempre, con QR o sin él', () => {
+    const conQr = buildPairingMessage({ ...base, origin: TAILNET, qr: '███' });
+    const sinQr = buildPairingMessage({ ...base, origin: TAILNET });
+    expect(conQr.text).toContain('Enlace: https://maquina.tailnet.ts.net');
+    expect(sinQr.text).toContain('Enlace: https://maquina.tailnet.ts.net');
+  });
+});
