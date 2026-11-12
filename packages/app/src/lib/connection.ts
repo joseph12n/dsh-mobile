@@ -214,6 +214,36 @@ export class CompanionClient {
     return response.type === 'workspace.ok' ? response.workspaces : [];
   }
 
+  /**
+   * Creates a session inside an existing folder.
+   *
+   * The host decides whether the folder exists: `not-found` is its answer, not a guess
+   * made here from a list that may be stale.
+   */
+  async createSession(workspaceId: string): Promise<string> {
+    const response = await this.#request({ type: 'session.create', workspaceId });
+    if (response.type === 'error') throw new ConnectionError(response.message, response.code);
+    if (response.type !== 'session.created') {
+      throw new ConnectionError('The host did not confirm the session.', 'internal');
+    }
+    return response.sessionId;
+  }
+
+  /**
+   * Archives a session.
+   *
+   * `active` comes back as its own error so the caller can offer "stop it first" instead
+   * of killing a running turn from a phone without asking.
+   */
+  async archiveSession(sessionId: string, stopActivity = false): Promise<void> {
+    const response = await this.#request({
+      type: 'workspace.archive',
+      sessionId,
+      ...(stopActivity ? { stopActivity: true } : {}),
+    });
+    if (response.type === 'error') throw new ConnectionError(response.message, response.code);
+  }
+
   async listSessions(): Promise<SessionSummary[]> {
     const response = await this.#request({ type: 'sessions.list' });
     if (response.type === 'error') throw new ConnectionError(response.message, response.code);

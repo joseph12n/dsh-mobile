@@ -10,7 +10,12 @@ import {
   type SessionSummary,
   type Workspace,
 } from '@dsh-mobile/protocol';
-import { CompanionClient, endpointFromLocation, normalizeEndpoint } from './lib/connection.js';
+import {
+  CompanionClient,
+  ConnectionError,
+  endpointFromLocation,
+  normalizeEndpoint,
+} from './lib/connection.js';
 import { classifyFailure, retryDelay } from './lib/reconnect.js';
 import { storage } from './lib/storage.js';
 import { QuestionsCard } from './components/Questions.js';
@@ -52,6 +57,8 @@ export function App() {
   const { contrast, setContrast } = useContrast();
   const [view, setView] = useState<View>({ kind: 'checking' });
   const [code, setCode] = useState('');
+  /** Last failed session action, shown above the list. */
+  const [actionError, setActionError] = useState<string | undefined>(undefined);
   const [endpointInput, setEndpointInput] = useState('');
   const [questions, setQuestions] = useState<QuestionBatch[]>([]);
   const [openSession, setOpenSession] = useState<SessionSummary | undefined>(undefined);
@@ -425,6 +432,40 @@ export function App() {
     setEndpointInput(endpointFromLocation());
   }, [start]);
 
+  /** Creates a session in a folder and reloads the list. */
+  const createInFolder = async (workspaceId: string) => {
+    const connection = client.current;
+    if (!connection) return;
+    try {
+      await connection.createSession(workspaceId);
+      setActionError(undefined);
+      await refresh();
+    } catch (error) {
+      setActionError(messageOf(error));
+    }
+  };
+
+  /**
+   * Archives a session.
+   *
+   * If the host refuses because a turn is running, nothing is destroyed: the user is told
+   * and has to stop the turn first. Killing work from a phone without asking is not a
+   * feature.
+   */
+  const archive = async (session: SessionSummary) => {
+    const connection = client.current;
+    if (!connection) return;
+    try {
+      await connection.archiveSession(session.id);
+      setActionError(undefined);
+      await refresh();
+    } catch (error) {
+      // El host se niega si hay un turno en marcha: se dice, no se mata el trabajo.
+      const code = error instanceof ConnectionError ? error.code : undefined;
+      setActionError(code === 'internal' ? t('action.stopFirst') : messageOf(error));
+    }
+  };
+
   const refresh = async () => {
     const connection = client.current;
     if (!connection) return;
@@ -584,10 +625,16 @@ export function App() {
                 </button>
               </div>
 
+              {actionError && <p className="error">{actionError}</p>}
+
               <SessionList
                 sessions={view.sessions}
                 workspaces={view.workspaces}
                 onOpen={(session) => void open(session)}
+                onCreate={(workspaceId) => void createInFolder(workspaceId)}
+                onArchive={(session) => void archive(session)}
+                canCreate={view.host.capabilities.includes('session.create')}
+                canArchive={view.host.capabilities.includes('workspace.archive')}
               />
 
               <button type="button" className="ghost" onClick={forget}>
