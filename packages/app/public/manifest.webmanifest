@@ -1,7 +1,7 @@
 {
   "name": "DSH Mobile",
   "short_name": "DSH Mobile",
-  "description": "Control remoto de tus sesiones de DeepSeek Harness",
+  "description": "Remote control for DeepSeek Harness",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

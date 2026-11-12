@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useI18n } from '../i18n/index.js';
 import type { QuestionAnswerItem, QuestionBatch } from '@dsh-mobile/protocol';
 
 /**
@@ -19,6 +20,7 @@ export function QuestionsCard({
   titleFor?: (sessionId: string) => string;
   onSubmit: (callId: string, sessionId: string, answers: QuestionAnswerItem[]) => void;
 }) {
+  const { t } = useI18n();
   const [selected, setSelected] = useState<Record<string, string[]>>({});
   const [custom, setCustom] = useState<Record<string, string>>({});
 
@@ -53,7 +55,7 @@ export function QuestionsCard({
 
   return (
     <section className="card questions">
-      <h2>Te está esperando</h2>
+      <h2>{t('questions.title')}</h2>
 
       {questions.map((batch) => (
         <div key={batch.callId} className="question-batch">
@@ -90,7 +92,7 @@ export function QuestionsCard({
                     onChange={(event) =>
                       setCustom((previous) => ({ ...previous, [key]: event.target.value }))
                     }
-                    placeholder="O escribe otra respuesta…"
+                    placeholder={t('questions.other')}
                     autoCapitalize="sentences"
                   />
                 )}
@@ -99,7 +101,7 @@ export function QuestionsCard({
           })}
 
           <button type="button" onClick={() => submit(batch)}>
-            Enviar respuesta
+            {t('questions.submit')}
           </button>
         </div>
       ))}

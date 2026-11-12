@@ -1,21 +1,20 @@
-# Contribuir
+# Contributing
 
-Gracias por el interés. Esto es un proyecto pequeño y experimental; la prioridad es que
-el código sea fácil de razonar y que la frontera con DeepSeek Harness se mantenga limpia.
+Thanks for the interest. This is a small, experimental project; the priority is that the
+code stays easy to reason about and that the boundary with DeepSeek Harness stays clean.
 
-## Antes de empezar
+## Before you start
 
-Lee el [README](README.md) para entender la forma del sistema. La idea que ordena todo el
-diseño:
+Read the [README](README.md) to understand the shape of the system. The idea that orders the
+whole design:
 
-> El móvil habla **un contrato propio**. Solo el plugin conoce las tripas de DSH.
+> The phone speaks **a contract of its own**. Only the plugin knows DSH's internals.
 
-Si una propuesta hace que la PWA dependa de detalles internos de DSH, va en dirección
-contraria al proyecto.
+If a proposal makes the PWA depend on DSH internals, it points against the project.
 
-## Entorno
+## Environment
 
-- Node.js **24** (el plugin se ejecuta en el Node que embebe DSH).
+- Node.js **24** (the plugin runs on the Node DSH embeds).
 - pnpm **12**.
 
 ```bash
@@ -24,150 +23,170 @@ pnpm build
 pnpm test
 ```
 
-## Comandos
+## Commands
 
-| Comando          | Qué hace                                      |
-| ---------------- | --------------------------------------------- |
-| `pnpm build`     | Compila los tres paquetes en orden topológico |
-| `pnpm test`      | Vitest, toda la suite                         |
-| `pnpm typecheck` | `tsc --noEmit` por paquete                    |
-| `pnpm lint`      | ESLint                                        |
-| `pnpm format`    | Prettier                                      |
-| `pnpm dev`       | PWA en modo desarrollo                        |
+| Command             | What it does                                   |
+| ------------------- | ---------------------------------------------- |
+| `pnpm build`        | Builds the three packages in dependency order  |
+| `pnpm test`         | Vitest, the whole suite                        |
+| `pnpm test:watch`   | Vitest in watch mode                           |
+| `pnpm typecheck`    | `tsc --noEmit` per package                     |
+| `pnpm lint`         | ESLint                                         |
+| `pnpm lint:fix`     | ESLint, fixing what it can                     |
+| `pnpm format`       | Prettier, writing                              |
+| `pnpm format:check` | Prettier, checking only                        |
+| `pnpm smoke`        | Starts the built server and walks the contract |
+| `pnpm clean`        | Removes build output                           |
+| `pnpm dev`          | PWA in development mode                        |
 
-Antes de proponer un cambio, `pnpm lint && pnpm typecheck && pnpm test && pnpm build` debe
-pasar en limpio.
+Before proposing a change, `pnpm lint && pnpm typecheck && pnpm test && pnpm build` must pass
+clean.
 
-## Estructura
+`DSH_HOME` decides where the plugin keeps its `companion/` folder, and the evidence file lives
+there. The tests and the preview tool do not redirect it: they set `DSH_MOBILE_LOG_FILE=0` so
+the log is never opened, and the tests keep device state in memory.
+
+## Structure
 
 ```
 packages/
-  protocol/    contrato: esquemas Zod + tipos + constantes
-  companion/   plugin host
-    src/core/    dominio puro (sin DSH, sin I/O)
-    src/dsh/     ÚNICO lugar que conoce DSH
-    src/net/     WebSocket y autenticación
+  protocol/    the contract: Zod schemas + types + constants
+  companion/   host plugin
+    src/core/      pure domain (no DSH, no I/O)
+    src/dsh/       the ONLY place that talks to DSH
+    src/persist/   the little that reaches disk (the device file)
+    src/routes/    static serving and origin checks
+    src/server.ts  the WebSocket listener and the contract wiring
   app/         PWA (React + Vite)
 ```
 
-### Reglas de capas
+### Layer rules
 
-1. **`core` no importa nada de `@deepseek-ai/*` ni toca disco ni red.** Dominio puro: se
-   prueba con datos en memoria.
-2. **Solo `dsh` conoce DSH.** Todo el acoplamiento con el host vive ahí, detrás de
-   interfaces declaradas en `core`.
-3. **`net` no conoce el dominio.** Serializa el contrato y nada más.
-4. **`app` no conoce DSH.** Solo `@dsh-mobile/protocol`.
+1. **`core` imports nothing from `@deepseek-ai/*` and touches neither disk nor network.** Pure
+   domain: tested with in-memory data.
+2. **Only `dsh` talks to DSH**, with one deliberate exception: `probe.ts`, the diagnostic
+   report, reads host services directly. It exists to answer "what can this host do", so going
+   through the adapter would hide the very thing it measures. The shapes those services have
+   are declared in `src/host-api.ts`, which is a type contract and no runtime.
+3. **`routes` does not know the domain.** It serves static files and computes the public
+   origin; the contract is serialised in `server.ts`.
+4. **`app` does not know DSH.** Only `@dsh-mobile/protocol`.
 
-Romper la regla 2 es la forma más rápida de que una actualización de DSH nos rompa el
-proyecto.
+Breaking rule 2 is the fastest way for a DSH update to break the project.
 
-## El contrato
+## The contract
 
-`packages/protocol` es la **fuente única de verdad**. Los esquemas Zod generan los tipos.
+`packages/protocol` is the **single source of truth**. The Zod schemas generate the types.
 
-- Un mensaje nuevo entra en `messages.ts` como unión discriminada por `type`.
-- Todo mensaje lleva el sobre `{ v, id, at, type }`.
-- Las respuestas reutilizan el `id` de la petición.
-- Cambio incompatible ⇒ subir `PROTOCOL_VERSION` y ajustar `SUPPORTED_PROTOCOL_VERSIONS`.
-  Un host viejo debe **rechazar** al cliente nuevo con `proto-unsupported`, nunca fallar
-  de forma rara.
-- Los errores usan los códigos de `errors.ts`. No inventes códigos ad hoc: un cliente
-  ramifica sobre ellos.
+- A new message enters `messages.ts` as a discriminated union on `type`.
+- Every message carries the envelope `{ v, id, at, type }`.
+- Replies reuse the request `id`.
+- Incompatible change ⇒ bump `PROTOCOL_VERSION` and adjust `SUPPORTED_PROTOCOL_VERSIONS`. An
+  old host must **reject** the new client with `proto-unsupported`, never fail in a strange
+  way.
+- Errors use the codes in `errors.ts`. Do not invent ad-hoc codes: a client branches on them.
 
-Cada mensaje nuevo necesita su prueba de validación en `protocol.test.ts`.
+Every new message needs its validation test in `protocol.test.ts`.
 
-## Estilo
+## Style
 
-- **TypeScript estricto.** Nada de `any` sin justificar.
-- **ESM.** Imports relativos con extensión `.js`.
-- Comentarios en español; identificadores en inglés.
-- Prettier manda en el formato; no discutas el formato en un PR.
+- **Strict TypeScript.** No `any` without a reason.
+- **ESM.** Relative imports with the `.js` extension.
+- **Identifiers in English**, always. Comments and commit messages are **moving to English**:
+  new and edited code is written in English, and older comments still to be translated are
+  not worth a whitespace-only diff on their own.
+- Prettier owns the formatting; do not argue about formatting in a PR.
 
-## Pruebas
+## Tests
 
-- Unitarias: lógica de dominio, validación del contrato.
-- Integración: el listener con un cliente WebSocket real (`server.test.ts` lo hace con un
-  puerto efímero).
+- Unit: domain logic, contract validation.
+- Integration: the listener against a real WebSocket client (`server.test.ts` does it on an
+  ephemeral port).
 
-No se acepta una funcionalidad "probada solo en el emulador del navegador": lo que toca el
-móvil se prueba en un teléfono.
+A feature "tested only in a browser emulator" is not accepted when it touches the phone: if it
+touches the phone, it gets tested on a phone.
 
-## Commits y PR
+## Commits and PRs
 
-Este repositorio sigue **[Conventional Commits 1.0.0](https://www.conventionalcommits.org/en/v1.0.0/)**.
-Lo verifica `commitlint` en cada pull request, así que un mensaje fuera de formato rompe la CI.
-
-```
-<tipo>[alcance opcional]: <descripción>
-
-[cuerpo opcional, una línea en blanco después del asunto]
-
-[pies opcionales]
-```
-
-| Tipo       | Cuándo                                        |
-| ---------- | --------------------------------------------- |
-| `feat`     | Una funcionalidad nueva                       |
-| `fix`      | Un fallo corregido                            |
-| `docs`     | Solo documentación                            |
-| `style`    | Formato, sin cambio de comportamiento         |
-| `test`     | Solo pruebas                                  |
-| `refactor` | Cambio interno sin cambio de comportamiento   |
-| `perf`     | Mejora de rendimiento                         |
-| `build`    | Dependencias o empaquetado                    |
-| `ci`       | Workflows y automatización                    |
-| `chore`    | Mantenimiento que no encaja en los anteriores |
-| `revert`   | Deshacer un commit anterior                   |
-
-Ejemplos reales de este repositorio:
+This repository follows **[Conventional Commits 1.0.0](https://www.conventionalcommits.org/en/v1.0.0/)**.
+`commitlint` checks it on every pull request, so a message out of format breaks CI.
 
 ```
-feat(app): adopta la paleta y la tipografia reales de DeepSeek Harness
-fix(app): escribe el buffer de los iconos sin recodificar
-ci: ejecuta el humo y la comprobacion de iconos
-docs: alinea la documentacion sobre LAN y tailnet
+<type>[optional scope]: <description>
+
+[optional body, one blank line after the subject]
+
+[optional footers]
 ```
 
-Reglas del asunto:
+| Type       | When                                    |
+| ---------- | --------------------------------------- |
+| `feat`     | A new feature                           |
+| `fix`      | A bug fixed                             |
+| `docs`     | Documentation only                      |
+| `style`    | Formatting, no change in behaviour      |
+| `test`     | Tests only                              |
+| `refactor` | Internal change, no change in behaviour |
+| `perf`     | Performance improvement                 |
+| `build`    | Dependencies or packaging               |
+| `ci`       | Workflows and automation                |
+| `chore`    | Maintenance that fits none of the above |
+| `revert`   | Undoing an earlier commit               |
 
-- **En español**, en imperativo («añade», no «añadido»), y el **tipo en inglés**.
-- Sin punto final. **La línea entera, prefijo incluido, no pasa de 100 caracteres**: es lo
-  que mide `header-max-length`. Si no cabe, acorta el asunto y explica en el cuerpo.
-- El alcance, entre paréntesis, dice la zona: `app`, `companion`, `protocol`, `docs`, `ci`.
-
-El cuerpo explica **por qué**, no qué. Si el cambio rompe compatibilidad, añade `!` después
-del tipo (`feat(protocol)!: ...`) y un pie `BREAKING CHANGE:` explicando qué se rompe y cómo
-migrar.
-
-Referencias al issue con un pie, no en el asunto:
+Real subjects from this repository's history:
 
 ```
-fix(app): corrige la ruta de la PWA
+feat(protocol): define workspaces and let the probe find the service
+fix(app): keep the pairing through network drops
+feat(app): agrupa el detalle de la sesión por turnos
+ci: valida los mensajes de commit con commitlint
+```
 
-web-root calculaba la raiz del paquete un nivel de menos.
+**The history is mixed on purpose, and you should know it before you read it as an
+inconsistency:** commits written before the project moved to English have Spanish subjects
+(the last two above), and everything since has English ones. History that is already published
+is not rewritten — it costs more than it tidies. `commitlint` therefore accepts both: it
+checks the _shape_, not the language.
+
+Subject rules:
+
+- **In English** for new commits, in the imperative ("add", not "added").
+- No full stop. **The whole line, prefix included, is at most 100 characters**: that is what
+  `header-max-length` measures. If it does not fit, shorten the subject and explain in the
+  body.
+- The scope, in parentheses, names the area: `app`, `companion`, `protocol`, `docs`, `ci`.
+
+The body explains **why**, not what. If the change breaks compatibility, add `!` after the
+type (`feat(protocol)!: ...`) and a `BREAKING CHANGE:` footer explaining what breaks and how
+to migrate.
+
+Reference the issue in a footer, not in the subject:
+
+```
+fix(app): correct the PWA path
+
+web-root computed the package root one level too few.
 
 Refs: #16
 ```
 
 ### PR
 
-- Un PR que cambie el contrato debe explicar la compatibilidad.
-- Si algo **no** está verificado, dilo en el PR. Se prefiere un "no lo he probado" a una
-  afirmación por intuición.
-- Se fusiona con **squash**, así que el título del PR se convierte en el mensaje del commit
-  y **se valida con las mismas reglas** que los commits (`commitlint` lo comprueba en un
-  paso aparte). Los commits ya fusionados con merge commit quedan como están: reescribir
-  historia publicada rompe más de lo que ordena.
+- A PR that changes the contract must explain compatibility.
+- If something is **not** verified, say so in the PR. A "I have not tested this" is better
+  than a claim by intuition.
+- Merging uses **squash**, so the PR title becomes the commit message and **is validated with
+  the same rules** as commits (`commitlint` checks it in a separate step). Commits already
+  merged as merge commits stay as they are: rewriting published history breaks more than it
+  tidies.
 
-## Seguridad
+## Security
 
-Un fallo de seguridad en esto es serio: el cliente puede ejecutar acciones en la máquina
-del usuario.
+A security bug here is serious: the client can run actions on the user's machine.
 
-- Nada de secretos en el repositorio. Nada de tokens en logs.
-- Los tokens de dispositivo se guardan **hasheados**.
-- Los códigos de emparejamiento son de un solo uso y caducan.
-- No se expone el host a internet sin autenticación sólida.
-- Si encuentras una vulnerabilidad, **no abras un issue público**: escríbelo en privado a
-  quien mantiene el repo.
+- No secrets in the repository. No tokens in logs.
+- Device tokens are stored **hashed**.
+- Pairing codes are single use and expire.
+- The host is not exposed to the internet without solid authentication.
+- If you find a vulnerability, **do not open a public issue**: report it privately to whoever
+  maintains the repo.
