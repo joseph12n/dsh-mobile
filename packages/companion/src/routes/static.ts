@@ -117,10 +117,16 @@ export function resolveAsset(root: string, urlPath: string): string | undefined 
 
   // La comprobación barata primero: si el camino lógico ya se sale, no hay nada que
   // resolver contra el disco.
-  if (candidate !== cleanRoot && !candidate.startsWith(cleanRoot + sep)) return undefined;
+  if (!isInside(cleanRoot, candidate)) return undefined;
 
   const realCandidate = realOrUndefined(candidate);
   if (realCandidate === undefined) return spaIndex(cleanRoot, realRoot);
+
+  // La ruta existe. Si su forma real sale de la raíz, es un enlace que escapa: no se
+  // sirve, y tampoco se cae al índice, porque lo que se pidió existe. Vale igual para
+  // un archivo y para un directorio: servir el índice de una carpeta ajena era una
+  // respuesta incoherente, aunque no filtrara nada.
+  if (!isInside(realRoot, realCandidate)) return undefined;
 
   const stats = statOrUndefined(realCandidate);
   if (stats?.isDirectory()) {
@@ -131,9 +137,9 @@ export function resolveAsset(root: string, urlPath: string): string | undefined 
       : spaIndex(cleanRoot, realRoot);
   }
 
-  // La ruta existe. Si su forma real sale de la raíz, es un enlace que escapa: no se
-  // sirve, y tampoco se cae al índice, porque lo que se pidió existe.
-  if (!isInside(realRoot, realCandidate)) return undefined;
+  // Un FIFO o un dispositivo con extensión no se lee: `readFileSync` se quedaría
+  // esperando y el servidor no respondería nunca.
+  if (!stats?.isFile()) return undefined;
 
   if (!extname(candidate)) return spaIndex(cleanRoot, realRoot);
   return candidate;
@@ -157,17 +163,23 @@ function statOrUndefined(path: string): ReturnType<typeof statSync> | undefined 
   }
 }
 
+/** La ruta con separador final, para que un hermano `raiz-algo` no cuele como hijo. */
+function withSep(path: string): string {
+  return path.endsWith(sep) ? path : path + sep;
+}
+
 /**
  * `true` si la ruta real cae dentro de la raíz real.
  *
  * En Windows no distingue mayúsculas; en el resto sí, y bajar todo a minúsculas
- * dejaría pasar un hermano que solo difiere en mayúsculas.
+ * dejaría pasar un hermano que solo difiere en mayúsculas. La raíz de un volumen
+ * (`/`, `C:\`) ya termina en separador: añadir otro dejaría todo fuera.
  */
 function isInside(realRoot: string, path: string): boolean {
   const [base, target] =
     process.platform === 'win32' ? [realRoot.toLowerCase(), path.toLowerCase()] : [realRoot, path];
 
-  return target === base || target.startsWith(base + sep);
+  return target === base || target.startsWith(withSep(base));
 }
 
 /** El índice de la SPA, si la raíz tiene uno de verdad. */
