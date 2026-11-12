@@ -476,6 +476,40 @@ button.ghost.tiny {
   margin-bottom: 14px;
 }
 
+/* --- Turnos del detalle ---------------------------------------------------- */
+
+.turn + .turn {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.turn-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.turn-number {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Las herramientas plegadas cuelgan del turno con una guía, para que se vea que
+   pertenecen a él y no a la conversación. */
+.tool-group {
+  list-style: none;
+}
+
+.transcript.nested {
+  margin: 10px 0 0;
+  padding-left: 12px;
+  border-left: 2px solid var(--line-strong);
+}
+
 .transcript {
   list-style: none;
   margin: 16px 0 0;

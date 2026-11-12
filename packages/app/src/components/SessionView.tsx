@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { HistoryEntry, SessionSummary, TranscriptEvent } from '@dsh-mobile/protocol';
+import { groupTurns, partTurn, type Turn } from '../lib/turns.js';
 
 /**
  * Transcripción de una sesión.
@@ -49,6 +50,75 @@ function EventRow({ entry }: { entry: HistoryEntry }) {
       <span>{STATE_LABEL[event.state] ?? event.state}</span>
       <span className="muted small">{timeOf(entry.at)}</span>
     </li>
+  );
+}
+
+/**
+ * Una racha de herramientas seguidas dentro de un turno.
+ *
+ * El estado y el `id` son **por racha**, no por turno: un turno puede tener varias
+ * (herramientas, respuesta, más herramientas), y compartir el `id` producía ids
+ * duplicados y un `aria-controls` que apuntaba al grupo equivocado. Además, con un
+ * estado por turno, pulsar un botón desplegaba todas las rachas aunque dijera
+ * "1 herramienta".
+ */
+function ToolRun({ entries }: { entries: HistoryEntry[] }) {
+  const [open, setOpen] = useState(false);
+  const id = `herramientas-${entries[0]?.seq ?? 0}`;
+
+  return (
+    <li className="tool-group">
+      <button
+        type="button"
+        className="ghost tiny"
+        onClick={() => setOpen((previous) => !previous)}
+        aria-expanded={open}
+        // Solo apunta al grupo cuando existe: una referencia a un id que no está
+        // renderizado es ARIA inválido.
+        aria-controls={open ? id : undefined}
+      >
+        {entries.length} herramienta{entries.length > 1 ? 's' : ''}
+        {open ? ' · ocultar' : ''}
+      </button>
+
+      {open && (
+        <ul className="transcript nested" id={id}>
+          {entries.map((entry) => (
+            <EventRow key={`${entry.seq}-tool`} entry={entry} />
+          ))}
+        </ul>
+      )}
+    </li>
+  );
+}
+
+/**
+ * Un turno: lo que pidió el humano y lo que provocó.
+ *
+ * Las herramientas van **plegadas** porque son muchas y ruidosas; los mensajes y
+ * los cambios de estado siempre se ven, dentro del turno y **en su orden real**.
+ */
+function TurnBlock({ turn, number }: { turn: Turn; number: number }) {
+  const parts = partTurn(turn.entries);
+  const label = turn.prompt ? `Turno ${number}: ${turn.prompt}` : `Turno ${number}`;
+
+  return (
+    <section className="turn" aria-label={label}>
+      <header className="turn-head">
+        <span className="turn-number">Turno {number}</span>
+        <span className="muted small">{timeOf(turn.at)}</span>
+      </header>
+
+      <ul className="transcript">
+        {parts.map((part) =>
+          part.kind === 'entry' ? (
+            <EventRow key={part.entry.seq} entry={part.entry} />
+          ) : (
+            <ToolRun key={`herramientas-${part.entries[0]?.seq ?? 0}`} entries={part.entries} />
+          ),
+        )}
+      </ul>
+    </section>
   );
 }
 
@@ -103,11 +173,11 @@ export function SessionView({
       {entries.length === 0 ? (
         <p className="muted">{loading ? 'Cargando…' : 'Todavía no hay nada que mostrar.'}</p>
       ) : (
-        <ul className="transcript">
-          {entries.map((entry) => (
-            <EventRow key={`${entry.seq}-${entry.event.kind}`} entry={entry} />
+        <div className="transcript">
+          {groupTurns(entries).map((turn, index) => (
+            <TurnBlock key={turn.id} turn={turn} number={index + 1} />
           ))}
-        </ul>
+        </div>
       )}
 
       {/* Composer fijo al final: se escribe sin perder de vista la conversación. */}
