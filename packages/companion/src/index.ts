@@ -79,17 +79,17 @@ export function apply(ctx: HostContext): void {
     const page = `${origin?.origin ?? `http://127.0.0.1:${listeningPort ?? DEFAULT_PORT}`}/pair`;
 
     void openInBrowser(page).then((abierto) => {
-      if (!abierto) log(`no pude abrir el navegador en ${page}`);
+      if (!abierto) log(`could not open the browser at ${page}`);
     });
 
-    return `Abriendo ${page} en el navegador del PC.`;
+    return `Opening ${page} in the desktop browser.`;
   };
 
   /** Resuelve el origen público. No lanza: un fallo deja el nivel anterior. */
   const detectOrigin = async (port: number): Promise<void> => {
     try {
       origin = await resolvePublicOrigin(publicUrl, port);
-      log(`origen público para el emparejamiento: ${origin.origin} (${origin.source})`);
+      log(`public pairing origin: ${origin.origin} (${origin.source})`);
     } catch {
       // Sin detección, el comando ya cae a loopback y lo avisa.
     }
@@ -126,7 +126,7 @@ export function apply(ctx: HostContext): void {
             // equals font size, which the DSH chat does not do. Printing it by
             // default would look right and not scan.
             const wantsQr = argument === 'qr';
-            const wantsProbeOnly = argument === 'link';
+            const wantsLinkOnly = argument === 'link';
 
             const message = buildPairingMessage({
               code: current.code,
@@ -140,7 +140,7 @@ export function apply(ctx: HostContext): void {
 
             // Opening the pairing page is the default: the QR there is an image,
             // so it scans whatever the chat font is.
-            const opensBrowser = !wantsQr && !wantsProbeOnly && !listenerError;
+            const opensBrowser = !wantsQr && !wantsLinkOnly && !listenerError;
 
             return {
               kind: message.compromised && listenerError ? 'error' : 'success',
@@ -156,7 +156,7 @@ export function apply(ctx: HostContext): void {
     const registerSay = (): (() => void) =>
       ctx.commands!.register({
         name: 'mobile-say',
-        description: 'Inyecta un mensaje en una sesión vía sessionController.prompt (Fase 0, E0.3)',
+        description: 'Inject a message into a session through sessionController.prompt',
         input: { hint: '<sessionId> <texto>' },
         handler: (invocation) => {
           const raw = (invocation.rawInput ?? '').trim();
@@ -177,7 +177,7 @@ export function apply(ctx: HostContext): void {
 
           return {
             kind: 'success',
-            text: `Envío despachado a ${resolution.id}. El resultado queda en ${PROBE_LOG_PATH}.`,
+            text: `Send dispatched to ${resolution.id}. The result is in ${PROBE_LOG_PATH}.`,
           };
         },
       });
@@ -195,7 +195,7 @@ export function apply(ctx: HostContext): void {
       log(`no pude registrar los comandos: ${String(error)}`);
     }
   } else {
-    log('el servicio de comandos no está disponible; /mobile queda fuera');
+    log('the commands service is not available; /mobile is disabled');
   }
 
   // --- Estado del producto: emparejamiento y dispositivos ---------------------
@@ -260,7 +260,7 @@ export function apply(ctx: HostContext): void {
     try {
       probe();
     } catch (error) {
-      log(`el sondeo de arranque falló: ${String(error)}`);
+      log(`the startup probe failed: ${String(error)}`);
     }
   }, 2000);
   if (typeof timer.unref === 'function') timer.unref();

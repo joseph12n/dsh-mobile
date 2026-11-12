@@ -58,7 +58,7 @@ function describe(value: unknown): string {
   if (value === undefined) return 'ausente';
   if (value === null) return 'null';
   const type = typeof value;
-  if (type === 'function') return 'función';
+  if (type === 'function') return 'function';
   if (type !== 'object') return type;
   const keys = Object.keys(value as object);
   return `objeto{${keys.slice(0, 12).join(', ')}}`;
@@ -87,7 +87,7 @@ function sessionFacts(
   try {
     facts.messageCount = session.deriveMessages?.().length;
   } catch (error) {
-    log(`deriveMessages() falló en ${session.id}: ${String(error)}`);
+    log(`deriveMessages() failed on ${session.id}: ${String(error)}`);
   }
 
   if (projections) {
@@ -97,7 +97,7 @@ function sessionFacts(
       facts.projectionKeys = Object.keys(snapshot.values);
       facts.pendingQuestions = snapshot.values['userQuestions'];
     } catch (error) {
-      log(`snapshot() falló en ${session.id}: ${String(error)}`);
+      log(`snapshot() failed on ${session.id}: ${String(error)}`);
     }
   }
 
@@ -138,7 +138,7 @@ export function runProbe(ctx: HostContext): ProbeReport {
         facts.push(sessionFacts(session, projections));
       }
     } catch (error) {
-      log(`sessions.list() falló: ${String(error)}`);
+      log(`sessions.list() failed: ${String(error)}`);
     }
   }
 
@@ -170,20 +170,20 @@ export function reportToLog(report: ProbeReport): void {
   log(`servicios montados (${report.serviceNames.length}): ${report.serviceNames.join(', ')}`);
 
   for (const detail of report.serviceDetails) {
-    log(`  · ${detail.name}: ${detail.methods.join(', ') || '(sin métodos enumerables)'}`);
+    log(`  · ${detail.name}: ${detail.methods.join(', ') || '(no enumerable methods)'}`);
   }
 
   log(`sesiones vivas: ${report.sessionCount ?? 'no disponible'}`);
 
   for (const session of report.sessions) {
     log(
-      `- sesión ${session.id}: mensajes=${session.messageCount ?? '?'} ` +
+      `- session ${session.id}: messages=${session.messageCount ?? '?'} ` +
         `asOfSeq=${session.asOfSeq ?? '?'} proyecciones=${session.projectionKeys?.length ?? 0}`,
     );
     log(`  userQuestions -> ${summarize(session.pendingQuestions)}`);
   }
 
-  log(`candidatos de inyección: ${JSON.stringify(report.injectionCandidates)}`);
+  log(`injection candidates: ${JSON.stringify(report.injectionCandidates)}`);
   log('===== fin del sondeo =====');
 }
 
@@ -202,20 +202,20 @@ export function reportToText(report: ProbeReport): string {
   }
 
   lines.push('');
-  lines.push('Servicios relacionados con la conversación:');
+  lines.push('Services related to the conversation:');
   for (const detail of report.serviceDetails) {
-    lines.push(`  ${detail.name}: ${detail.methods.join(', ') || '(sin métodos enumerables)'}`);
+    lines.push(`  ${detail.name}: ${detail.methods.join(', ') || '(no enumerable methods)'}`);
   }
 
   lines.push('');
-  lines.push('Candidatos de inyección de texto:');
+  lines.push('Text injection candidates:');
   for (const [key, value] of Object.entries(report.injectionCandidates)) {
     lines.push(`  ${key}: ${value}`);
   }
 
   if (report.sessions.length > 0) {
     lines.push('');
-    lines.push('Para inyectar en una: /mobile-say <número> <texto>');
+    lines.push('To inject into one: /mobile-say <number> <text>');
   }
 
   return lines.join('\n');

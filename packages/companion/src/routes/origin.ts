@@ -122,7 +122,7 @@ export function originNotice(origin: string): OriginNotice | undefined {
   if (!isValidOrigin(origin)) {
     return {
       severity: 'blocking',
-      message: `La dirección pública "${origin}" no es válida.`,
+      message: `The public address "${origin}" is not valid.`,
     };
   }
 
@@ -132,8 +132,8 @@ export function originNotice(origin: string): OriginNotice | undefined {
     return {
       severity: 'blocking',
       message:
-        `${parsed.host} solo existe dentro de este PC: en el teléfono apunta al propio ` +
-        'teléfono. Abre esta página desde la dirección del tailnet (tailscale serve) o ' +
+        `${parsed.host} only exists inside this PC: on a phone it points at the phone ` +
+        'itself. Open this page through the tailnet address (tailscale serve) or ' +
         'configura DSH_MOBILE_PUBLIC_URL.',
     };
   }
@@ -142,7 +142,7 @@ export function originNotice(origin: string): OriginNotice | undefined {
     return {
       severity: 'warning',
       message:
-        'Esta dirección va por HTTP. La app cargará, pero el navegador no la dejará ' +
+        'This address is plain HTTP. The app will load, but the browser will not ' +
         'instalarse ni usar notificaciones: eso exige HTTPS, que es lo que da el nombre ' +
         'del tailnet.',
     };
@@ -154,6 +154,6 @@ export function originNotice(origin: string): OriginNotice | undefined {
 /** Texto del cartel para la página de emparejamiento. */
 export function noticeHeadline(notice: OriginNotice): string {
   return notice.severity === 'blocking'
-    ? 'Este QR no va a funcionar desde el teléfono.'
-    : 'Funcionará, pero no podrás instalarla.';
+    ? 'This QR will not work from a phone.'
+    : 'It will work, but you will not be able to install it.';
 }

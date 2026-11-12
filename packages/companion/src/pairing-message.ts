@@ -48,11 +48,11 @@ export function buildPairingMessage(view: PairingView): PairingLink {
     return {
       compromised: true,
       text: [
-        'El plugin no pudo abrir el listener, así que no hay a dónde emparejar.',
+        'The plugin could not open its listener, so there is nowhere to pair.',
         '',
         view.listenerError,
         '',
-        'Revisa que el puerto no esté ocupado y vuelve a iniciar DSH.',
+        'Check that the port is free and start DSH again.',
       ].join('\n'),
     };
   }

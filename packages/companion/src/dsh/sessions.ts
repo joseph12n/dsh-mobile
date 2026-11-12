@@ -20,10 +20,10 @@ function clean(raw: string): string {
 
 export function resolveSessionId(ctx: HostContext, raw: string): SessionResolution {
   const wanted = clean(raw);
-  if (!wanted) return { ok: false, error: 'Falta el identificador de sesión.' };
+  if (!wanted) return { ok: false, error: 'Missing the session identifier.' };
 
   const sessions = service<SessionsService>(ctx, 'sessions');
-  if (!sessions) return { ok: false, error: 'El servicio de sesiones no está disponible.' };
+  if (!sessions) return { ok: false, error: 'The sessions service is not available.' };
 
   let ids: string[];
   try {
@@ -39,7 +39,7 @@ export function resolveSessionId(ctx: HostContext, raw: string): SessionResoluti
     if (chosen) return { ok: true, id: chosen };
     return {
       ok: false,
-      error: `No hay sesión nº ${wanted}. Hay ${ids.length}:\n${ids.map((id, i) => `${i + 1}) ${id}`).join('\n')}`,
+      error: `No session number ${wanted}. There are ${ids.length}:\n${ids.map((id, i) => `${i + 1}) ${id}`).join('\n')}`,
     };
   }
 
@@ -62,6 +62,6 @@ export function resolveSessionId(ctx: HostContext, raw: string): SessionResoluti
 
   return {
     ok: false,
-    error: `No hay ninguna sesión que coincida con "${wanted}".\nSesiones vivas:\n${ids.join('\n') || '(ninguna)'}`,
+    error: `No session matches "${wanted}".\nLive sessions:\n${ids.join('\n') || '(none)'}`,
   };
 }

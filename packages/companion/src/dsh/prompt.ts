@@ -30,11 +30,11 @@ export async function injectText(
   const controller = service<SessionController>(ctx, 'sessionController');
 
   if (!controller || typeof controller.prompt !== 'function') {
-    return { ok: false, detail: 'ctx.sessionController no está disponible en este host.' };
+    return { ok: false, detail: 'ctx.sessionController is not available on this host.' };
   }
 
   const trimmed = text.trim();
-  if (!trimmed) return { ok: false, detail: 'El texto está vacío.' };
+  if (!trimmed) return { ok: false, detail: 'The text is empty.' };
 
   try {
     const result = await controller.prompt(
@@ -49,8 +49,8 @@ export async function injectText(
 
     return result.accepted
       ? { ok: true, detail: `Mensaje aceptado en ${sessionId} (modo ${mode}).` }
-      : { ok: false, detail: `El host no aceptó el mensaje para ${sessionId}.` };
+      : { ok: false, detail: `The host did not accept the message for ${sessionId}.` };
   } catch (error) {
-    return { ok: false, detail: `Falló la inyección: ${String(error)}` };
+    return { ok: false, detail: `Injection failed: ${String(error)}` };
   }
 }

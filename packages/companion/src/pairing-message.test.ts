@@ -53,7 +53,7 @@ describe('mensaje de emparejamiento', () => {
     const { text, compromised } = buildPairingMessage({ ...base, port: 6768 });
     expect(compromised).toBe(true);
     expect(text).toContain('http://127.0.0.1:6768');
-    expect(text).toContain('averiguándolo');
+    expect(text).toContain('working it out');
   });
 
   it('usa el puerto real, no el de reserva, cuando el listener ya escucha', () => {
@@ -74,7 +74,7 @@ describe('mensaje de emparejamiento', () => {
     });
 
     expect(compromised).toBe(true);
-    expect(text).toContain('no pudo abrir el listener');
+    expect(text).toContain('could not open its listener');
     expect(text).toContain('EADDRINUSE');
     expect(text).not.toContain('#/pair');
   });
