@@ -104,10 +104,31 @@ export const RunCancelMessage = message('run.cancel', {
 
 export const PingMessage = message('ping', {});
 
+/**
+ * Creates a session inside an existing folder.
+ *
+ * A session needs a directory, so it is always born in one: the phone cannot pick a
+ * directory on the desktop's filesystem, and inventing one would be worse.
+ */
+export const SessionCreateMessage = message('session.create', {
+  workspaceId: z.string().min(1),
+  /** First instruction, if the user typed one. */
+  prompt: z.string().optional(),
+});
+
+/** Archives a session: it leaves the list and can be recovered on the desktop. */
+export const WorkspaceArchiveMessage = message('workspace.archive', {
+  sessionId: SessionId,
+  /** Stop whatever is running before archiving, instead of refusing. */
+  stopActivity: z.boolean().optional(),
+});
+
 export const ClientMessage = z.discriminatedUnion('type', [
   HelloMessage,
   PairRedeemMessage,
   SessionsListMessage,
+  SessionCreateMessage,
+  WorkspaceArchiveMessage,
   WorkspaceListMessage,
   SessionSubscribeMessage,
   SessionHistoryMessage,
@@ -137,6 +158,16 @@ export const PairOkMessage = message('pair.ok', {
   deviceToken: z.string().min(1),
   host: HostInfo,
   device: DeviceInfo,
+});
+
+export const SessionCreatedMessage = message('session.created', {
+  sessionId: SessionId,
+  /** Last known sequence of the new session. */
+  seq: z.number().int().nonnegative(),
+});
+
+export const WorkspaceArchivedMessage = message('workspace.archived', {
+  sessionId: SessionId,
 });
 
 export const SessionsOkMessage = message('sessions.ok', {
@@ -228,6 +259,8 @@ export const ServerMessage = z.discriminatedUnion('type', [
   SessionsOkMessage,
   WorkspaceOkMessage,
   SessionOkMessage,
+  SessionCreatedMessage,
+  WorkspaceArchivedMessage,
   HistoryOkMessage,
   ReplyOkMessage,
   AnswerOkMessage,

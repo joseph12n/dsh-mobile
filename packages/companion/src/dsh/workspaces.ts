@@ -35,6 +35,8 @@ export interface WorkspaceController {
   list?: () => unknown;
   /** A stream whose first frame is a complete baseline. */
   follow?: (signal: AbortSignal) => AsyncIterable<unknown>;
+  /** Takes a session out of the list. Refuses if it has running work, unless told not to. */
+  archiveSession?: (sessionId: string, options?: { stopActivity?: boolean }) => Promise<unknown>;
 }
 
 /** How long to wait for a baseline before giving up. Never hang the command. */
