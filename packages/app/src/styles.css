@@ -660,3 +660,50 @@ button.ghost.tiny {
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+/* --- Contrast levels ------------------------------------------------------ */
+
+/*
+ * `:root` above is the desktop's palette. These override only what changes contrast,
+ * never hue or layout: a "high contrast" that also shifts colours stops being the same
+ * app, and one that changes spacing breaks the screens it was meant to help.
+ */
+
+:root[data-contrast='high'] {
+  --bg: #000000;
+  --surface: #1c1c1e;
+  --surface-2: #262629;
+  --surface-3: #323236;
+  --text: #ffffff;
+  --text-secondary: #e8eaed;
+  --muted: #c8ccd1;
+  --line: #ffffff2e;
+  --line-strong: #ffffff52;
+  --line-emphasis: #ffffff70;
+  --link: #9dc0ff;
+}
+
+/* El foco es lo primero que se pierde de vista: en alto contraste, más grueso. */
+:root[data-contrast='high'] :focus-visible {
+  outline-width: 3px;
+}
+
+:root[data-contrast='low'] {
+  --bg: #17171a;
+  --surface: #1f1f22;
+  --surface-2: #262629;
+  --surface-3: #2d2d31;
+  --text: #d9dce0;
+  --text-secondary: #b9bec4;
+  --muted: #93999f;
+  --line: #ffffff0a;
+  --line-strong: #ffffff14;
+  --line-emphasis: #ffffff1a;
+  --link: #8fb4f0;
+}
+
+/* Menos brillo en las superficies grandes, que es lo que cansa de noche. */
+:root[data-contrast='low'] .card,
+:root[data-contrast='low'] .session-row {
+  box-shadow: none;
+}

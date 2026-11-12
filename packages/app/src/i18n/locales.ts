@@ -42,6 +42,10 @@ const en = {
   'reconnect.now': 'Retry now',
 
   'error.authLost': 'The host no longer recognises this device. Pair it again.',
+  'settings.contrast': 'Contrast',
+  'contrast.normal': 'Normal',
+  'contrast.high': 'High',
+  'contrast.low': 'Low',
   'settings.language': 'Language',
 
   'error.retry': 'Retry',
@@ -116,6 +120,10 @@ const es: Catalogue = {
   'reconnect.now': 'Reintentar ahora',
 
   'error.authLost': 'El host ya no reconoce este dispositivo. Vuelve a emparejarlo.',
+  'settings.contrast': 'Contraste',
+  'contrast.normal': 'Normal',
+  'contrast.high': 'Alto',
+  'contrast.low': 'Bajo',
   'settings.language': 'Idioma',
 
   'error.retry': 'Reintentar',
@@ -185,6 +193,10 @@ const ptBR: Catalogue = {
   'reconnect.now': 'Tentar agora',
 
   'error.authLost': 'O host não reconhece mais este dispositivo. Emparelhe de novo.',
+  'settings.contrast': 'Contraste',
+  'contrast.normal': 'Normal',
+  'contrast.high': 'Alto',
+  'contrast.low': 'Baixo',
   'settings.language': 'Idioma',
 
   'error.retry': 'Tentar de novo',
@@ -253,6 +265,10 @@ const zhHans: Catalogue = {
   'reconnect.now': '立即重试',
 
   'error.authLost': '主机已不识别此设备，请重新配对。',
+  'settings.contrast': '对比度',
+  'contrast.normal': '标准',
+  'contrast.high': '高',
+  'contrast.low': '低',
   'settings.language': '语言',
 
   'error.retry': '重试',
