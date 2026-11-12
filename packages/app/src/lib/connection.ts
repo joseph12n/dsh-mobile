@@ -169,6 +169,7 @@ export class CompanionClient {
       throw new Error(`Respuesta inesperada: ${response.type}`);
     }
 
+    this.#handshakeDone = true;
     this.#onState({ kind: 'connected', host: response.host, device: response.device });
     return { host: response.host, ...(response.device ? { device: response.device } : {}) };
   }
@@ -252,6 +253,17 @@ export class CompanionClient {
   /** `true` mientras el cierre lo pide la propia app. */
   #intentionalClose = false;
 
+  /**
+   * `true` una vez el host aceptó el `hello`.
+   *
+   * Separa un **rechazo durante el handshake** —donde el cierre que viene detrás no
+   * es una caída y no debe reintentarse— de un error cualquiera en una conexión ya
+   * establecida. Sin esto la bandera era pegajosa por socket: tras un `rate-limited`
+   * el socket podía caerse de verdad y nadie reintentaba, con la transcripción
+   * congelada y sin síntoma.
+   */
+  #handshakeDone = false;
+
   close(): void {
     this.#failAll(new Error('Conexión cerrada.'));
     // Marcado antes de cerrar: onclose no debe confundir un cierre pedido con
@@ -287,9 +299,10 @@ export class CompanionClient {
     const message = parseServerMessage(raw);
     if (!message) return;
 
-    // Antes de resolver: el cierre puede llegar en el mismo tick y la carrera
-    // hacía que se anunciara como caída.
-    if (message.type === 'error') this.#hostRejected = true;
+    // Antes de resolver: el cierre puede llegar en el mismo tick y la carrera hacía
+    // que se anunciara como caída. Solo durante el handshake: más tarde un error es
+    // una respuesta normal y la caída posterior sí debe reintentarse.
+    if (message.type === 'error' && !this.#handshakeDone) this.#hostRejected = true;
 
     const pending = this.#pending.get(message.id);
     if (pending) {
