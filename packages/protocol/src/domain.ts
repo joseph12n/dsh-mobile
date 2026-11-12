@@ -16,6 +16,8 @@ export type SessionState = z.infer<typeof SessionState>;
  * modo que un plugin viejo no rompe una PWA nueva.
  */
 export const Capability = z.enum([
+  'session.create',
+  'workspace.archive',
   'session.history',
   'reply.send',
   'question.answer',
