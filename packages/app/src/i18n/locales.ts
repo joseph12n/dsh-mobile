@@ -36,11 +36,13 @@ const en = {
   'pairing.code': 'Code',
   'pairing.host': 'Host',
   'pairing.submit': 'Pair',
-  'pairing.submitting': 'Pairing…',
 
   'reconnect.kept': 'The pairing is still saved.',
   'reconnect.attempt': 'Attempt {attempt}, retrying in {seconds} s.',
   'reconnect.now': 'Retry now',
+
+  'error.authLost': 'The host no longer recognises this device. Pair it again.',
+  'settings.language': 'Language',
 
   'error.retry': 'Retry',
   'error.forget': 'Forget this device',
@@ -48,7 +50,6 @@ const en = {
   'sessions.title': 'Sessions',
   'sessions.refresh': 'Refresh',
   'sessions.empty': 'No live sessions on the host.',
-  'sessions.forget': 'Forget this device',
 
   'group.waiting': 'Waiting for you',
   'group.working': 'Working',
@@ -79,7 +80,6 @@ const en = {
   'session.questionCount_plural': '{count} questions',
 
   'questions.title': 'Waiting for you',
-  'questions.confirm': 'Confirmation',
   'questions.other': 'Or write another answer…',
   'questions.submit': 'Send answer',
 
@@ -108,11 +108,13 @@ const es: Catalogue = {
   'pairing.code': 'Código',
   'pairing.host': 'Host',
   'pairing.submit': 'Emparejar',
-  'pairing.submitting': 'Emparejando…',
 
   'reconnect.kept': 'El emparejamiento sigue guardado.',
   'reconnect.attempt': 'Intento {attempt}, reintento en {seconds} s.',
   'reconnect.now': 'Reintentar ahora',
+
+  'error.authLost': 'El host ya no reconoce este dispositivo. Vuelve a emparejarlo.',
+  'settings.language': 'Idioma',
 
   'error.retry': 'Reintentar',
   'error.forget': 'Olvidar este dispositivo',
@@ -120,7 +122,6 @@ const es: Catalogue = {
   'sessions.title': 'Sesiones',
   'sessions.refresh': 'Actualizar',
   'sessions.empty': 'No hay sesiones vivas en el host.',
-  'sessions.forget': 'Olvidar este dispositivo',
 
   'group.waiting': 'Esperando tu respuesta',
   'group.working': 'Trabajando',
@@ -151,7 +152,6 @@ const es: Catalogue = {
   'session.questionCount_plural': '{count} preguntas',
 
   'questions.title': 'Te está esperando',
-  'questions.confirm': 'Confirmación',
   'questions.other': 'O escribe otra respuesta…',
   'questions.submit': 'Enviar respuesta',
 
@@ -167,7 +167,7 @@ const ptBR: Catalogue = {
   'state.checking': 'Verificando…',
   'state.connecting': 'Conectando',
   'state.reconnecting': 'Reconectando…',
-  'state.pairing': 'Sem emparelhamento',
+  'state.pairing': 'Não emparelhado',
   'state.error': 'Não consegui conectar',
 
   'pairing.explain':
@@ -175,11 +175,13 @@ const ptBR: Catalogue = {
   'pairing.code': 'Código',
   'pairing.host': 'Host',
   'pairing.submit': 'Emparelhar',
-  'pairing.submitting': 'Emparelhando…',
 
   'reconnect.kept': 'O emparelhamento continua salvo.',
-  'reconnect.attempt': 'Tentativa {attempt}, nova tentativa em {seconds} s.',
+  'reconnect.attempt': 'Tentativa {attempt}, novo intento em {seconds} s.',
   'reconnect.now': 'Tentar agora',
+
+  'error.authLost': 'O host não reconhece mais este dispositivo. Emparelhe de novo.',
+  'settings.language': 'Idioma',
 
   'error.retry': 'Tentar de novo',
   'error.forget': 'Esquecer este dispositivo',
@@ -187,11 +189,10 @@ const ptBR: Catalogue = {
   'sessions.title': 'Sessões',
   'sessions.refresh': 'Atualizar',
   'sessions.empty': 'Nenhuma sessão ativa no host.',
-  'sessions.forget': 'Esquecer este dispositivo',
 
   'group.waiting': 'Esperando você',
   'group.working': 'Trabalhando',
-  'group.idle': 'Parada',
+  'group.idle': 'Paradas',
   'group.stale': 'Mais antigas',
   'group.show': 'Mostrar',
   'group.hide': 'Ocultar',
@@ -218,7 +219,6 @@ const ptBR: Catalogue = {
   'session.questionCount_plural': '{count} perguntas',
 
   'questions.title': 'Esperando você',
-  'questions.confirm': 'Confirmação',
   'questions.other': 'Ou escreva outra resposta…',
   'questions.submit': 'Enviar resposta',
 
@@ -241,11 +241,13 @@ const zhHans: Catalogue = {
   'pairing.code': '配对码',
   'pairing.host': '主机',
   'pairing.submit': '配对',
-  'pairing.submitting': '配对中…',
 
   'reconnect.kept': '配对信息仍然保留。',
   'reconnect.attempt': '第 {attempt} 次尝试，{seconds} 秒后重试。',
   'reconnect.now': '立即重试',
+
+  'error.authLost': '主机已不识别此设备，请重新配对。',
+  'settings.language': '语言',
 
   'error.retry': '重试',
   'error.forget': '忘记此设备',
@@ -253,7 +255,6 @@ const zhHans: Catalogue = {
   'sessions.title': '会话',
   'sessions.refresh': '刷新',
   'sessions.empty': '主机上没有活跃会话。',
-  'sessions.forget': '忘记此设备',
 
   'group.waiting': '等待你回复',
   'group.working': '进行中',
@@ -284,7 +285,6 @@ const zhHans: Catalogue = {
   'session.questionCount_plural': '{count} 个问题',
 
   'questions.title': '等待你回复',
-  'questions.confirm': '确认',
   'questions.other': '或者写另一个回答…',
   'questions.submit': '发送回答',
 

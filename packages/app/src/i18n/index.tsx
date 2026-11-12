@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { CATALOGUES, LOCALES, type Locale, type MessageKey } from './locales.js';
 
@@ -24,8 +24,15 @@ export function isLocale(value: unknown): value is Locale {
  * Picks the starting language.
  *
  * `navigator.languages` is tried in order: someone who prefers `pt-BR` but also
- * accepts `en` gets Portuguese, not English. `zh-CN` maps to `zh-Hans`, because
- * browsers report the region and we ship the simplified script.
+ * accepts `en` gets Portuguese, not English.
+ *
+ * Two mappings are deliberate and worth writing down, because both override an
+ * explicit preference:
+ *  - **`zh-TW` → `zh-Hans`**: we ship one Chinese script. Serving traditional
+ *    readers simplified text is worse than English for them, so a `zh-Hant`
+ *    catalogue is the follow-up.
+ *  - **`pt-PT` → `pt-BR`**: we ship one Portuguese. The spelling differs but the
+ *    language does not, and "mostly right Portuguese" beats English for a pt-PT user.
  */
 export function detectLocale(preferred?: readonly string[]): Locale {
   const candidates = preferred ?? [];
@@ -82,22 +89,22 @@ interface I18n {
 
 const I18nContext = createContext<I18n | undefined>(undefined);
 
-export function I18nProvider({
-  children,
-  initial,
-}: {
-  children: ReactNode;
-  initial?: Locale;
-}): ReactNode {
-  const [locale, setLocaleState] = useState<Locale>(() => {
-    if (initial) return initial;
-    return storedLocale() ?? detectLocale(globalThis.navigator?.languages);
-  });
+export function I18nProvider({ children }: { children: ReactNode }): ReactNode {
+  const [locale, setLocaleState] = useState<Locale>(
+    () => storedLocale() ?? detectLocale(globalThis.navigator?.languages),
+  );
 
   const setLocale = useCallback((next: Locale) => {
     setLocaleState(next);
     storeLocale(next);
   }, []);
+
+  // `document.documentElement.lang` drives the screen reader voice and the browser's
+  // offer to translate. Leaving it at the value in index.html tells a screen reader to
+  // read Chinese with a Spanish voice.
+  useEffect(() => {
+    document.documentElement.lang = locale;
+  }, [locale]);
 
   const value = useMemo<I18n>(
     () => ({ locale, setLocale, t: translator(locale) }),
@@ -117,7 +124,14 @@ export function useI18n(): I18n {
   return { locale: 'en', setLocale: () => undefined, t: translator('en') };
 }
 
-/** `1 tool` / `2 tools`, using the `_plural` key when the count needs it. */
+/**
+ * `1 tool` / `2 tools`.
+ *
+ * The plural key is derived, so it is checked at runtime: a key **without** a
+ * `_plural` sibling would otherwise render `session.tools_plural` literally on
+ * screen, and the type system cannot see that. Falling back to the singular is wrong
+ * grammatically but it is English, not a raw key.
+ */
 export function plural(
   t: Translate,
   key: MessageKey,
@@ -125,6 +139,7 @@ export function plural(
   values: Record<string, string | number> = {},
 ): string {
   const pluralKey = `${key}_plural` as MessageKey;
-  const choice = count === 1 ? key : pluralKey;
+  const hasPlural = pluralKey in CATALOGUES.en;
+  const choice = count === 1 || !hasPlural ? key : pluralKey;
   return t(choice, { count, ...values });
 }

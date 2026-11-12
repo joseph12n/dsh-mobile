@@ -102,7 +102,7 @@ export function App() {
           setView({
             kind: 'pairing',
             endpoint,
-            notice: 'The host no longer recognises this device. Pair it again.',
+            notice: t('error.authLost'),
           });
           return;
 
@@ -446,10 +446,7 @@ export function App() {
       {view.kind === 'pairing' && (
         <section className="card">
           <h2>{t('state.pairing')}</h2>
-          <p>
-            Abre el QR en el escritorio y escanéalo con la cámara. Si no puedes, escribe el código y
-            la dirección del host.
-          </p>
+          <p>{t('pairing.explain')}</p>
 
           <label className="field">
             <span>{t('pairing.code')}</span>
@@ -566,7 +563,7 @@ export function App() {
         {/* Language lives in the footer on purpose: it is reachable before pairing,
             when a user who cannot read the screen has the most to gain from it. */}
         <label className="locale-picker">
-          <span className="visually-hidden">Language</span>
+          <span className="visually-hidden">{t('settings.language')}</span>
           <select
             className="locale"
             value={locale}
