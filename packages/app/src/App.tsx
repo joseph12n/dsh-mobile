@@ -5,6 +5,8 @@ import {
   parsePairingUrl,
   type HistoryEntry,
   type HostInfo,
+  type ModelCatalog,
+  type ModelSelection,
   type QuestionAnswerItem,
   type QuestionBatch,
   type SessionSummary,
@@ -73,6 +75,8 @@ export function App() {
   /** Session whose archive is in flight: a second tap would answer not-found. */
   const [archiving, setArchiving] = useState<string | undefined>(undefined);
   const [endpointInput, setEndpointInput] = useState('');
+  /** Catalog the host offers, when it announced `model.select`. */
+  const [catalog, setCatalog] = useState<ModelCatalog | undefined>(undefined);
   const [questions, setQuestions] = useState<QuestionBatch[]>([]);
   const [openSession, setOpenSession] = useState<SessionSummary | undefined>(undefined);
   const [entries, setEntries] = useState<HistoryEntry[]>([]);
@@ -251,7 +255,14 @@ export function App() {
           ? await connection.listWorkspaces().catch(() => [])
           : [];
 
+        // El catálogo es un extra: sin él se escribe y se responde igual. Un fallo
+        // aquí no puede impedir abrir la lista de sesiones.
+        const catalog = hello.host.capabilities.includes('model.select')
+          ? await connection.listModels().catch(() => undefined)
+          : undefined;
+
         retry.current = 0;
+        setCatalog(catalog);
         setView({ kind: 'sessions', endpoint, host: hello.host, sessions, workspaces });
 
         // After a reconnect the open session must be resubscribed, or the
@@ -365,6 +376,7 @@ export function App() {
       setOpenSession(session);
       setEntries([]);
       setHasMore(false);
+      setModelError(undefined);
       setLoadingHistory(true);
 
       try {
@@ -411,6 +423,36 @@ export function App() {
         await connection.reply(openSession.id, text);
       } catch (error) {
         setView({ kind: 'error', endpoint: connection.url, message: messageOf(error) });
+      }
+    },
+    [client, openSession],
+  );
+
+  /** Error del último cambio de modelo, dentro de la sesión abierta. */
+  const [modelError, setModelError] = useState<string | undefined>(undefined);
+
+  /** Cambia el modelo de la sesión abierta and keeps both views in sync. */
+  const changeModel = useCallback(
+    async (selection: ModelSelection) => {
+      const connection = client.current;
+      if (!connection || !openSession) return;
+      try {
+        // El host normaliza: se guarda lo que aceptó, no lo que se pidió.
+        const settled = await connection.selectModel(openSession.id, selection);
+        setModelError(undefined);
+        setOpenSession((previous) => (previous ? { ...previous, model: settled } : previous));
+        setView((previous) =>
+          previous.kind === 'sessions'
+            ? {
+                ...previous,
+                sessions: previous.sessions.map((session) =>
+                  session.id === openSession.id ? { ...session, model: settled } : session,
+                ),
+              }
+            : previous,
+        );
+      } catch (error) {
+        setModelError(messageOf(error));
       }
     },
     [client, openSession],
@@ -686,6 +728,12 @@ export function App() {
               onLoadMore={() => void loadMore()}
               onCancel={() => void stop()}
               onSend={(text) => void sendText(text)}
+              {...(openSession.model ? { model: openSession.model } : {})}
+              {...(catalog ? { catalog } : {})}
+              {...(catalog
+                ? { onSelectModel: (selection: ModelSelection) => void changeModel(selection) }
+                : {})}
+              {...(modelError ? { error: modelError } : {})}
             />
           ) : (
             <section className="card">
