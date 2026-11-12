@@ -1,30 +1,58 @@
-import { describe, expect, it } from 'vitest';
-import { ConnectionError, isAuthFailure } from './connection.js';
+import { afterEach, describe, expect, it } from 'vitest';
+import { endpointFromLocation, normalizeEndpoint } from './connection.js';
 
 /**
- * Distinguir «no hay red» de «este token ya no vale» es lo que evita que un bache
- * de cobertura cueste volver a emparejar.
+ * Normalización del endpoint. Importa porque es el único dato de red que el
+ * usuario teclea a mano, y equivocarlo da un error críptico de WebSocket.
  */
 
-describe('fallos de conexión', () => {
-  it('un token rechazado es fallo de autenticación', () => {
-    expect(isAuthFailure(new ConnectionError('no', 'auth-required'))).toBe(true);
-    expect(isAuthFailure(new ConnectionError('no', 'auth-invalid'))).toBe(true);
+const original = globalThis.location;
+
+afterEach(() => {
+  globalThis.location = original;
+});
+
+function stubLocation(protocol: string, host: string): void {
+  Object.defineProperty(globalThis, 'location', {
+    value: { protocol, host },
+    configurable: true,
+    writable: true,
+  });
+}
+
+describe('endpoint por defecto', () => {
+  it('usa wss sobre https', () => {
+    stubLocation('https:', 'maquina.tailnet.ts.net');
+    expect(endpointFromLocation()).toBe('wss://maquina.tailnet.ts.net/ws');
   });
 
-  it('un fallo de red no lo es', () => {
-    expect(isAuthFailure(new Error('No pude abrir el WebSocket.'))).toBe(false);
-    expect(isAuthFailure(new ConnectionError('timeout'))).toBe(false);
+  it('usa ws sobre http', () => {
+    stubLocation('http:', '127.0.0.1:6768');
+    expect(endpointFromLocation()).toBe('ws://127.0.0.1:6768/ws');
+  });
+});
+
+describe('normalización de lo que teclea el usuario', () => {
+  it('respeta un WebSocket ya escrito', () => {
+    expect(normalizeEndpoint('wss://host/ws')).toBe('wss://host/ws');
+    expect(normalizeEndpoint('ws://host:1234/ws')).toBe('ws://host:1234/ws');
   });
 
-  it('otros códigos del protocolo no cuentan como token inválido', () => {
-    for (const code of ['not-found', 'denied', 'rate-limited', 'bad-request']) {
-      expect(isAuthFailure(new ConnectionError('x', code))).toBe(false);
-    }
+  it('convierte http en ws', () => {
+    expect(normalizeEndpoint('https://host')).toBe('wss://host');
+    expect(normalizeEndpoint('http://host:6768')).toBe('ws://host:6768');
   });
 
-  it('un valor que no es error no rompe', () => {
-    expect(isAuthFailure(undefined)).toBe(false);
-    expect(isAuthFailure('auth-required')).toBe(false);
+  it('añade ws a un host pelado', () => {
+    expect(normalizeEndpoint('host:6768')).toBe('ws://host:6768');
+  });
+
+  it('recorta espacios', () => {
+    expect(normalizeEndpoint('  host  ')).toBe('ws://host');
+  });
+
+  it('cae al endpoint por defecto si viene vacío', () => {
+    stubLocation('https:', 'host');
+    expect(normalizeEndpoint('   ')).toBe('wss://host/ws');
   });
 });

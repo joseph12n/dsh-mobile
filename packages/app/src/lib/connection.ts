@@ -42,7 +42,18 @@ export class ConnectionError extends Error {
   }
 }
 
-/** 	rue si el fallo es del token, no de la red. */
+/** Fallo al canjear un código de emparejamiento. */
+export class PairingError extends Error {
+  readonly code: string | undefined;
+
+  constructor(message: string, code?: string) {
+    super(message);
+    this.name = 'PairingError';
+    this.code = code;
+  }
+}
+
+/** `true` si el fallo es del token, no de la red. */
 export function isAuthFailure(error: unknown): boolean {
   return (
     error instanceof ConnectionError &&
@@ -137,11 +148,11 @@ export class CompanionClient {
 
     socket.onmessage = (event: MessageEvent<string>) => this.#receive(event.data);
     socket.onclose = () => {
-      // Avisar del cierre es lo que permite reconectar. Antes solo se fallaban las
-      // peticiones en vuelo, así que la app se quedaba mostrando datos muertos
-      // como si la conexión siguiera viva.
-      this.#onState({ kind: 'offline', reason: 'El host cerró la conexión.' });
-      this.#failAll(new Error('El host cerró la conexión.'));
+      const reason = 'El host cerró la conexión.';
+      this.#failAll(new Error(reason));
+
+      // Un cierre pedido por la app no es una caída: no debe disparar reintentos.
+      if (!this.#intentionalClose) this.#onState({ kind: 'offline', reason });
     };
     socket.onerror = () => this.#failAll(new Error('Error de WebSocket.'));
 
@@ -152,7 +163,8 @@ export class CompanionClient {
     });
 
     if (response.type === 'error') {
-      this.#onState({ kind: 'offline', reason: response.message });
+      // Sin emitir offline: si además se programara un reintento desde aquí, el
+      // intento y el reintento se pisarían (dos relojes para lo mismo).
       throw new ConnectionError(response.message, response.code);
     }
 
@@ -176,7 +188,7 @@ export class CompanionClient {
 
   async listSessions(): Promise<SessionSummary[]> {
     const response = await this.#request({ type: 'sessions.list' });
-    if (response.type === 'error') throw new Error(response.message);
+    if (response.type === 'error') throw new ConnectionError(response.message, response.code);
     return response.type === 'sessions.ok' ? response.sessions : [];
   }
 
@@ -226,8 +238,14 @@ export class CompanionClient {
     if (response.type === 'error') throw new Error(response.message);
   }
 
+  /** `true` mientras el cierre lo pide la propia app. */
+  #intentionalClose = false;
+
   close(): void {
     this.#failAll(new Error('Conexión cerrada.'));
+    // Marcado antes de cerrar: onclose no debe confundir un cierre pedido con
+    // una caída, o la app programaría un reintento que mataría la conexión nueva.
+    this.#intentionalClose = true;
     this.#socket?.close();
     this.#socket = undefined;
     this.#onState({ kind: 'idle' });
