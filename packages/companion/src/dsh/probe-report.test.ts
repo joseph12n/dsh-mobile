@@ -17,7 +17,11 @@ function hostWithEverything(): HostContext {
       list: () => [{ id: 's1', deriveMessages: () => [] }],
       get: () => undefined,
     },
-    sessionProjections: { snapshot: () => ({ asOfSeq: 3, values: { title: 'x' } }) },
+    sessionProjections: {
+      // `userQuestions` como array es lo que hace que el informe describa un
+      // `array(1) first element: …`. Sin esto la prueba no toca esa rama.
+      snapshot: () => ({ asOfSeq: 3, values: { title: 'x', userQuestions: [{ callId: 'c1' }] } }),
+    },
     sessionController: { prompt: () => Promise.resolve({ accepted: true }) },
     userQuestions: { list: () => [{ callId: 'c1' }] },
   };
@@ -40,11 +44,17 @@ describe('the probe report is English', () => {
     expect(texto).toContain('Mounted services:');
   });
 
-  it('describes services in English', () => {
-    // `objeto{…}` y `primer elemento` eran las dos cadenas que sobrevivieron.
+  it('describes a list of questions in English', () => {
+    // Las dos cadenas que sobrevivieron eran `objeto{…}` y `primer elemento`. Esta
+    // aserción exige que la rama del array se ejecute de verdad.
+    expect(texto).toContain('array(1) first element: object{');
     expect(texto).not.toContain('objeto{');
     expect(texto).not.toContain('primer elemento');
-    expect(texto).toMatch(/object\{|absent/);
+  });
+
+  it('describes a service in English', () => {
+    expect(texto).toMatch(/object\{prompt\}|absent/);
+    expect(texto).not.toContain('objeto{');
   });
 
   it('describes sessions in English', () => {
