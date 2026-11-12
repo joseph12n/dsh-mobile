@@ -255,15 +255,21 @@ export function App() {
           ? await connection.listWorkspaces().catch(() => [])
           : [];
 
-        // El catálogo es un extra: sin él se escribe y se responde igual. Un fallo
-        // aquí no puede impedir abrir la lista de sesiones.
-        const catalog = hello.host.capabilities.includes('model.select')
-          ? await connection.listModels().catch(() => undefined)
-          : undefined;
-
         retry.current = 0;
-        setCatalog(catalog);
         setView({ kind: 'sessions', endpoint, host: hello.host, sessions, workspaces });
+
+        // El catálogo llega **después**: es un extra y una respuesta lenta no puede
+        // retrasar la lista de sesiones hasta diez segundos.
+        if (hello.host.capabilities.includes('model.select')) {
+          void connection
+            .listModels()
+            .then((loaded) => {
+              if (client.current === connection) setCatalog(loaded);
+            })
+            .catch(() => setCatalog(undefined));
+        } else {
+          setCatalog(undefined);
+        }
 
         // After a reconnect the open session must be resubscribed, or the
         // transcript stays frozen and stops receiving live events.
@@ -431,27 +437,49 @@ export function App() {
   /** Error del último cambio de modelo, dentro de la sesión abierta. */
   const [modelError, setModelError] = useState<string | undefined>(undefined);
 
+  /** Marca de la elección más reciente: una respuesta vieja no puede pisar una nueva. */
+  const modelRequest = useRef(0);
+
   /** Cambia el modelo de la sesión abierta and keeps both views in sync. */
   const changeModel = useCallback(
     async (selection: ModelSelection) => {
       const connection = client.current;
       if (!connection || !openSession) return;
+
+      // La sesión se captura ahora: si el usuario vuelve y abre otra antes de que
+      // responda el host, la respuesta es de A y no puede escribir en B.
+      const sessionId = openSession.id;
+      const request = ++modelRequest.current;
+
       try {
-        // El host normaliza: se guarda lo que aceptó, no lo que se pidió.
-        const settled = await connection.selectModel(openSession.id, selection);
+        const settled = await connection.selectModel(sessionId, selection);
+        if (request !== modelRequest.current) return;
+
         setModelError(undefined);
-        setOpenSession((previous) => (previous ? { ...previous, model: settled } : previous));
+        setOpenSession((previous) =>
+          previous && previous.id === sessionId ? { ...previous, model: settled } : previous,
+        );
         setView((previous) =>
           previous.kind === 'sessions'
             ? {
                 ...previous,
                 sessions: previous.sessions.map((session) =>
-                  session.id === openSession.id ? { ...session, model: settled } : session,
+                  session.id === sessionId ? { ...session, model: settled } : session,
                 ),
               }
             : previous,
         );
       } catch (error) {
+        if (request !== modelRequest.current) return;
+
+        // Si el host rechaza la elección, el catálogo del teléfono está viejo: se
+        // recarga en vez de ofrecer reintentar el mismo modelo que ya no existe.
+        if (error instanceof ConnectionError && error.code === 'bad-request') {
+          void connection
+            .listModels()
+            .then(setCatalog)
+            .catch(() => undefined);
+        }
         setModelError(messageOf(error));
       }
     },

@@ -170,16 +170,23 @@ function ModelBar({
   );
   const selected = choices[index];
   const efforts = selected?.option.reasoningEfforts ?? [];
-  const effort = model?.reasoningEffort ?? selected?.option.defaultReasoningEffort ?? '';
+  // El elegido de verdad, si lo hay. El `defaultReasoningEffort` es lo que el host
+  // aplicaría sin elección: sirve para mostrarlo, no para arrastrarlo como si el
+  // usuario lo hubiera elegido.
+  const explicitEffort = model?.reasoningEffort;
+  const effort = explicitEffort ?? selected?.option.defaultReasoningEffort ?? '';
 
   const choose = (next: number): void => {
     const choice = choices[next];
     if (!choice) return;
 
-    // El nivel anterior puede no existir en el modelo nuevo: se conserva solo si
-    // lo anuncia, y si no se usa el que ese modelo trae por defecto.
+    // El nivel anterior puede no existir en el modelo nuevo: se conserva solo si lo
+    // anuncia, y si no se usa el que ese modelo trae por defecto.
     const available = choice.option.reasoningEfforts ?? [];
-    const keep = effort && available.some((item) => item.id === effort) ? effort : undefined;
+    const keep =
+      explicitEffort && available.some((item) => item.id === explicitEffort)
+        ? explicitEffort
+        : undefined;
     const effortId = keep ?? choice.option.defaultReasoningEffort;
 
     onSelect({
@@ -213,9 +220,17 @@ function ModelBar({
           <span className="muted small">{t('model.label')}</span>
           <select
             value={index >= 0 ? String(index) : ''}
-            onChange={(e) => choose(Number(e.target.value))}
+            onChange={(event) => {
+              // El hueco no es una opción: `Number('')` es 0 y elegiría el primero.
+              if (event.target.value === '') return;
+              choose(Number(event.target.value));
+            }}
           >
-            {index < 0 && <option value="">{t('model.none')}</option>}
+            {index < 0 && (
+              <option value="" disabled>
+                {t('model.choose')}
+              </option>
+            )}
             {catalog.groups.map((group) => (
               <optgroup key={group.id} label={group.name}>
                 {group.models.map((option) => {
@@ -314,7 +329,11 @@ export function SessionView({
       <h2 className="session-heading">{session.title}</h2>
       <p className="muted small">{t(STATE_KEY[session.state] ?? 'session.idle')}</p>
 
-      {error && <p className="error">{error}</p>}
+      {error && (
+        <p className="error" role="alert">
+          {error}
+        </p>
+      )}
 
       {catalog && onSelectModel && (
         <ModelBar model={model} catalog={catalog} onSelect={onSelectModel} />

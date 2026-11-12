@@ -1051,17 +1051,41 @@ describe('models over the WebSocket', () => {
   });
 
   // Cada fallo del adaptador tiene su código: `unavailable` es culpa de la petición
-  // (recarga el catálogo), `not-found` de la sesión y `failed` es una avería.
+  // (recarga el catálogo), `not-found` de la sesión y `failed` es una avería. Un host
+  // sin el servicio es una capacidad ausente, como el handler ausente.
   it.each([
     ['unavailable', 'bad-request'],
     ['not-found', 'not-found'],
     ['failed', 'internal'],
+    ['no-service', 'bad-request'],
   ])('maps a %s selection fault to %s', async (code, expected) => {
     const response = await exchange(
       { selectModel: async () => ({ ok: false, code, message: code }) },
       { type: 'model.select', sessionId: 'session-1', provider: 'deepseek', model: 'chat' },
     );
     expect(response).toMatchObject({ type: 'error', code: expected });
+  });
+
+  it('refuses models.list without a paired device', async () => {
+    const registry = new DeviceRegistry({ persistence: new MemoryPersistence() });
+    const server = await startCompanionServer({
+      pairing: new PairingService(),
+      devices: registry,
+      port: 0,
+      listSessions: () => Promise.resolve([]),
+      listModels: async () => catalog,
+    });
+
+    try {
+      const client = await openClient(server.port);
+      // Sin `hello`: cualquier mensaje que no sea el saludo exige dispositivo.
+      client.send({ v: PROTOCOL_VERSION, id: 'm0', at: Date.now(), type: 'models.list' } as never);
+      const response = await client.next();
+      expect(response).toMatchObject({ type: 'error', code: 'auth-required' });
+      client.close();
+    } finally {
+      await server.close();
+    }
   });
 });
 describe('session actions over the WebSocket', () => {

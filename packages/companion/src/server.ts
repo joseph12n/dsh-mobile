@@ -548,8 +548,9 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
               message.id,
               // Una eleccion que ya no existe es culpa de la peticion, no del host:
               // `bad-request` deja que la app diga "ese modelo ya no esta" y recargue
-              // el catalogo, en vez de ofrecer reintentar lo mismo.
-              selected.code === 'unavailable'
+              // el catalogo, en vez de ofrecer reintentar lo mismo. Un host sin el
+              // servicio es una capacidad ausente, no una averia.
+              selected.code === 'unavailable' || selected.code === 'no-service'
                 ? 'bad-request'
                 : selected.code === 'not-found'
                   ? 'not-found'

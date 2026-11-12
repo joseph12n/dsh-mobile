@@ -37,6 +37,17 @@ export const Capability = z.enum([
 export type Capability = z.infer<typeof Capability>;
 
 /**
+ * La lista de capacidades **tal como viaja en el cable**.
+ *
+ * Cadenas, no el enum: un host nuevo puede anunciar algo que este cliente no conoce, y
+ * validar la lista contra el enum rechazaría el `hello.ok` entero. El cliente se quedaría
+ * sin conexión y `connect()` moriría por timeout, que es mucho peor que ignorar una
+ * capacidad. El cliente decide qué hacer con las que sí conoce.
+ */
+export const Capabilities = z.array(z.string().min(1));
+export type Capabilities = z.infer<typeof Capabilities>;
+
+/**
  * Cómo se enrutará la próxima petición de una sesión.
  *
  * Es la forma que DSH guarda en la proyección `modelSelection`: la aplicación la
@@ -242,7 +253,8 @@ export const HostInfo = z.object({
   name: z.string(),
   version: z.string(),
   platform: z.string(),
-  capabilities: z.array(Capability),
+  /** Lo que este host sabe hacer. Puede incluir cosas que el cliente no conozca. */
+  capabilities: Capabilities,
 });
 export type HostInfo = z.infer<typeof HostInfo>;
 

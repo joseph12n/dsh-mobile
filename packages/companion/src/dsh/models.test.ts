@@ -157,21 +157,22 @@ describe('selecting a model', () => {
     expect(seen).toEqual([{ sessionId: 's1', provider: 'p', model: 'm' }]);
   });
 
-  it('reports a model that is no longer available', async () => {
+  it('reports a model that is no longer available, keeping the host message', async () => {
+    // El código cubre "modelo borrado" y "esfuerzo no soportado": el texto del host es
+    // lo único que distingue los dos casos.
     const ctx = ctxWith({
       sessionController: {
         selectModel: async () => {
-          throw coded('session/model-unavailable');
+          throw coded('session/model-unavailable', 'Could not resolve reasoning effort');
         },
       },
     });
 
-    expect(await selectModel(ctx, { sessionId: 's1', provider: 'p', model: 'gone' })).toMatchObject(
-      {
-        ok: false,
-        code: 'unavailable',
-      },
-    );
+    expect(await selectModel(ctx, { sessionId: 's1', provider: 'p', model: 'gone' })).toEqual({
+      ok: false,
+      code: 'unavailable',
+      message: 'Could not resolve reasoning effort',
+    });
   });
 
   it('reports a session that no longer exists', async () => {
@@ -202,6 +203,21 @@ describe('selecting a model', () => {
       ok: false,
       code: 'failed',
       message: 'disk on fire',
+    });
+  });
+
+  it('keeps an unknown host code as failed', async () => {
+    const ctx = ctxWith({
+      sessionController: {
+        selectModel: async () => {
+          throw Object.assign(new Error('weird'), { code: 'session/something-else' });
+        },
+      },
+    });
+
+    expect(await selectModel(ctx, { sessionId: 's1', provider: 'p', model: 'm' })).toMatchObject({
+      ok: false,
+      code: 'failed',
     });
   });
 

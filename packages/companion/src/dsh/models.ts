@@ -231,9 +231,9 @@ export type SelectResult =
 /**
  * Selects the model of one session.
  *
- * The host normalizes the choice, so the caller gets back what was actually
- * recorded: if the requested effort is not offered by that model, the phone
- * learns it here instead of in the next turn.
+ * The host confirms the recorded selection. It does **not** materialize defaults: what
+ * comes back is what was asked for, so the phone learns about a rejected route here
+ * instead of in the next turn.
  */
 export async function selectModel(
   ctx: HostContext,
@@ -261,11 +261,9 @@ export async function selectModel(
   } catch (error) {
     const code = codeOf(error);
     if (code === 'session/model-unavailable') {
-      return {
-        ok: false,
-        code: 'unavailable',
-        message: 'That model is no longer available.',
-      };
+      // El mismo código cubre "ese modelo ya no está" y "ese esfuerzo no existe": el
+      // mensaje del host es el único que dice cuál, así que no se sustituye.
+      return { ok: false, code: 'unavailable', message: messageOf(error) };
     }
     if (code === 'session/not-found' || code === 'workspace/not-found') {
       return { ok: false, code: 'not-found', message: 'That session no longer exists.' };

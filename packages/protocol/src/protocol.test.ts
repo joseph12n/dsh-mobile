@@ -59,6 +59,37 @@ describe('mensajes del cliente', () => {
     expect(ClientMessage.safeParse({ ...base, stopActivity: 'sí' }).success).toBe(false);
   });
 
+  it('acepta un hello.ok con una capacidad que este cliente no conoce', () => {
+    // El enum es del cliente, no del cable: rechazar el frame entero por una capacidad
+    // nueva dejaría al cliente sin conexión y `connect()` moriría por timeout.
+    const msg = {
+      v: PROTOCOL_VERSION,
+      id: 'h',
+      at,
+      type: 'hello.ok',
+      host: {
+        id: 'h',
+        name: 'n',
+        version: '1',
+        platform: 'p',
+        capabilities: ['session.create', 'algo-del-futuro'],
+      },
+    };
+    const parsed = ServerMessage.safeParse(msg);
+    expect(parsed.success).toBe(true);
+  });
+
+  it('rechaza una capacidad que no es texto', () => {
+    const msg = {
+      v: PROTOCOL_VERSION,
+      id: 'h',
+      at,
+      type: 'hello.ok',
+      host: { id: 'h', name: 'n', version: '1', platform: 'p', capabilities: [42] },
+    };
+    expect(ServerMessage.safeParse(msg).success).toBe(false);
+  });
+
   it('hace ida y vuelta las confirmaciones de una acción', () => {
     const created = parseServerMessage(
       JSON.stringify({

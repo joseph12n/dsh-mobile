@@ -93,6 +93,7 @@ const en = {
   'model.effort': 'Reasoning',
   'model.effortDefault': 'Default',
   'model.none': 'No models available',
+  'model.choose': 'Select model',
 
   'questions.title': 'Waiting for you',
   'questions.other': 'Or write another answer…',
@@ -180,6 +181,7 @@ const es: Catalogue = {
   'model.effort': 'Razonamiento',
   'model.effortDefault': 'Por defecto',
   'model.none': 'No hay modelos disponibles',
+  'model.choose': 'Elegir modelo',
 
   'questions.title': 'Te está esperando',
   'questions.other': 'O escribe otra respuesta…',
@@ -262,6 +264,7 @@ const ptBR: Catalogue = {
   'model.effort': 'Raciocínio',
   'model.effortDefault': 'Padrão',
   'model.none': 'Nenhum modelo disponível',
+  'model.choose': 'Escolher modelo',
 
   'questions.title': 'Esperando você',
   'questions.other': 'Ou escreva outra resposta…',
@@ -343,6 +346,7 @@ const zhHans: Catalogue = {
   'model.effort': '推理强度',
   'model.effortDefault': '默认',
   'model.none': '没有可用的模型',
+  'model.choose': '选择模型',
 
   'questions.title': '等待你回复',
   'questions.other': '或者写另一个回答…',

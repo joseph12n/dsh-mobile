@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { envelopeFields } from './envelope.js';
 import { ErrorCode } from './errors.js';
 import {
-  Capability,
+  Capabilities,
   DeviceInfo,
   HostInfo,
   ModelCatalog,
@@ -282,7 +282,7 @@ export const DevicesChangedMessage = message('devices.changed', {
 export const ErrorMessage = message('error', {
   code: ErrorCode,
   message: z.string(),
-  capabilities: z.array(Capability).optional(),
+  capabilities: Capabilities.optional(),
 });
 
 export const ServerMessage = z.discriminatedUnion('type', [
