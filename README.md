@@ -126,6 +126,7 @@ straight from the phone. When it cannot â€” no Tailscale, or a loopback origin â
 so instead of handing you a link that goes nowhere.
 
 Environment variables: `DSH_MOBILE_PORT`, `DSH_MOBILE_PUBLIC_URL`, `DSH_MOBILE_WEB_ROOT`.
+`DSH_HOME` decides where the plugin keeps its `companion/` folder and its evidence file.
 `DSH_MOBILE_LOG_FILE=0` turns off the plugin's evidence file, which the tests and the preview
 tool use so they do not dirty your log.
 

@@ -42,9 +42,9 @@ pnpm test
 Before proposing a change, `pnpm lint && pnpm typecheck && pnpm test && pnpm build` must pass
 clean.
 
-`DSH_HOME` decides where the plugin keeps its `companion/` folder (device registry and evidence
-file); the tests and the preview tool point it at a temporary directory so they never touch
-yours.
+`DSH_HOME` decides where the plugin keeps its `companion/` folder, and the evidence file lives
+there. The tests and the preview tool do not redirect it: they set `DSH_MOBILE_LOG_FILE=0` so
+the log is never opened, and the tests keep device state in memory.
 
 ## Structure
 
@@ -64,9 +64,10 @@ packages/
 
 1. **`core` imports nothing from `@deepseek-ai/*` and touches neither disk nor network.** Pure
    domain: tested with in-memory data.
-2. **Only `dsh` talks to DSH.** It is the only folder that calls host services; the shapes
-   those services have are declared in `src/host-api.ts`, which is a type contract and no
-   runtime.
+2. **Only `dsh` talks to DSH**, with one deliberate exception: `probe.ts`, the diagnostic
+   report, reads host services directly. It exists to answer "what can this host do", so going
+   through the adapter would hide the very thing it measures. The shapes those services have
+   are declared in `src/host-api.ts`, which is a type contract and no runtime.
 3. **`routes` does not know the domain.** It serves static files and computes the public
    origin; the contract is serialised in `server.ts`.
 4. **`app` does not know DSH.** Only `@dsh-mobile/protocol`.

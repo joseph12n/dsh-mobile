@@ -45,8 +45,9 @@ The rules that do not bend:
 
 1. **`core/` does not import `@deepseek-ai/*`** and touches neither disk nor network. It is
    tested with in-memory data and an injected clock.
-2. **Only `dsh/` knows DSH.** It is the bumper: when upstream changes, the damage is
-   confined to that folder.
+2. **Only `dsh/` talks to DSH**, plus `probe.ts`, which reads host services on purpose: it is
+   the diagnostic report, and routing it through the adapter would hide what it measures. That
+   folder is the bumper: when upstream changes, the damage is confined there.
 3. **`app/` does not know DSH.** Only `@dsh-mobile/protocol`.
 
 Breaking rule 2 is the fastest way for a DSH update to break the project.
@@ -90,8 +91,10 @@ Transport: **WebSocket**, JSON messages, shared envelope `{ v, id, at, type }`.
 - **`id` correlates.** The reply repeats the request `id`.
 - **Errors carry a stable code** (`errors.ts`). A client branches on the code, never on the
   text.
-- **Host messages with no request** are spontaneous sends: `question.pending`,
-  `question.settled`, `session.event`, `session.state`, `devices.changed`.
+- **Host messages with no request** are spontaneous sends. The contract defines
+  `question.pending`, `question.settled`, `session.event`, `session.state` and
+  `devices.changed`; this host emits the first, the third, and nothing else yet — the rest are
+  declared so a client can already branch on them.
 - Unknown version ⇒ `proto-unsupported` with the host's capabilities, never a strange
   failure.
 
