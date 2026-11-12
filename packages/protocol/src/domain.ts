@@ -25,8 +25,81 @@ export const Capability = z.enum([
   'run.cancel',
   /** El host expone las carpetas del escritorio y responde `workspace.list`. */
   'workspace.list',
+  /**
+   * El host expone el catálogo de modelos y acepta cambiarlos.
+   *
+   * Es una sola capacidad porque el selector de la PWA no sirve de nada sin las
+   * dos mitades: un host que solo listara modelos mostraría una lista que no
+   * cambia nada.
+   */
+  'model.select',
 ]);
 export type Capability = z.infer<typeof Capability>;
+
+/**
+ * Cómo se enrutará la próxima petición de una sesión.
+ *
+ * Es la forma que DSH guarda en la proyección `modelSelection`: la aplicación la
+ * muestra tal cual, sin traducir nombres ni inventar esfuerzos.
+ */
+export const ModelSelection = z.object({
+  provider: z.string().min(1),
+  model: z.string().min(1),
+  /** Ausente significa "el que el adaptador use por defecto". */
+  reasoningEffort: z.string().min(1).optional(),
+});
+export type ModelSelection = z.infer<typeof ModelSelection>;
+
+/** Un nivel de razonamiento que un modelo anuncia. */
+export const ReasoningEffortOption = z.object({
+  id: z.string().min(1),
+  name: z.string(),
+  description: z.string().optional(),
+});
+export type ReasoningEffortOption = z.infer<typeof ReasoningEffortOption>;
+
+/** Un modelo del catálogo del host. */
+export const ModelOption = z.object({
+  id: z.string().min(1),
+  name: z.string(),
+  description: z.string().optional(),
+  /** Ausente cuando el adaptador no anuncia niveles de razonamiento. */
+  reasoningEfforts: z.array(ReasoningEffortOption).optional(),
+  /** Nivel que el host aplica cuando no se elige ninguno. */
+  defaultReasoningEffort: z.string().min(1).optional(),
+});
+export type ModelOption = z.infer<typeof ModelOption>;
+
+/** Un proveedor y sus modelos, en el orden que fija el host. */
+export const ModelGroup = z.object({
+  id: z.string().min(1),
+  name: z.string(),
+  models: z.array(ModelOption),
+});
+export type ModelGroup = z.infer<typeof ModelGroup>;
+
+/** Proveedor que el host no pudo leer. Se muestra, no se oculta. */
+export const ModelFailure = z.object({
+  id: z.string().min(1),
+  name: z.string(),
+  message: z.string(),
+});
+export type ModelFailure = z.infer<typeof ModelFailure>;
+
+/**
+ * El catálogo completo: lo que la PWA puede ofrecer.
+ *
+ * `groups` puede venir vacío (host sin proveedores) y `failures` explica los
+ * proveedores que fallaron: un catálogo vacío sin explicación parece un error de
+ * la app.
+ */
+export const ModelCatalog = z.object({
+  /** Selección de despliegue, para cuando una sesión aún no eligió. */
+  default: ModelSelection.optional(),
+  groups: z.array(ModelGroup),
+  failures: z.array(ModelFailure),
+});
+export type ModelCatalog = z.infer<typeof ModelCatalog>;
 
 /** Fila de la lista de sesiones. */
 export const SessionSummary = z.object({
@@ -38,6 +111,8 @@ export const SessionSummary = z.object({
   seq: z.number().int().nonnegative(),
   /** Preguntas sin responder en esta sesión. */
   pendingQuestions: z.number().int().nonnegative(),
+  /** Modelo con el que seguirá la sesión, si el host lo conoce. */
+  model: ModelSelection.optional(),
   /**
    * Carpeta (Workspace) a la que pertenece.
    *

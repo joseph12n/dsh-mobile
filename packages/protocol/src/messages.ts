@@ -5,6 +5,8 @@ import {
   Capability,
   DeviceInfo,
   HostInfo,
+  ModelCatalog,
+  ModelSelection,
   QuestionAnswerItem,
   QuestionBatch,
   SessionId,
@@ -102,6 +104,22 @@ export const RunCancelMessage = message('run.cancel', {
   sessionId: SessionId,
 });
 
+/** Pide el catálogo de modelos del host, con sus proveedores y esfuerzos. */
+export const ModelListMessage = message('models.list', {});
+
+/**
+ * Elige el modelo de una sesión.
+ *
+ * `reasoningEffort` omitido limpia el nivel explícito y deja que el adaptador use
+ * el suyo, que es exactamente lo que hace el escritorio.
+ */
+export const ModelSelectMessage = message('model.select', {
+  sessionId: SessionId,
+  provider: z.string().min(1),
+  model: z.string().min(1),
+  reasoningEffort: z.string().min(1).optional(),
+});
+
 export const PingMessage = message('ping', {});
 
 /**
@@ -128,6 +146,8 @@ export const ClientMessage = z.discriminatedUnion('type', [
   SessionCreateMessage,
   WorkspaceArchiveMessage,
   WorkspaceListMessage,
+  ModelListMessage,
+  ModelSelectMessage,
   SessionSubscribeMessage,
   SessionHistoryMessage,
   ReplySendMessage,
@@ -173,6 +193,23 @@ export const SessionsOkMessage = message('sessions.ok', {
 /** Folders of the desktop. A host without workspaces answers with an empty list. */
 export const WorkspaceOkMessage = message('workspace.ok', {
   workspaces: z.array(Workspace),
+});
+
+/** Catálogo de modelos. Puede venir vacío: `failures` dice por qué. */
+export const ModelsOkMessage = message('models.ok', {
+  catalog: ModelCatalog,
+});
+
+/**
+ * El host aceptó el cambio de modelo.
+ *
+ * Devuelve la selección **normalizada** por el host, no la pedida: si recorta un
+ * esfuerzo que ese modelo no admite, la app se entera aquí y no en el siguiente
+ * turno.
+ */
+export const ModelSelectedMessage = message('model.selected', {
+  sessionId: SessionId,
+  selection: ModelSelection,
 });
 
 export const SessionOkMessage = message('session.ok', {
@@ -257,6 +294,8 @@ export const ServerMessage = z.discriminatedUnion('type', [
   SessionOkMessage,
   SessionCreatedMessage,
   WorkspaceArchivedMessage,
+  ModelsOkMessage,
+  ModelSelectedMessage,
   HistoryOkMessage,
   ReplyOkMessage,
   AnswerOkMessage,
