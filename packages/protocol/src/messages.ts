@@ -54,9 +54,15 @@ export const SessionsListMessage = message('sessions.list', {});
 /**
  * Pide las carpetas del escritorio.
  *
- * Un host sin workspaces responde `workspace.ok` con una lista vacía: la app no
- * distingue "no hay carpetas" de "este host no las soporta" mirando el error, así
- * que la lista vacía es la respuesta honesta.
+ * Tres respuestas posibles, y el cliente tiene que tratar las tres:
+ *
+ * - `workspace.ok` con la lista, que puede estar vacía porque no hay carpetas.
+ * - `error` `bad-request` de un host que aún no lo implementa. Se trata como "sin
+ *   carpetas", no como fallo: es lo que hacía este servidor antes de soportarlo.
+ * - `error` de otro tipo, que sí es un fallo y se propaga.
+ *
+ * El cliente no debe distinguir "no hay carpetas" de "este host no las tiene"
+ * mirando el error: en los dos casos la lista plana es la respuesta correcta.
  */
 export const WorkspaceListMessage = message('workspace.list', {});
 

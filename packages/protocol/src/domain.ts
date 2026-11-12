@@ -21,6 +21,8 @@ export const Capability = z.enum([
   'question.answer',
   'run.start',
   'run.cancel',
+  /** El host expone las carpetas del escritorio y responde `workspace.list`. */
+  'workspace.list',
 ]);
 export type Capability = z.infer<typeof Capability>;
 
@@ -39,23 +41,40 @@ export const SessionSummary = z.object({
    *
    * Opcional a propósito: un host que no exponga workspaces sigue siendo válido y
    * la app cae a una lista plana en vez de romperse.
+   *
+   * **Se omite, nunca se manda vacío.** Un `''` no es un id, y el validador
+   * rechazaría el mensaje entero: el cliente perdería todas las sesiones por un
+   * campo mal puesto. Por eso aquí se acepta cualquier cadena y el adaptador del
+   * host se encarga de omitirlo.
    */
-  workspaceId: z.string().min(1).optional(),
+  workspaceId: z.string().optional(),
 });
 export type SessionSummary = z.infer<typeof SessionSummary>;
 
 /**
- * Carpeta de DSH: un directorio registrado en el escritorio, con título y orden.
+ * Carpeta de DSH: un directorio registrado en el escritorio.
  *
- * El título puede estar vacío; entonces se muestra el nombre del directorio, que
- * es lo que hace el escritorio.
+ * La forma sale de la proyección real del host
+ * (`@deepseek-ai/dsh-api-workspace-controller/lib/types/feed.js`), no de una
+ * suposición: `workspaceId`, `path`, `title`, `sessionIds`, `createdAt`, `updatedAt`.
+ *
+ * **No lleva `order`.** El escritorio ordena por la posición en su lista de ids, y
+ * la lista que se envía ya viene en ese orden. Inventar un entero habría duplicado
+ * una verdad que ya viaja en el orden del array.
  */
 export const Workspace = z.object({
+  /** `workspaceId` en la proyección del host. */
   id: z.string().min(1),
+  /**
+   * Título visible. Puede venir vacío: el escritorio muestra entonces un nombre
+   * derivado (`workspaceDisplayTitle`), salvo para el workspace por defecto, que
+   * recibe una etiqueta localizada. Mandar el título vacío es legítimo.
+   */
   title: z.string(),
-  directory: z.string(),
-  /** Posición en la barra lateral del escritorio, de menor a mayor. */
-  order: z.number().int().nonnegative(),
+  /** `path` en la proyección del host: el directorio registrado. */
+  directory: z.string().min(1),
+  /** Sesiones de la carpeta, en el orden del escritorio. */
+  sessionIds: z.array(SessionId),
 });
 export type Workspace = z.infer<typeof Workspace>;
 
