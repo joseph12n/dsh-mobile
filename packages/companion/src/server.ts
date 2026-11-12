@@ -333,7 +333,7 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
       // El manejador es asíncrono porque hay consultas que lo son. Cualquier
       // fallo se responde como `internal` en vez de cerrar el socket.
       void handleFrame(data).catch((error: unknown) => {
-        log(`marco fallido: ${String(error)}`);
+        log(`failed frame: ${String(error)}`);
         if (socket.readyState === socket.OPEN) {
           send(socket, errorMessage(newMessageId(), 'internal', 'Internal host failure.'));
         }
@@ -679,7 +679,7 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
       const address = http.address();
       listeningPort =
         typeof address === 'object' && address !== null ? address.port : requestedPort;
-      log(`listener escuchando en ${localOrigin()} (ws ${WEBSOCKET_PATH})`);
+      log(`listener on ${localOrigin()} (ws ${WEBSOCKET_PATH})`);
 
       resolve({
         port: listeningPort,

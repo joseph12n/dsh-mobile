@@ -64,13 +64,13 @@ function describe(value: unknown): string {
   if (type === 'function') return 'function';
   if (type !== 'object') return type;
   const keys = Object.keys(value as object);
-  return `objeto{${keys.slice(0, 12).join(', ')}}`;
+  return `object{${keys.slice(0, 12).join(', ')}}`;
 }
 
 /** Resumen legible de una forma desconocida: tipo, longitud y primeras claves. */
 function summarize(value: unknown): string {
   if (Array.isArray(value)) {
-    return `array(${value.length}) primer elemento: ${describe(value[0])}`;
+    return `array(${value.length}) first element: ${describe(value[0])}`;
   }
   return describe(value);
 }
@@ -185,7 +185,7 @@ export function reportToLog(report: ProbeReport): void {
   for (const session of report.sessions) {
     log(
       `- session ${session.id}: messages=${session.messageCount ?? '?'} ` +
-        `asOfSeq=${session.asOfSeq ?? '?'} proyecciones=${session.projectionKeys?.length ?? 0}`,
+        `asOfSeq=${session.asOfSeq ?? '?'} projections=${session.projectionKeys?.length ?? 0}`,
     );
     log(`  userQuestions -> ${summarize(session.pendingQuestions)}`);
   }

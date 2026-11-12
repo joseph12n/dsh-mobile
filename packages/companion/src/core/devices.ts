@@ -80,7 +80,7 @@ export class DeviceRegistry {
     const token = this.#generateToken();
     const stored: StoredDevice = {
       id: this.#generateId(),
-      name: name.trim().slice(0, 64) || 'Dispositivo',
+      name: name.trim().slice(0, 64) || 'Device',
       platform: platform.slice(0, 64),
       createdAt: now,
       lastSeenAt: now,

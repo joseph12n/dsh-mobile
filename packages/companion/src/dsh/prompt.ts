@@ -48,7 +48,7 @@ export async function injectText(
     );
 
     return result.accepted
-      ? { ok: true, detail: `Mensaje aceptado en ${sessionId} (modo ${mode}).` }
+      ? { ok: true, detail: `Message accepted on ${sessionId} (mode ${mode}).` }
       : { ok: false, detail: `The host did not accept the message for ${sessionId}.` };
   } catch (error) {
     return { ok: false, detail: `Injection failed: ${String(error)}` };

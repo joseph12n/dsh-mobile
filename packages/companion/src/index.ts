@@ -41,7 +41,7 @@ export const inject = ['sessions', 'sessionProjections', 'commands'];
 const COMMAND_DESCRIPTION = 'Pair your phone, or check the companion status';
 
 export function apply(ctx: HostContext): void {
-  log(`plugin cargado · evidencia en ${PROBE_LOG_PATH}`);
+  log(`plugin loaded · evidence in ${PROBE_LOG_PATH}`);
 
   const disposers: Array<() => void> = [];
 
@@ -159,7 +159,7 @@ export function apply(ctx: HostContext): void {
       ctx.commands!.register({
         name: 'mobile-say',
         description: 'Inject a message into a session through sessionController.prompt',
-        input: { hint: '<sessionId> <texto>' },
+        input: { hint: '<sessionId> <text>' },
         handler: (invocation) => {
           const raw = (invocation.rawInput ?? '').trim();
           const split = raw.indexOf(' ');
@@ -211,7 +211,7 @@ export function apply(ctx: HostContext): void {
   const options = Number.isInteger(portFromEnv) && portFromEnv > 0 ? { port: portFromEnv } : {};
   const publicUrl = process.env.DSH_MOBILE_PUBLIC_URL?.trim();
   const webRoot = findWebRoot();
-  log(webRoot ? `PWA servida desde ${webRoot}` : 'PWA no encontrada; el host sirve solo la API');
+  log(webRoot ? `PWA served from ${webRoot}` : 'PWA not found; the host serves the API only');
 
   // Se anuncia solo lo que este host sabe hacer, y se **evalúa en cada hello**: el
   // controlador de workspaces puede montarse después del arranque, y una bandera
@@ -286,7 +286,7 @@ export function apply(ctx: HostContext): void {
           // Un disposer defectuoso no debe impedir los demás.
         }
       }
-      log('plugin descargado');
+      log('plugin unloaded');
     };
   }, 'dsh-mobile lifecycle');
 }
