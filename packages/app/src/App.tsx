@@ -8,6 +8,7 @@ import {
   type QuestionAnswerItem,
   type QuestionBatch,
   type SessionSummary,
+  type Workspace,
 } from '@dsh-mobile/protocol';
 import { CompanionClient, endpointFromLocation, normalizeEndpoint } from './lib/connection.js';
 import { classifyFailure, retryDelay } from './lib/reconnect.js';
@@ -35,7 +36,14 @@ type View =
     }
   | { kind: 'reconnecting'; endpoint: string; attempt: number; retryInMs: number }
   | { kind: 'connecting'; endpoint: string }
-  | { kind: 'sessions'; endpoint: string; host: HostInfo; sessions: SessionSummary[] }
+  | {
+      kind: 'sessions';
+      endpoint: string;
+      host: HostInfo;
+      sessions: SessionSummary[];
+      /** Folders of the desktop. Empty when the host does not expose them. */
+      workspaces: Workspace[];
+    }
   | { kind: 'error'; endpoint: string; message: string };
 
 export function App() {
@@ -209,9 +217,12 @@ export function App() {
           storage.saveEndpoint(endpoint);
         }
 
-        const sessions = await connection.listSessions();
+        const [sessions, workspaces] = await Promise.all([
+          connection.listSessions(),
+          connection.listWorkspaces(),
+        ]);
         retry.current = 0;
-        setView({ kind: 'sessions', endpoint, host: hello.host, sessions });
+        setView({ kind: 'sessions', endpoint, host: hello.host, sessions, workspaces });
 
         // After a reconnect the open session must be resubscribed, or the
         // transcript stays frozen and stops receiving live events.
@@ -411,8 +422,13 @@ export function App() {
     const connection = client.current;
     if (!connection) return;
     try {
-      const sessions = await connection.listSessions();
-      setView((previous) => (previous.kind === 'sessions' ? { ...previous, sessions } : previous));
+      const [sessions, workspaces] = await Promise.all([
+        connection.listSessions(),
+        connection.listWorkspaces(),
+      ]);
+      setView((previous) =>
+        previous.kind === 'sessions' ? { ...previous, sessions, workspaces } : previous,
+      );
     } catch (error) {
       setView((previous) =>
         previous.kind === 'sessions'
@@ -563,7 +579,11 @@ export function App() {
                 </button>
               </div>
 
-              <SessionList sessions={view.sessions} onOpen={(session) => void open(session)} />
+              <SessionList
+                sessions={view.sessions}
+                workspaces={view.workspaces}
+                onOpen={(session) => void open(session)}
+              />
 
               <button type="button" className="ghost" onClick={forget}>
                 {t('error.forget')}

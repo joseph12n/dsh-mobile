@@ -45,9 +45,25 @@ const server = await startCompanionServer({
   devices,
   port,
   webRoot: findWebRoot(),
+  listWorkspaces: async () => [
+    {
+      id: 'ws-1',
+      title: 'dsh-mobile',
+      directory: 'C:/work/dsh-mobile',
+      sessionIds: ['session-a', 'session-b'],
+    },
+    {
+      id: 'ws-2',
+      title: 'facturacion',
+      directory: 'C:/work/facturacion',
+      sessionIds: ['session-c'],
+    },
+    { id: 'ws-3', title: '', directory: 'C:/work/informes', sessionIds: [] },
+  ],
   listSessions: async () => [
     {
       id: 'session-a',
+      workspaceId: 'ws-1',
       title: 'Arreglar el despliegue de producción',
       updatedAt: now - 2 * 60 * 1000,
       seq: 412,
@@ -57,6 +73,7 @@ const server = await startCompanionServer({
     },
     {
       id: 'session-b',
+      workspaceId: 'ws-1',
       title: 'Revisar la migración de la base de datos',
       updatedAt: now - 14 * 60 * 1000,
       seq: 120,
@@ -66,6 +83,7 @@ const server = await startCompanionServer({
     },
     {
       id: 'session-c',
+      workspaceId: 'ws-2',
       title: 'Documentar la API de facturación',
       updatedAt: now - 3 * 60 * 60 * 1000,
       seq: 88,
@@ -76,6 +94,7 @@ const server = await startCompanionServer({
     // Una sesión vieja, para que se vea el grupo plegable de "Más antiguas".
     {
       id: 'session-d',
+      workspaceId: 'ws-2',
       title: 'Migrar los informes a la nueva plantilla',
       updatedAt: now - 11 * 24 * 60 * 60 * 1000,
       seq: 64,

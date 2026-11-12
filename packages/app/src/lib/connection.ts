@@ -10,6 +10,7 @@ import {
   type QuestionAnswerItem,
   type ServerMessage,
   type SessionSummary,
+  type Workspace,
 } from '@dsh-mobile/protocol';
 
 /**
@@ -186,6 +187,24 @@ export class CompanionClient {
 
     this.#onState({ kind: 'connected', host: response.host, device: response.device });
     return { deviceToken: response.deviceToken, device: response.device, host: response.host };
+  }
+
+  /**
+   * Folders of the desktop.
+   *
+   * A host that does not implement `workspace.list` answers `bad-request`; that is not a
+   * failure, it means "no folders", and the caller renders a flat list. Only other error
+   * codes propagate.
+   */
+  async listWorkspaces(): Promise<Workspace[]> {
+    const response = await this.#request({ type: 'workspace.list' });
+
+    if (response.type === 'error') {
+      if (response.code === 'bad-request') return [];
+      throw new ConnectionError(response.message, response.code);
+    }
+
+    return response.type === 'workspace.ok' ? response.workspaces : [];
   }
 
   async listSessions(): Promise<SessionSummary[]> {

@@ -19,6 +19,7 @@ import {
   type ProjectionsService,
   type SessionsService,
 } from '../host-api.js';
+import { listWorkspaces } from './workspaces.js';
 
 /** Una entrada del registro de sesiones, tal como la ve el móvil. */
 export interface SessionRecord {
@@ -31,6 +32,8 @@ export interface SessionRecord {
   /** Hay un turno en curso. */
   running: boolean;
   pendingQuestions: number;
+  /** Folder that contains it, when the host exposes workspaces. */
+  workspaceId?: string;
 }
 
 /** Resumen que devuelve `sessionController.list()`. Subconjunto de lo que usamos. */
@@ -127,6 +130,23 @@ export async function listSessions(ctx: HostContext): Promise<SessionRecord[]> {
     })
     .filter((record) => record.id !== '');
 
+  // Carpeta de cada sesión. El host guarda la pertenencia en la proyección de
+  // workspaces, no en el resumen de la sesión, así que hay que cruzarla. Un fallo
+  // aquí deja la lista plana, nunca la rompe.
+  try {
+    const workspaces = await listWorkspaces(ctx);
+    const folderOf = new Map<string, string>();
+    for (const workspace of workspaces) {
+      for (const sessionId of workspace.sessionIds) folderOf.set(sessionId, workspace.id);
+    }
+    for (const record of records) {
+      const folder = folderOf.get(record.id);
+      if (folder) record.workspaceId = folder;
+    }
+  } catch {
+    // Sin carpetas, la lista plana es la respuesta correcta.
+  }
+
   // Lo más reciente primero: es lo que uno mira al coger el teléfono.
   records.sort((a, b) => b.updatedAt - a.updatedAt);
   return records;
@@ -141,5 +161,7 @@ export function toWireSession(record: SessionRecord): WireSession {
     updatedAt: record.updatedAt,
     seq: record.seq,
     pendingQuestions: record.pendingQuestions,
+    // Se omite, never empty: el contrato acepta cualquier cadena, pero un `''` no es un id.
+    ...(record.workspaceId ? { workspaceId: record.workspaceId } : {}),
   };
 }
