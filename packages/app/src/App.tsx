@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   PROTOCOL_NAME,
   PROTOCOL_VERSION,
@@ -9,7 +9,12 @@ import {
   type QuestionBatch,
   type SessionSummary,
 } from '@dsh-mobile/protocol';
-import { CompanionClient, endpointFromLocation, normalizeEndpoint } from './lib/connection.js';
+import {
+  CompanionClient,
+  endpointFromLocation,
+  isAuthFailure,
+  normalizeEndpoint,
+} from './lib/connection.js';
 import { storage } from './lib/storage.js';
 import { QuestionsCard } from './components/Questions.js';
 import { SessionView } from './components/SessionView.js';
@@ -17,7 +22,8 @@ import { SessionList } from './components/SessionList.js';
 
 type View =
   | { kind: 'checking' }
-  | { kind: 'pairing'; endpoint: string; message?: string }
+  | { kind: 'pairing'; endpoint: string; notice?: string }
+  | { kind: 'reconnecting'; endpoint: string; attempt: number; retryInMs: number }
   | { kind: 'connecting'; endpoint: string }
   | { kind: 'sessions'; endpoint: string; host: HostInfo; sessions: SessionSummary[] }
   | { kind: 'error'; endpoint: string; message: string };
@@ -34,6 +40,44 @@ export function App() {
 
   const client = useMemo(() => ({ current: undefined as CompanionClient | undefined }), []);
 
+  /**
+   * Intentos fallidos seguidos. Vive en un `ref` para que el reintento no dependa
+   * de volver a renderizar, y para poder reiniciarlo al conectar.
+   */
+  const retry = useRef(0);
+  const retryTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  /** Espera entre reintentos: 1, 2, 4, 8, 15 y como mucho 30 segundos. */
+  const RETRY_DELAYS_MS = [1_000, 2_000, 4_000, 8_000, 15_000, 30_000];
+
+  /**
+   * Programa otro intento.
+   *
+   * La conexión se pierde sola todo el rato: el móvil cambia de red, se apaga la
+   * pantalla, el tailnet parpadea. Antes eso dejaba una pantalla de error cuyo
+   * único botón **borraba el emparejamiento**, así que cada bache costaba volver a
+   * emparejar desde cero.
+   */
+  const scheduleRetry = useCallback((endpoint: string) => {
+    clearTimeout(retryTimer.current);
+
+    const intento = Math.min(retry.current, RETRY_DELAYS_MS.length - 1);
+    const espera = RETRY_DELAYS_MS[intento] ?? 30_000;
+    retry.current += 1;
+
+    setView({ kind: 'reconnecting', endpoint, attempt: retry.current, retryInMs: espera });
+
+    retryTimer.current = setTimeout(() => {
+      void startRef.current?.(endpoint);
+    }, espera);
+  }, []);
+
+  // `start` se referencia a sí mismo para el reintento; el `ref` evita la
+  // dependencia circular entre ambos `useCallback`.
+  const startRef = useRef<((endpoint: string, pairingCode?: string) => Promise<void>) | undefined>(
+    undefined,
+  );
+
   /** Conecta, opcionalmente empareja con un código, y carga sesiones. */
   const start = useCallback(
     async (endpoint: string, pairingCode?: string) => {
@@ -42,6 +86,12 @@ export function App() {
       client.current = connection;
       setQuestions([]);
       setView({ kind: 'connecting', endpoint });
+
+      // Si el socket se cae, se reintenta: el emparejamiento no se toca.
+      connection.onState((state) => {
+        if (state.kind !== 'offline') return;
+        scheduleRetry(endpoint);
+      });
 
       // Se registra antes de pedir nada: los lotes llegan empujados detrás de la lista.
       connection.onPush((message) => {
@@ -99,13 +149,31 @@ export function App() {
         }
 
         const sessions = await connection.listSessions();
+        retry.current = 0;
         setView({ kind: 'sessions', endpoint, host: hello.host, sessions });
       } catch (error) {
-        setView({ kind: 'error', endpoint, message: messageOf(error) });
+        // Un fallo de red se reintenta: el emparejamiento no se toca. Solo se
+        // vuelve a emparejar si el host dice que el token ya no vale.
+        if (isAuthFailure(error)) {
+          storage.saveToken(undefined);
+          setView({
+            kind: 'pairing',
+            endpoint,
+            notice: 'El host ya no reconoce este dispositivo. Vuelve a emparejarlo.',
+          });
+          return;
+        }
+
+        scheduleRetry(endpoint);
       }
     },
-    [client],
+    // `scheduleRetry` y `forget` se definen con `useCallback` más abajo y son
+    // estables; incluidas aquí para no capturar una versión vieja.
+    [client, scheduleRetry],
   );
+
+  // El reintento llama a la versión vigente de start.
+  startRef.current = start;
 
   const answer = useCallback(
     async (callId: string, sessionId: string, answers: QuestionAnswerItem[]) => {
@@ -292,7 +360,21 @@ export function App() {
           >
             Emparejar
           </button>
-          {view.message && <p className="error">{view.message}</p>}
+          {view.notice && <p className="error">{view.notice}</p>}
+        </section>
+      )}
+
+      {view.kind === 'reconnecting' && (
+        <section className="card">
+          <h2>Reconectando…</h2>
+          <p className="muted">
+            El emparejamiento sigue guardado. Intento {view.attempt}, reintento en{' '}
+            {Math.round(view.retryInMs / 1000)} s.
+          </p>
+          <p className="muted small">{view.endpoint}</p>
+          <button type="button" onClick={() => void start(view.endpoint)}>
+            Reintentar ahora
+          </button>
         </section>
       )}
 
@@ -300,8 +382,13 @@ export function App() {
         <section className="card">
           <h2>No pude conectar</h2>
           <p className="error">{view.message}</p>
-          <button type="button" onClick={forget}>
-            Volver a emparejar
+          <button type="button" onClick={() => void start(view.endpoint)}>
+            Reintentar
+          </button>
+          {/* Olvidar el dispositivo es una decisión aparte: antes era el ÚNICO
+              botón, así que un fallo de red costaba volver a emparejar. */}
+          <button type="button" className="ghost" onClick={forget}>
+            Olvidar este dispositivo
           </button>
         </section>
       )}

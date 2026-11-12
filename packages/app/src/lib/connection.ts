@@ -26,6 +26,30 @@ export type ConnectionState =
   | { kind: 'connected'; host: HostInfo; device: DeviceInfo | undefined }
   | { kind: 'offline'; reason: string };
 
+/**
+ * Fallo de conexión con el código del protocolo, cuando lo hay.
+ *
+ * La app necesita distinguir «el host no responde» de «este token ya no vale»:
+ * lo primero se reintenta, lo segundo solo se arregla volviendo a emparejar.
+ */
+export class ConnectionError extends Error {
+  readonly code: string | undefined;
+
+  constructor(message: string, code?: string) {
+    super(message);
+    this.name = 'ConnectionError';
+    this.code = code;
+  }
+}
+
+/** 	rue si el fallo es del token, no de la red. */
+export function isAuthFailure(error: unknown): boolean {
+  return (
+    error instanceof ConnectionError &&
+    (error.code === 'auth-required' || error.code === 'auth-invalid')
+  );
+}
+
 export interface PairResult {
   deviceToken: string;
   device: DeviceInfo;
@@ -112,7 +136,13 @@ export class CompanionClient {
     });
 
     socket.onmessage = (event: MessageEvent<string>) => this.#receive(event.data);
-    socket.onclose = () => this.#failAll(new Error('El host cerró la conexión.'));
+    socket.onclose = () => {
+      // Avisar del cierre es lo que permite reconectar. Antes solo se fallaban las
+      // peticiones en vuelo, así que la app se quedaba mostrando datos muertos
+      // como si la conexión siguiera viva.
+      this.#onState({ kind: 'offline', reason: 'El host cerró la conexión.' });
+      this.#failAll(new Error('El host cerró la conexión.'));
+    };
     socket.onerror = () => this.#failAll(new Error('Error de WebSocket.'));
 
     const response = await this.#request({
@@ -123,7 +153,7 @@ export class CompanionClient {
 
     if (response.type === 'error') {
       this.#onState({ kind: 'offline', reason: response.message });
-      throw new Error(response.message);
+      throw new ConnectionError(response.message, response.code);
     }
 
     if (response.type !== 'hello.ok') {
