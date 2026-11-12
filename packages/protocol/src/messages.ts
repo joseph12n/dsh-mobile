@@ -10,6 +10,7 @@ import {
   SessionId,
   SessionState,
   SessionSummary,
+  Workspace,
   TranscriptEvent,
 } from './domain.js';
 
@@ -49,6 +50,21 @@ export const PairRedeemMessage = message('pair.redeem', {
 });
 
 export const SessionsListMessage = message('sessions.list', {});
+
+/**
+ * Pide las carpetas del escritorio.
+ *
+ * Tres respuestas posibles, y el cliente tiene que tratar las tres:
+ *
+ * - `workspace.ok` con la lista, que puede estar vacía porque no hay carpetas.
+ * - `error` `bad-request` de un host que aún no lo implementa. Se trata como "sin
+ *   carpetas", no como fallo: es lo que hacía este servidor antes de soportarlo.
+ * - `error` de otro tipo, que sí es un fallo y se propaga.
+ *
+ * El cliente no debe distinguir "no hay carpetas" de "este host no las tiene"
+ * mirando el error: en los dos casos la lista plana es la respuesta correcta.
+ */
+export const WorkspaceListMessage = message('workspace.list', {});
 
 export const SessionSubscribeMessage = message('session.subscribe', {
   sessionId: SessionId,
@@ -92,6 +108,7 @@ export const ClientMessage = z.discriminatedUnion('type', [
   HelloMessage,
   PairRedeemMessage,
   SessionsListMessage,
+  WorkspaceListMessage,
   SessionSubscribeMessage,
   SessionHistoryMessage,
   ReplySendMessage,
@@ -124,6 +141,11 @@ export const PairOkMessage = message('pair.ok', {
 
 export const SessionsOkMessage = message('sessions.ok', {
   sessions: z.array(SessionSummary),
+});
+
+/** Folders of the desktop. A host without workspaces answers with an empty list. */
+export const WorkspaceOkMessage = message('workspace.ok', {
+  workspaces: z.array(Workspace),
 });
 
 export const SessionOkMessage = message('session.ok', {
@@ -204,6 +226,7 @@ export const ServerMessage = z.discriminatedUnion('type', [
   HelloOkMessage,
   PairOkMessage,
   SessionsOkMessage,
+  WorkspaceOkMessage,
   SessionOkMessage,
   HistoryOkMessage,
   ReplyOkMessage,

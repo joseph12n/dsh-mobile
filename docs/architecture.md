@@ -97,17 +97,18 @@ Transporte: **WebSocket**, mensajes JSON, sobre común `{ v, id, at, type }`.
 
 ### Mensajes
 
-| Cliente → Host      | Host → Cliente                       |
-| ------------------- | ------------------------------------ |
-| `hello`             | `hello.ok` / `error`                 |
-| `pair.redeem`       | `pair.ok`                            |
-| `sessions.list`     | `sessions.ok` (+ `question.pending`) |
-| `session.history`   | `history.ok`                         |
-| `session.subscribe` | `session.ok` (+ `session.event`)     |
-| `reply.send`        | `reply.ok`                           |
-| `question.answer`   | `answer.ok`                          |
-| `run.cancel`        | `run.ok`                             |
-| `ping`              | `pong`                               |
+| Cliente → Host      | Host → Cliente                          |
+| ------------------- | --------------------------------------- |
+| `hello`             | `hello.ok` / `error`                    |
+| `pair.redeem`       | `pair.ok`                               |
+| `sessions.list`     | `sessions.ok` (+ `question.pending`)    |
+| `workspace.list`    | `workspace.ok` (folders of the desktop) |
+| `session.history`   | `history.ok`                            |
+| `session.subscribe` | `session.ok` (+ `session.event`)        |
+| `reply.send`        | `reply.ok`                              |
+| `question.answer`   | `answer.ok`                             |
+| `run.cancel`        | `run.ok`                                |
+| `ping`              | `pong`                                  |
 
 ## 8. Emparejamiento
 
