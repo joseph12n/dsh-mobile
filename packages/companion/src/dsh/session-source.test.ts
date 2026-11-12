@@ -142,4 +142,44 @@ describe('listado de sesiones', () => {
     const records = await listSessions(ctx);
     expect(records.map((record) => record.id)).toEqual(['s2']);
   });
+
+  it('lee el modelo de la proyección, prefiriendo el que se aplicará', async () => {
+    const records = await listSessions(
+      ctxWith([
+        summary({
+          sessionId: 's1',
+          values: {
+            modelSelection: {
+              lastUsed: { provider: 'deepseek', model: 'chat' },
+              next: { provider: 'deepseek', model: 'reasoner', reasoningEffort: 'high' },
+            },
+          },
+        }),
+      ]),
+    );
+
+    expect(toWireSession(records[0]!).model).toEqual({
+      provider: 'deepseek',
+      model: 'reasoner',
+      reasoningEffort: 'high',
+    });
+  });
+
+  it('omite el modelo cuando el host no lo proyecta', async () => {
+    const records = await listSessions(ctxWith([summary({ sessionId: 's1' })]));
+    expect('model' in toWireSession(records[0]!)).toBe(false);
+  });
+
+  it('omite una proyección de modelo malformada en vez de romper la lista', async () => {
+    const records = await listSessions(
+      ctxWith([
+        summary({ sessionId: 's1', values: { modelSelection: { next: { provider: 42 } } } }),
+        summary({ sessionId: 's2', values: { modelSelection: { next: null, lastUsed: null } } }),
+        summary({ sessionId: 's3', values: { modelSelection: 'nada' } }),
+      ]),
+    );
+
+    expect(records).toHaveLength(3);
+    for (const record of records) expect('model' in toWireSession(record)).toBe(false);
+  });
 });

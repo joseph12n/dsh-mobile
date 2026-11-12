@@ -16,6 +16,7 @@
  */
 import { service, type HostContext } from '../host-api.js';
 import type { WorkspaceController } from './workspaces.js';
+import { codeOf, messageOf } from './errors.js';
 
 /** The part of the session controller we use. */
 interface SessionLifecycleController {
@@ -25,26 +26,6 @@ interface SessionLifecycleController {
     agentPreset?: string;
     reusable?: boolean;
   }) => Promise<{ sessionId?: unknown; agentPreset?: unknown }>;
-}
-
-/** An error that carries a stable code, which is how the host reports refusals. */
-interface CodedError {
-  code?: unknown;
-  message?: unknown;
-}
-
-function codeOf(error: unknown): string | undefined {
-  if (typeof error !== 'object' || error === null) return undefined;
-  const { code } = error as CodedError;
-  return typeof code === 'string' ? code : undefined;
-}
-
-function messageOf(error: unknown): string {
-  if (typeof error === 'object' && error !== null) {
-    const { message } = error as CodedError;
-    if (typeof message === 'string') return message;
-  }
-  return String(error);
 }
 
 /** `true` if a session can be created on this host. */

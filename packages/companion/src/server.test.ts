@@ -956,6 +956,138 @@ describe('folders over the WebSocket', () => {
   });
 });
 
+describe('models over the WebSocket', () => {
+  /** What the host can do in one scenario. */
+  interface ModelDeps {
+    listModels?: () => Promise<{
+      default?: { provider: string; model: string };
+      groups: unknown[];
+      failures: unknown[];
+    }>;
+    selectModel?: (request: unknown) => Promise<{
+      ok: boolean;
+      code?: string;
+      message?: string;
+      selection?: { provider: string; model: string; reasoningEffort?: string };
+    }>;
+  }
+
+  /**
+   * Empareja, manda un marco y devuelve la respuesta.
+   *
+   * Sin esto cada caso repetía el arranque del servidor y el `send`; el analizador lo
+   * contaba como duplicación y, peor, ocultaba qué cambiaba entre un caso y otro.
+   */
+  async function exchange(
+    deps: ModelDeps,
+    payload: Record<string, unknown>,
+  ): Promise<Record<string, unknown>> {
+    const registry = new DeviceRegistry({ persistence: new MemoryPersistence() });
+    const { token } = registry.enroll('Pixel', 'android');
+
+    const server = await startCompanionServer({
+      pairing: new PairingService(),
+      devices: registry,
+      port: 0,
+      listSessions: () => Promise.resolve([]),
+      ...(deps.listModels ? { listModels: deps.listModels as never } : {}),
+      ...(deps.selectModel ? { selectModel: deps.selectModel as never } : {}),
+    });
+
+    try {
+      const client = await openClient(server.port);
+      client.send(hello({ deviceToken: token }));
+      expect((await client.next())['type']).toBe('hello.ok');
+      client.send({ v: PROTOCOL_VERSION, id: 'x', at: Date.now(), ...payload } as never);
+      const response = await client.next();
+      client.close();
+      return response;
+    } finally {
+      await server.close();
+    }
+  }
+
+  const catalog = {
+    default: { provider: 'deepseek', model: 'chat' },
+    groups: [{ id: 'deepseek', name: 'DeepSeek', models: [{ id: 'chat', name: 'Chat' }] }],
+    failures: [],
+  };
+
+  it('hands the catalog to a paired device', async () => {
+    const response = await exchange({ listModels: async () => catalog }, { type: 'models.list' });
+    expect(response).toMatchObject({ type: 'models.ok', catalog });
+  });
+
+  it('refuses models.list when the host cannot describe them', async () => {
+    const response = await exchange({}, { type: 'models.list' });
+    expect(response).toMatchObject({ type: 'error', code: 'bad-request' });
+  });
+
+  it('confirms the selection the host normalized', async () => {
+    const seen: unknown[] = [];
+    const response = await exchange(
+      {
+        selectModel: async (request) => {
+          seen.push(request);
+          return { ok: true, selection: { provider: 'deepseek', model: 'chat' } };
+        },
+      },
+      {
+        type: 'model.select',
+        sessionId: 'session-1',
+        provider: 'deepseek',
+        model: 'chat',
+        reasoningEffort: 'high',
+      },
+    );
+
+    expect(response).toMatchObject({
+      type: 'model.selected',
+      selection: { provider: 'deepseek', model: 'chat' },
+    });
+    expect(seen).toEqual([
+      { sessionId: 'session-1', provider: 'deepseek', model: 'chat', reasoningEffort: 'high' },
+    ]);
+  });
+
+  // Cada fallo del adaptador tiene su código: `unavailable` es culpa de la petición
+  // (recarga el catálogo), `not-found` de la sesión y `failed` es una avería. Un host
+  // sin el servicio es una capacidad ausente, como el handler ausente.
+  it.each([
+    ['unavailable', 'bad-request'],
+    ['not-found', 'not-found'],
+    ['failed', 'internal'],
+    ['no-service', 'bad-request'],
+  ])('maps a %s selection fault to %s', async (code, expected) => {
+    const response = await exchange(
+      { selectModel: async () => ({ ok: false, code, message: code }) },
+      { type: 'model.select', sessionId: 'session-1', provider: 'deepseek', model: 'chat' },
+    );
+    expect(response).toMatchObject({ type: 'error', code: expected });
+  });
+
+  it('refuses models.list without a paired device', async () => {
+    const registry = new DeviceRegistry({ persistence: new MemoryPersistence() });
+    const server = await startCompanionServer({
+      pairing: new PairingService(),
+      devices: registry,
+      port: 0,
+      listSessions: () => Promise.resolve([]),
+      listModels: async () => catalog,
+    });
+
+    try {
+      const client = await openClient(server.port);
+      // Sin `hello`: cualquier mensaje que no sea el saludo exige dispositivo.
+      client.send({ v: PROTOCOL_VERSION, id: 'm0', at: Date.now(), type: 'models.list' } as never);
+      const response = await client.next();
+      expect(response).toMatchObject({ type: 'error', code: 'auth-required' });
+      client.close();
+    } finally {
+      await server.close();
+    }
+  });
+});
 describe('session actions over the WebSocket', () => {
   /** What the host can do in one scenario. */
   interface ActionDeps {
