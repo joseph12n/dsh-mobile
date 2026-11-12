@@ -76,6 +76,8 @@ const en = {
   'settings.hideEmpty': 'Hide empty folders',
   'settings.folders': 'Folders shown',
   'settings.allHidden': 'All folders are hidden. Show one in Settings.',
+  'settings.noneVisible':
+    'Your folders are empty and hidden. Turn off “Hide empty folders” in Settings.',
 
   'session.working': 'working',
   'session.waiting': 'waiting',
@@ -173,6 +175,8 @@ const es: Catalogue = {
   'settings.hideEmpty': 'Ocultar carpetas vacías',
   'settings.folders': 'Carpetas visibles',
   'settings.allHidden': 'Todas las carpetas están ocultas. Muestra alguna en Ajustes.',
+  'settings.noneVisible':
+    'Tus carpetas están vacías y ocultas. Desactiva «Ocultar carpetas vacías» en Ajustes.',
 
   'session.working': 'trabajando',
   'session.waiting': 'espera respuesta',
@@ -265,6 +269,8 @@ const ptBR: Catalogue = {
   'settings.hideEmpty': 'Ocultar pastas vazias',
   'settings.folders': 'Pastas visíveis',
   'settings.allHidden': 'Todas as pastas estão ocultas. Mostre uma em Ajustes.',
+  'settings.noneVisible':
+    'Suas pastas estão vazias e ocultas. Desative «Ocultar pastas vazias» em Ajustes.',
 
   'session.working': 'trabalhando',
   'session.waiting': 'espera resposta',
@@ -356,6 +362,7 @@ const zhHans: Catalogue = {
   'settings.hideEmpty': '隐藏空文件夹',
   'settings.folders': '显示的文件夹',
   'settings.allHidden': '所有文件夹都已隐藏。请在设置中显示一个。',
+  'settings.noneVisible': '文件夹为空且已隐藏。请在设置中关闭“隐藏空文件夹”。',
 
   'session.working': '进行中',
   'session.waiting': '等待回复',

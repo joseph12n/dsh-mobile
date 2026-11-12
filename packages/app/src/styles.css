@@ -501,13 +501,14 @@ button.ghost.tiny {
 }
 
 .settings > summary {
-  display: flex;
-  align-items: center;
-  /* El resumen entero se pulsa, y en un móvil con el pulgar. */
+  /* Sin `display: flex`, que borraba el triángulo: el panel dejaba de parecer
+     desplegable justo cuando un aviso manda a Ajustes. */
   min-height: 44px;
+  padding: 12px 0;
   cursor: pointer;
   color: var(--text-secondary);
   font-size: 14px;
+  line-height: 20px;
 }
 
 .settings[open] > summary {

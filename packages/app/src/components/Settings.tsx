@@ -70,7 +70,13 @@ export function Settings({
         <fieldset className="settings-folders">
           <legend>{t('settings.folders')}</legend>
           {workspaces.map((workspace) => (
-            <label className="settings-row" key={workspace.id}>
+            <label
+              className="settings-row"
+              key={workspace.id}
+              // Dos carpetas pueden llamarse igual (mismo último segmento): el
+              // directorio completo es la única forma de distinguirlas.
+              title={workspace.directory}
+            >
               <input
                 type="checkbox"
                 checked={!preferences.hidden.includes(workspace.id)}

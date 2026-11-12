@@ -4,6 +4,7 @@ import { fakeStorage, restoreStorage } from './test-storage.js';
 import {
   applyFolderPreferences,
   DEFAULT_FOLDER_PREFERENCES,
+  folderListState,
   isFolderOrder,
   storeFolderPreferences,
   storedFolderPreferences,
@@ -81,7 +82,11 @@ describe('applying the preferences', () => {
   it('keeps empty folders unless asked to drop them', () => {
     const sections = [section('empty'), section('full', [1])];
     expect(applyFolderPreferences(sections, prefs())).toHaveLength(2);
-    expect(applyFolderPreferences(sections, prefs({ hideEmpty: true }))).toHaveLength(1);
+
+    // Se comprueba **cuál** queda: una prueba de longitud sola pasaría aunque se
+    // hubiera escondido la carpeta equivocada.
+    const visible = applyFolderPreferences(sections, prefs({ hideEmpty: true }));
+    expect(visible.map((item) => item.title)).toEqual(['full']);
   });
 
   it('orders by name when asked', () => {
@@ -119,6 +124,42 @@ describe('toggling a folder', () => {
   });
 });
 
+describe('which message the empty list gets', () => {
+  it('says nothing special when the host has no folders', () => {
+    // Sin carpetas el grupo es la lista plana: no hay ningún estado que explicar.
+    expect(folderListState([orphans()], prefs())).toBe('folders');
+  });
+
+  it('renders the folders when at least one is visible', () => {
+    expect(folderListState([section('a'), section('b')], prefs({ hidden: ['a'] }))).toBe('folders');
+  });
+
+  it('says "all hidden" only when the user hid every folder', () => {
+    expect(folderListState([section('a'), section('b')], prefs({ hidden: ['a', 'b'] }))).toBe(
+      'all-hidden',
+    );
+  });
+
+  it('does not blame the user when only the empty ones were left out', () => {
+    // Es el primer arranque con «ocultar vacías»: en Ajustes está todo marcado, así que
+    // decir «todas ocultas» era mentira y además borraba los botones de sesión nueva.
+    expect(folderListState([section('a'), section('b')], prefs({ hideEmpty: true }))).toBe(
+      'only-empty-hidden',
+    );
+  });
+
+  it('prefers showing the empty folders over an empty screen', () => {
+    // Si una carpeta tiene sesiones, no se oculta por hideEmpty.
+    expect(
+      folderListState([section('a', [3]), section('b')], prefs({ hideEmpty: true, hidden: [] })),
+    ).toBe('folders');
+  });
+
+  it('does not warn when hidden folders coexist with sessions that have no folder', () => {
+    expect(folderListState([section('a'), orphans()], prefs({ hidden: ['a'] }))).toBe('folders');
+  });
+});
+
 describe('reading and storing', () => {
   it('is the default when nothing was stored', () => {
     fakeStorage();
@@ -140,6 +181,25 @@ describe('reading and storing', () => {
   it('survives broken JSON from an older version', () => {
     fakeStorage();
     globalThis.localStorage.setItem(KEY, '{not json');
+    expect(storedFolderPreferences()).toEqual(DEFAULT_FOLDER_PREFERENCES);
+  });
+
+  it('survives valid JSON that is not an object', () => {
+    // `null` y `[]` son JSON válido: sin guarda, leer `.hidden` lanzaba y el catch lo
+    // tapaba. La guarda hace que el motivo sea explícito.
+    fakeStorage();
+    for (const raw of ['null', '[]', '"texto"', '3']) {
+      globalThis.localStorage.setItem(KEY, raw);
+      expect(storedFolderPreferences()).toEqual(DEFAULT_FOLDER_PREFERENCES);
+    }
+  });
+
+  it('ignores a wrong shape instead of trusting it', () => {
+    fakeStorage();
+    globalThis.localStorage.setItem(
+      KEY,
+      JSON.stringify({ hidden: 'a', hideEmpty: 'true', order: 1 }),
+    );
     expect(storedFolderPreferences()).toEqual(DEFAULT_FOLDER_PREFERENCES);
   });
 

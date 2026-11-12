@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import type { FolderSection } from './folders.js';
 
 /**
@@ -47,15 +47,20 @@ export function storedFolderPreferences(): FolderPreferences {
     const raw = globalThis.localStorage?.getItem(STORAGE_KEY);
     if (!raw) return DEFAULT_FOLDER_PREFERENCES;
 
-    const parsed = JSON.parse(raw) as Partial<Record<keyof FolderPreferences, unknown>>;
-    const hidden = Array.isArray(parsed.hidden)
-      ? parsed.hidden.filter((id): id is string => typeof id === 'string' && id.length > 0)
+    const parsed: unknown = JSON.parse(raw);
+    // JSON válido puede ser `null`, un array o un número: sin esta guarda se leería
+    // `parsed.hidden` de algo que no es un registro y el error lo taparía el catch.
+    if (typeof parsed !== 'object' || parsed === null) return DEFAULT_FOLDER_PREFERENCES;
+
+    const record = parsed as Partial<Record<keyof FolderPreferences, unknown>>;
+    const hidden = Array.isArray(record.hidden)
+      ? record.hidden.filter((id): id is string => typeof id === 'string' && id.length > 0)
       : [];
 
     return {
       hidden,
-      order: isFolderOrder(parsed.order) ? parsed.order : 'host',
-      hideEmpty: parsed.hideEmpty === true,
+      order: isFolderOrder(record.order) ? record.order : 'host',
+      hideEmpty: record.hideEmpty === true,
     };
   } catch {
     // Vale para almacenamiento roto y para JSON inválido de una versión anterior.
@@ -79,21 +84,22 @@ export interface FolderPreferencesState {
 export function useFolderPreferences(): FolderPreferencesState {
   const [preferences, setState] = useState<FolderPreferences>(storedFolderPreferences);
 
+  // Se guarda solo cuando el usuario cambia algo. Escribir al montar reemplazaba unas
+  // preferencias reales por los valores por defecto si la lectura fallaba una vez.
   const setPreferences = useCallback((next: FolderPreferences) => {
     setState(next);
     storeFolderPreferences(next);
   }, []);
 
-  // Se guarda también al montar: si la lectura encontró basura, queda reemplazada por
-  // unos valores válidos en vez de reintentar el análisis en cada arranque.
-  useEffect(() => {
-    storeFolderPreferences(preferences);
-  }, [preferences]);
-
   return { preferences, setPreferences };
 }
 
-/** Alterna una carpeta oculta, sin tocar el resto. */
+/**
+ * Alterna una carpeta oculta, sin tocar el resto.
+ *
+ * El id de una carpeta que ya no existe se conserva a propósito: si vuelve con el mismo
+ * id, vuelve como estaba. Se puede mostrar de nuevo desde Ajustes.
+ */
 export function toggleHidden(
   preferences: FolderPreferences,
   workspaceId: string,
@@ -115,10 +121,14 @@ function lastActivity(section: FolderSection): number {
  *
  * The group of sessions with no known folder is **never** hidden: it has no id to hide,
  * and those sessions would otherwise disappear with no way to reach them.
+ *
+ * `locale` decides the alphabetical order. Without it, `localeCompare` uses the device
+ * locale, which can differ from the one the UI is in (there are four).
  */
 export function applyFolderPreferences(
   sections: readonly FolderSection[],
   preferences: FolderPreferences,
+  locale?: string,
 ): FolderSection[] {
   const visible = sections.filter((section) => {
     if (!section.workspace) return true;
@@ -135,9 +145,42 @@ export function applyFolderPreferences(
 
   const sorted =
     preferences.order === 'name'
-      ? [...folders].sort((left, right) => left.title.localeCompare(right.title))
-      : [...folders].sort((left, right) => lastActivity(right) - lastActivity(left));
+      ? [...folders].sort((left, right) => left.title.localeCompare(right.title, locale))
+      : // Una carpeta sin sesiones no tiene actividad: cae al final, no desaparece.
+        [...folders].sort((left, right) => lastActivity(right) - lastActivity(left));
 
   // Sin carpeta va siempre al final: no es una carpeta, es lo que sobró.
   return [...sorted, ...orphans];
+}
+
+/** Qué enseñar cuando la lista agrupada no tiene ninguna carpeta que pintar. */
+export type FolderListState = 'folders' | 'all-hidden' | 'only-empty-hidden';
+
+/**
+ * Distingue "el usuario ocultó todo" de "no queda nada porque las vacías se ocultan".
+ *
+ * Confundirlos mostraba «todas las carpetas están ocultas» con todo marcado en Ajustes, y
+ * de paso borraba los botones de sesión nueva, que viven en cada carpeta.
+ */
+export function folderListState(
+  sections: readonly FolderSection[],
+  preferences: FolderPreferences,
+): FolderListState {
+  const folders = sections.filter((section) => section.workspace !== undefined);
+  if (folders.length === 0) return 'folders';
+
+  const visible = folders.filter(
+    (section) =>
+      !preferences.hidden.includes(section.workspace!.id) &&
+      !(preferences.hideEmpty && section.sessions.length === 0),
+  );
+  if (visible.length > 0) return 'folders';
+
+  // Con sesiones huérfanas visibles no se avisa de nada: hay contenido en pantalla.
+  if (sections.some((section) => !section.workspace && section.sessions.length > 0)) {
+    return 'folders';
+  }
+
+  const allHidden = folders.every((section) => preferences.hidden.includes(section.workspace!.id));
+  return allHidden ? 'all-hidden' : 'only-empty-hidden';
 }
