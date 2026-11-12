@@ -232,16 +232,17 @@ export class CompanionClient {
   /**
    * Archives a session.
    *
-   * `active` comes back as its own error so the caller can offer "stop it first" instead
-   * of killing a running turn from a phone without asking.
+   * The "session has work running" refusal arrives as `denied`, so the caller can offer
+   * "stop it first" instead of killing a running turn from a phone without asking. The
+   * response is checked like every other one: a frame that is not `workspace.archived`
+   * is a failure, not a success.
    */
-  async archiveSession(sessionId: string, stopActivity = false): Promise<void> {
-    const response = await this.#request({
-      type: 'workspace.archive',
-      sessionId,
-      ...(stopActivity ? { stopActivity: true } : {}),
-    });
+  async archiveSession(sessionId: string): Promise<void> {
+    const response = await this.#request({ type: 'workspace.archive', sessionId });
     if (response.type === 'error') throw new ConnectionError(response.message, response.code);
+    if (response.type !== 'workspace.archived') {
+      throw new ConnectionError('The host did not confirm the archive.', 'internal');
+    }
   }
 
   async listSessions(): Promise<SessionSummary[]> {

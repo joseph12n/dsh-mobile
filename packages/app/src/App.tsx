@@ -52,13 +52,26 @@ type View =
     }
   | { kind: 'error'; endpoint: string; message: string };
 
+/**
+ * Aviso de una acción fallida.
+ *
+ * Se guarda la **clave**, no el texto: traducir al pintar evita el aviso congelado en
+ * el idioma que estaba activo cuando falló, que es la misma trampa que ya arregló
+ * `noticeKey` en la pantalla de emparejamiento.
+ */
+type ActionNotice = { key: MessageKey } | { text: string };
+
 export function App() {
   const { t, locale, setLocale } = useI18n();
   const { contrast, setContrast } = useContrast();
   const [view, setView] = useState<View>({ kind: 'checking' });
   const [code, setCode] = useState('');
   /** Last failed session action, shown above the list. */
-  const [actionError, setActionError] = useState<string | undefined>(undefined);
+  const [actionError, setActionError] = useState<ActionNotice | undefined>(undefined);
+  /** Folder whose "New session" is in flight: a second tap would create another session. */
+  const [creatingIn, setCreatingIn] = useState<string | undefined>(undefined);
+  /** Session whose archive is in flight: a second tap would answer not-found. */
+  const [archiving, setArchiving] = useState<string | undefined>(undefined);
   const [endpointInput, setEndpointInput] = useState('');
   const [questions, setQuestions] = useState<QuestionBatch[]>([]);
   const [openSession, setOpenSession] = useState<SessionSummary | undefined>(undefined);
@@ -75,6 +88,9 @@ export function App() {
   /** The open session, so it can be resubscribed after a reconnect. */
   const openSessionId = useRef<string | undefined>(undefined);
   const reopenRef = useRef<((sessionId: string) => Promise<void>) | undefined>(undefined);
+
+  /** Marca de la recarga más reciente: una respuesta vieja no puede pisar la nueva. */
+  const refreshSeq = useRef(0);
 
   /** `start` calls itself to retry; the ref breaks the dependency cycle. */
   const startRef = useRef<((endpoint: string, pairingCode?: string) => Promise<void>) | undefined>(
@@ -432,16 +448,25 @@ export function App() {
     setEndpointInput(endpointFromLocation());
   }, [start]);
 
-  /** Creates a session in a folder and reloads the list. */
+  /** Creates a session in a folder, reloads the list and opens the new session. */
   const createInFolder = async (workspaceId: string) => {
     const connection = client.current;
-    if (!connection) return;
+    if (!connection || creatingIn) return;
+
+    setCreatingIn(workspaceId);
     try {
-      await connection.createSession(workspaceId);
+      const sessionId = await connection.createSession(workspaceId);
       setActionError(undefined);
-      await refresh();
+
+      // Crear sin ver el resultado parece que no hizo nada: se abre la sesión.
+      const sessions = await refresh();
+      const created = sessions.find((session) => session.id === sessionId);
+      // Sin `await`: el botón de la carpeta se libera ya, y la sesión se abre sola.
+      if (created) void open(created);
     } catch (error) {
-      setActionError(messageOf(error));
+      setActionError({ text: messageOf(error) });
+    } finally {
+      setCreatingIn(undefined);
     }
   };
 
@@ -451,38 +476,82 @@ export function App() {
    * If the host refuses because a turn is running, nothing is destroyed: the user is told
    * and has to stop the turn first. Killing work from a phone without asking is not a
    * feature.
+   *
+   * The row is removed as soon as the host confirms: waiting for the reload left the
+   * user tapping a session that was already gone. If the reload then fails, the row is
+   * already correct and the failure is reported, not hidden.
    */
   const archive = async (session: SessionSummary) => {
     const connection = client.current;
-    if (!connection) return;
+    if (!connection || archiving) return;
+
+    setArchiving(session.id);
     try {
       await connection.archiveSession(session.id);
+      dropRow(session.id);
       setActionError(undefined);
-      await refresh();
     } catch (error) {
-      // El host se niega si hay un turno en marcha: se dice, no se mata el trabajo.
-      // El código es `denied`, no `internal`: con `internal` cualquier avería real
-      // acababa con el consejo de parar un turno que no existía.
       const code = error instanceof ConnectionError ? error.code : undefined;
-      setActionError(code === 'denied' ? t('action.stopFirst') : messageOf(error));
+      if (code === 'not-found') {
+        // Ya no está: el objetivo está cumplido aunque el host se queje.
+        dropRow(session.id);
+        setActionError(undefined);
+      } else {
+        // `denied` es la negativa por trabajo en marcha: se dice, no se mata el trabajo.
+        setActionError(
+          code === 'denied' ? { key: 'action.stopFirst' } : { text: messageOf(error) },
+        );
+      }
+    } finally {
+      try {
+        await refresh();
+      } catch (error) {
+        setActionError({ text: messageOf(error) });
+      } finally {
+        setArchiving(undefined);
+      }
     }
   };
 
-  const refresh = async () => {
-    const connection = client.current;
-    if (!connection) return;
-    try {
-      const sessions = await connection.listSessions();
-      const admiteCarpetas = connection.capabilities().includes('workspace.list');
-      const workspaces = admiteCarpetas ? await connection.listWorkspaces().catch(() => []) : [];
+  /** Quita la fila ya, sin esperar a la lista. */
+  const dropRow = (sessionId: string) => {
+    setView((previous) =>
+      previous.kind === 'sessions'
+        ? { ...previous, sessions: previous.sessions.filter((item) => item.id !== sessionId) }
+        : previous,
+    );
+  };
 
+  /**
+   * Reloads the list and returns what it loaded.
+   *
+   * **Throws** when it cannot: the previous version swallowed the failure while already
+   * showing the list, so after archiving from the phone a network blip left the row
+   * there with no message at all. Callers decide whether to report or ignore.
+   */
+  const refresh = async (): Promise<SessionSummary[]> => {
+    const connection = client.current;
+    if (!connection) return [];
+
+    const generation = ++refreshSeq.current;
+    const sessions = await connection.listSessions();
+    const admiteCarpetas = connection.capabilities().includes('workspace.list');
+    const workspaces = admiteCarpetas ? await connection.listWorkspaces().catch(() => []) : [];
+
+    // Dos recargas solapadas: la que llega tarde no puede pisar una foto más nueva.
+    if (generation === refreshSeq.current) {
       setView((state) => (state.kind === 'sessions' ? { ...state, sessions, workspaces } : state));
+    }
+    return sessions;
+  };
+
+  /** El botón "Actualizar": un fallo aquí se dice en vez de fingir que no pasó nada. */
+  const reload = async () => {
+    try {
+      await refresh();
+      setActionError(undefined);
     } catch (error) {
-      setView((previous) =>
-        previous.kind === 'sessions'
-          ? previous
-          : { kind: 'error', endpoint: '', message: messageOf(error) },
-      );
+      setActionError({ text: messageOf(error) });
     }
   };
 
@@ -622,12 +691,16 @@ export function App() {
             <section className="card">
               <div className="row">
                 <h2>{t('sessions.title')}</h2>
-                <button type="button" className="ghost" onClick={() => void refresh()}>
+                <button type="button" className="ghost" onClick={() => void reload()}>
                   {t('sessions.refresh')}
                 </button>
               </div>
 
-              {actionError && <p className="error">{actionError}</p>}
+              {actionError && (
+                <p className="error" role="alert">
+                  {'key' in actionError ? t(actionError.key) : actionError.text}
+                </p>
+              )}
 
               <SessionList
                 sessions={view.sessions}
@@ -637,6 +710,8 @@ export function App() {
                 onArchive={(session) => void archive(session)}
                 canCreate={view.host.capabilities.includes('session.create')}
                 canArchive={view.host.capabilities.includes('workspace.archive')}
+                {...(creatingIn ? { createPending: creatingIn } : {})}
+                {...(archiving ? { archivePending: archiving } : {})}
               />
 
               <button type="button" className="ghost" onClick={forget}>

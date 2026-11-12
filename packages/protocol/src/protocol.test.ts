@@ -45,8 +45,48 @@ describe('mensajes del cliente', () => {
     expect(ClientMessage.safeParse(msg).success).toBe(false);
   });
 
-  it('exige el sobre completo', () => {
-    expect(ClientMessage.safeParse({ v: PROTOCOL_VERSION, type: 'ping', at }).success).toBe(false);
+  it('exige la carpeta al crear una sesión', () => {
+    const base = { v: PROTOCOL_VERSION, id: 'c', at, type: 'session.create' };
+    expect(ClientMessage.safeParse({ ...base, workspaceId: 'w' }).success).toBe(true);
+    expect(ClientMessage.safeParse(base).success).toBe(false);
+    expect(ClientMessage.safeParse({ ...base, workspaceId: '' }).success).toBe(false);
+  });
+
+  it('archivar acepta el sobre con y sin stopActivity', () => {
+    const base = { v: PROTOCOL_VERSION, id: 'a', at, type: 'workspace.archive', sessionId: 's' };
+    expect(ClientMessage.safeParse(base).success).toBe(true);
+    expect(ClientMessage.safeParse({ ...base, stopActivity: true }).success).toBe(true);
+    expect(ClientMessage.safeParse({ ...base, stopActivity: 'sí' }).success).toBe(false);
+  });
+
+  it('hace ida y vuelta las confirmaciones de una acción', () => {
+    const created = parseServerMessage(
+      JSON.stringify({
+        v: PROTOCOL_VERSION,
+        id: 'c',
+        at,
+        type: 'session.created',
+        sessionId: 'session-1',
+      }),
+    );
+    const archived = parseServerMessage(
+      JSON.stringify({
+        v: PROTOCOL_VERSION,
+        id: 'a',
+        at,
+        type: 'workspace.archived',
+        sessionId: 'session-1',
+      }),
+    );
+
+    expect(created?.type).toBe('session.created');
+    expect(archived?.type).toBe('workspace.archived');
+    // Una confirmación sin id no confirma nada: se descarta.
+    expect(
+      parseServerMessage(
+        JSON.stringify({ v: PROTOCOL_VERSION, id: 'x', at, type: 'session.created' }),
+      ),
+    ).toBeUndefined();
   });
 });
 

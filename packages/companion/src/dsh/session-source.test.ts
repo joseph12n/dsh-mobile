@@ -14,6 +14,8 @@ interface SummaryOverrides {
   agentAvailable?: boolean;
   title?: string | null;
   asOfSeq?: number;
+  /** Proyecciones extra, como `modelSelection`. */
+  values?: Record<string, unknown>;
 }
 
 function summary(overrides: SummaryOverrides) {
@@ -24,7 +26,10 @@ function summary(overrides: SummaryOverrides) {
     agentAvailable: overrides.agentAvailable ?? true,
     projections: {
       asOfSeq: overrides.asOfSeq ?? 42,
-      values: { title: overrides.title === undefined ? 'Una sesión' : overrides.title },
+      values: {
+        title: overrides.title === undefined ? 'Una sesión' : overrides.title,
+        ...overrides.values,
+      },
     },
   };
 }
@@ -117,5 +122,24 @@ describe('listado de sesiones', () => {
     };
     const records = await listSessions(ctx);
     expect(records[0]?.pendingQuestions).toBe(0);
+  });
+
+  it('quita las sesiones archivadas: archivar desde el móvil tiene que notarse', async () => {
+    // El host conserva la fila y solo marca el id en el baseline de workspaces. Sin
+    // este filtro, el usuario archiva y la sesión sigue en la lista.
+    const ctx: HostContext = {
+      sessionController: {
+        list: () =>
+          Promise.resolve({
+            items: [summary({ sessionId: 's1' }), summary({ sessionId: 's2' })],
+          }),
+      },
+      workspaceController: {
+        list: () => Promise.resolve({ items: [], archivedSessionIds: ['s1'] }),
+      },
+    };
+
+    const records = await listSessions(ctx);
+    expect(records.map((record) => record.id)).toEqual(['s2']);
   });
 });

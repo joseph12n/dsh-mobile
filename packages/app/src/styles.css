@@ -203,7 +203,9 @@ button {
   cursor: pointer;
 }
 
-button:hover:not(:disabled):not(.option) {
+/* `.session-open` lleva `background: none` y `color: inherit`, así que el relleno
+   de hover lo dejaría con el texto casi invisible: se excluye. */
+button:hover:not(:disabled):not(.option):not(.session-open) {
   background: var(--accent-hover);
 }
 
@@ -470,7 +472,7 @@ button.ghost.tiny {
   border-color: var(--line-emphasis);
 }
 
-.session-row:hover .session-open .session-title {
+.session-open:hover .session-title {
   text-decoration: underline;
 }
 

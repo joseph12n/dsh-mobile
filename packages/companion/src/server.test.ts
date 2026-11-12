@@ -1060,6 +1060,40 @@ describe('session actions over the WebSocket', () => {
     });
   });
 
+  it('refuses to create when the host has no handler wired', async () => {
+    await acting({}, async (client) => {
+      client.send({
+        v: PROTOCOL_VERSION,
+        id: 'c3',
+        at: Date.now(),
+        type: 'session.create',
+        workspaceId: 'ws-1',
+      } as never);
+      const response = await client.next();
+      expect(response['type']).toBe('error');
+      expect(response['code']).toBe('bad-request');
+    });
+  });
+
+  it('treats a host without the controller as a missing capability', async () => {
+    // "No hay servicio" y "no hay handler" son la misma respuesta: este host no lo hace.
+    await acting(
+      { createSession: async () => ({ ok: false, code: 'no-service', message: 'no service' }) },
+      async (client) => {
+        client.send({
+          v: PROTOCOL_VERSION,
+          id: 'c4',
+          at: Date.now(),
+          type: 'session.create',
+          workspaceId: 'ws-1',
+        } as never);
+        const response = await client.next();
+        expect(response['type']).toBe('error');
+        expect(response['code']).toBe('bad-request');
+      },
+    );
+  });
+
   it('reports a running session as denied, not as an internal failure', async () => {
     // El usuario puede resolver esto parando el turno, así que la app necesita un
     // código propio. Con `internal` no podía distinguirlo de una avería real.
@@ -1072,6 +1106,18 @@ describe('session actions over the WebSocket', () => {
     const response = await archiveFailure({ ok: false, code: 'failed', message: 'boom' });
     expect(response['type']).toBe('error');
     expect(response['code']).toBe('internal');
+  });
+
+  it('answers not-found when archiving a session that is already gone', async () => {
+    const response = await archiveFailure({ ok: false, code: 'not-found', message: 'gone' });
+    expect(response['type']).toBe('error');
+    expect(response['code']).toBe('not-found');
+  });
+
+  it('treats a host without the controller as a missing capability', async () => {
+    const response = await archiveFailure({ ok: false, code: 'no-service', message: 'no service' });
+    expect(response['type']).toBe('error');
+    expect(response['code']).toBe('bad-request');
   });
 
   /** Pide archivar una sesión y devuelve la respuesta del host. */

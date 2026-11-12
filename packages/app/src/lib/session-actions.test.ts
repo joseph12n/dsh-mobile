@@ -1,0 +1,88 @@
+import { afterEach, describe, expect, it } from 'vitest';
+import { ConnectionError } from './connection.js';
+import { answer, connected, flush, lastSent, restoreSocket, stubSocket } from './test-socket.js';
+
+/**
+ * Las acciones de la sesión sobre el contrato.
+ *
+ * Lo que se fija aquí es que el cliente **no dé por bueno cualquier marco**: una
+ * confirmación que no llegue, o que llegue con otro tipo, es un fallo, no un éxito.
+ */
+
+afterEach(() => {
+  restoreSocket();
+});
+
+describe('crear una sesión', () => {
+  it('manda el workspace y devuelve el id confirmado', async () => {
+    stubSocket();
+    const { socket, client } = await connected(['session.create']);
+
+    const creating = client.createSession('ws-1');
+    await flush();
+    expect(lastSent(socket)).toMatchObject({ type: 'session.create', workspaceId: 'ws-1' });
+
+    answer(socket, { type: 'session.created', sessionId: 'session-9' });
+    await expect(creating).resolves.toBe('session-9');
+  });
+
+  it('propaga el código del host cuando la carpeta ya no está', async () => {
+    stubSocket();
+    const { socket, client } = await connected(['session.create']);
+
+    const creating = client.createSession('gone');
+    await flush();
+    answer(socket, { type: 'error', code: 'not-found', message: 'gone' });
+
+    await expect(creating).rejects.toMatchObject({ code: 'not-found' });
+  });
+
+  it('rechaza una confirmación con otro tipo', async () => {
+    // Un host que contesta `workspace.archived` a un `session.create` no ha creado nada.
+    stubSocket();
+    const { socket, client } = await connected(['session.create']);
+
+    const creating = client.createSession('ws-1');
+    await flush();
+    answer(socket, { type: 'workspace.archived', sessionId: 'session-9' });
+
+    await expect(creating).rejects.toBeInstanceOf(ConnectionError);
+  });
+});
+
+describe('archivar una sesión', () => {
+  it('resuelve cuando el host confirma', async () => {
+    stubSocket();
+    const { socket, client } = await connected(['workspace.archive']);
+
+    const archiving = client.archiveSession('session-1');
+    await flush();
+    expect(lastSent(socket)).toMatchObject({ type: 'workspace.archive', sessionId: 'session-1' });
+
+    answer(socket, { type: 'workspace.archived', sessionId: 'session-1' });
+    await expect(archiving).resolves.toBeUndefined();
+  });
+
+  it('propaga `denied`, que es la negativa por trabajo en marcha', async () => {
+    stubSocket();
+    const { socket, client } = await connected(['workspace.archive']);
+
+    const archiving = client.archiveSession('session-1');
+    await flush();
+    answer(socket, { type: 'error', code: 'denied', message: 'busy' });
+
+    await expect(archiving).rejects.toMatchObject({ code: 'denied' });
+  });
+
+  it('rechaza cualquier respuesta que no sea la confirmación', async () => {
+    // El fallo silencioso: antes se aceptaba cualquier marco que no fuera `error`.
+    stubSocket();
+    const { socket, client } = await connected(['workspace.archive']);
+
+    const archiving = client.archiveSession('session-1');
+    await flush();
+    answer(socket, { type: 'sessions.ok', sessions: [] });
+
+    await expect(archiving).rejects.toBeInstanceOf(ConnectionError);
+  });
+});

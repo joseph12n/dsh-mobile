@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { CompanionClient, type ConnectionState } from './connection.js';
+import { answer, connected, FakeSocket, flush, restoreSocket, stubSocket } from './test-socket.js';
 
 /**
  * When a socket close counts as a **drop**.
@@ -10,72 +11,9 @@ import { CompanionClient, type ConnectionState } from './connection.js';
  * while the handshake is in progress.
  */
 
-/** Minimal stand-in for the browser WebSocket. */
-class FakeSocket {
-  static readonly OPEN = 1;
-  static instances: FakeSocket[] = [];
-
-  readyState = 0;
-  sent: string[] = [];
-  onopen: (() => void) | undefined;
-  onmessage: ((event: { data: string }) => void) | undefined;
-  onclose: (() => void) | undefined;
-  onerror: (() => void) | undefined;
-
-  constructor(readonly url: string) {
-    FakeSocket.instances.push(this);
-  }
-
-  send(data: string): void {
-    this.sent.push(data);
-  }
-
-  close(): void {
-    this.readyState = 3;
-    this.onclose?.();
-  }
-
-  /** Simulates the server accepting the socket. */
-  open(): void {
-    this.readyState = 1;
-    this.onopen?.();
-  }
-
-  /** Simulates a frame from the host. */
-  deliver(message: Record<string, unknown>): void {
-    this.onmessage?.({ data: JSON.stringify(message) });
-  }
-
-  /** Simulates the host closing the socket. */
-  drop(): void {
-    this.readyState = 3;
-    this.onclose?.();
-  }
-}
-
-const original = globalThis.WebSocket;
-
-function stubSocket(): void {
-  FakeSocket.instances = [];
-  (globalThis as unknown as { WebSocket: unknown }).WebSocket = Object.assign(FakeSocket, {
-    OPEN: 1,
-  });
-}
-
 afterEach(() => {
-  (globalThis as unknown as { WebSocket: unknown }).WebSocket = original;
+  restoreSocket();
 });
-
-/** Lets the pending promise chain run: the client sends `hello` after `onopen`. */
-const flush = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
-
-/** Replies to the pending request with the given frame. */
-function answer(socket: FakeSocket, frame: Record<string, unknown>): void {
-  const last = socket.sent.at(-1);
-  if (!last) throw new Error('nothing was sent');
-  const parsed = JSON.parse(last) as { id: string };
-  socket.deliver({ v: 1, id: parsed.id, at: 1, ...frame });
-}
 
 describe('offline reporting', () => {
   it('reports a drop while the handshake is in progress', async () => {
@@ -151,26 +89,9 @@ describe('offline reporting', () => {
 });
 
 describe('asking for folders', () => {
-  /** Connects a client to the fake socket and answers `hello.ok`. */
-  async function connected(capabilities: string[] = []): Promise<FakeSocket> {
-    const client = new CompanionClient('ws://host/ws');
-    const connecting = client.connect('token');
-    const socket = FakeSocket.instances.at(-1)!;
-    socket.open();
-    await flush();
-    answer(socket, {
-      type: 'hello.ok',
-      host: { id: 'h', name: 'n', version: '1', platform: 'p', capabilities },
-    });
-    await connecting;
-    (socket as unknown as { client: CompanionClient }).client = client;
-    return socket;
-  }
-
   it('relays the folders the host sends', async () => {
     stubSocket();
-    const socket = await connected(['workspace.list']);
-    const client = (socket as unknown as { client: CompanionClient }).client;
+    const { socket, client } = await connected(['workspace.list']);
 
     const listing = client.listWorkspaces();
     await flush();
@@ -186,8 +107,7 @@ describe('asking for folders', () => {
     // An older host without the handler answers this way; the list must stay flat
     // rather than showing an error.
     stubSocket();
-    const socket = await connected();
-    const client = (socket as unknown as { client: CompanionClient }).client;
+    const { socket, client } = await connected();
 
     const listing = client.listWorkspaces();
     await flush();
@@ -198,8 +118,7 @@ describe('asking for folders', () => {
 
   it('other errors do propagate', async () => {
     stubSocket();
-    const socket = await connected();
-    const client = (socket as unknown as { client: CompanionClient }).client;
+    const { socket, client } = await connected();
 
     const listing = client.listWorkspaces();
     await flush();
@@ -210,8 +129,7 @@ describe('asking for folders', () => {
 
   it('the capabilities announced at hello are remembered', async () => {
     stubSocket();
-    const socket = await connected(['workspace.list']);
-    const client = (socket as unknown as { client: CompanionClient }).client;
+    const { client } = await connected(['workspace.list']);
     expect(client.capabilities()).toEqual(['workspace.list']);
   });
 });
