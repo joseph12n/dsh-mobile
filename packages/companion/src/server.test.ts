@@ -957,17 +957,20 @@ describe('folders over the WebSocket', () => {
 });
 
 describe('session actions over the WebSocket', () => {
+  /** What the host can do in one scenario. */
+  interface ActionDeps {
+    createSession?: () => Promise<{
+      ok: boolean;
+      code?: string;
+      message?: string;
+      sessionId?: string;
+    }>;
+    archiveSession?: () => Promise<{ ok: boolean; code?: string; message?: string }>;
+  }
+
   /** A server whose session actions are whatever the test needs. */
   async function acting(
-    deps: {
-      createSession?: () => Promise<{
-        ok: boolean;
-        code?: string;
-        message?: string;
-        sessionId?: string;
-      }>;
-      archiveSession?: () => Promise<{ ok: boolean; code?: string; message?: string }>;
-    },
+    deps: ActionDeps,
     run: (client: TestClient) => Promise<void>,
   ): Promise<void> {
     const registry = new DeviceRegistry({ persistence: new MemoryPersistence() });
@@ -1061,80 +1064,89 @@ describe('session actions over the WebSocket', () => {
   });
 
   it('refuses to create when the host has no handler wired', async () => {
-    await acting({}, async (client) => {
-      client.send({
-        v: PROTOCOL_VERSION,
-        id: 'c3',
-        at: Date.now(),
-        type: 'session.create',
-        workspaceId: 'ws-1',
-      } as never);
-      const response = await client.next();
-      expect(response['type']).toBe('error');
-      expect(response['code']).toBe('bad-request');
-    });
+    const response = await exchange({}, { type: 'session.create', workspaceId: 'ws-1' });
+    expect(response['type']).toBe('error');
+    expect(response['code']).toBe('bad-request');
   });
 
-  it('treats a host without the controller as a missing capability', async () => {
+  it('treats a host without the create controller as a missing capability', async () => {
     // "No hay servicio" y "no hay handler" son la misma respuesta: este host no lo hace.
-    await acting(
+    const response = await exchange(
       { createSession: async () => ({ ok: false, code: 'no-service', message: 'no service' }) },
-      async (client) => {
-        client.send({
-          v: PROTOCOL_VERSION,
-          id: 'c4',
-          at: Date.now(),
-          type: 'session.create',
-          workspaceId: 'ws-1',
-        } as never);
-        const response = await client.next();
-        expect(response['type']).toBe('error');
-        expect(response['code']).toBe('bad-request');
-      },
+      { type: 'session.create', workspaceId: 'ws-1' },
     );
+    expect(response['type']).toBe('error');
+    expect(response['code']).toBe('bad-request');
   });
 
   it('reports a running session as denied, not as an internal failure', async () => {
     // El usuario puede resolver esto parando el turno, así que la app necesita un
     // código propio. Con `internal` no podía distinguirlo de una avería real.
-    const response = await archiveFailure({ ok: false, code: 'active', message: 'busy' });
+    const response = await exchange(
+      { archiveSession: async () => archiveResult('active') },
+      {
+        type: 'workspace.archive',
+        sessionId: 's1',
+      },
+    );
     expect(response['type']).toBe('error');
     expect(response['code']).toBe('denied');
   });
 
   it('keeps a genuine failure internal', async () => {
-    const response = await archiveFailure({ ok: false, code: 'failed', message: 'boom' });
+    const response = await exchange(
+      { archiveSession: async () => archiveResult('failed') },
+      {
+        type: 'workspace.archive',
+        sessionId: 's1',
+      },
+    );
     expect(response['type']).toBe('error');
     expect(response['code']).toBe('internal');
   });
 
   it('answers not-found when archiving a session that is already gone', async () => {
-    const response = await archiveFailure({ ok: false, code: 'not-found', message: 'gone' });
+    const response = await exchange(
+      { archiveSession: async () => archiveResult('not-found') },
+      {
+        type: 'workspace.archive',
+        sessionId: 's1',
+      },
+    );
     expect(response['type']).toBe('error');
     expect(response['code']).toBe('not-found');
   });
 
-  it('treats a host without the controller as a missing capability', async () => {
-    const response = await archiveFailure({ ok: false, code: 'no-service', message: 'no service' });
+  it('treats a host without the archive controller as a missing capability', async () => {
+    const response = await exchange(
+      { archiveSession: async () => archiveResult('no-service') },
+      {
+        type: 'workspace.archive',
+        sessionId: 's1',
+      },
+    );
     expect(response['type']).toBe('error');
     expect(response['code']).toBe('bad-request');
   });
 
-  /** Pide archivar una sesión y devuelve la respuesta del host. */
-  async function archiveFailure(result: {
-    ok: boolean;
-    code?: string;
-    message?: string;
-  }): Promise<Record<string, unknown>> {
+  /** Una negativa del adaptador con el código dado. */
+  function archiveResult(code: string): { ok: boolean; code: string; message: string } {
+    return { ok: false, code, message: code };
+  }
+
+  /**
+   * Empareja, manda un marco y devuelve la respuesta.
+   *
+   * Existe para que cada caso sea una sola idea: antes cada prueba repetía el sobre y
+   * el `send`, y el análisis estático lo contaba como código duplicado.
+   */
+  async function exchange(
+    deps: ActionDeps,
+    payload: Record<string, unknown>,
+  ): Promise<Record<string, unknown>> {
     let received: Record<string, unknown> = {};
-    await acting({ archiveSession: async () => result }, async (client) => {
-      client.send({
-        v: PROTOCOL_VERSION,
-        id: 'a3',
-        at: Date.now(),
-        type: 'workspace.archive',
-        sessionId: 's1',
-      } as never);
+    await acting(deps, async (client) => {
+      client.send({ v: PROTOCOL_VERSION, id: 'x', at: Date.now(), ...payload } as never);
       received = await client.next();
     });
     return received;

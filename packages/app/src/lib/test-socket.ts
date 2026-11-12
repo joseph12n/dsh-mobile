@@ -85,7 +85,7 @@ export function lastSent(socket: FakeSocket): Record<string, unknown> {
 export async function connected(
   capabilities: string[] = [],
 ): Promise<{ socket: FakeSocket; client: CompanionClient }> {
-  const client = new CompanionClient('ws://host/ws');
+  const client = new CompanionClient('wss://host/ws');
   const connecting = client.connect('token');
   const socket = FakeSocket.instances.at(-1)!;
   socket.open();
