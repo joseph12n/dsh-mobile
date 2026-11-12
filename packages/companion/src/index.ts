@@ -14,9 +14,11 @@ import { qrText } from './qr-text.js';
 import { buildPairingUrl } from '@dsh-mobile/protocol';
 import { openInBrowser } from './open-browser.js';
 import { resolveSessionId } from './dsh/sessions.js';
+import { hasWorkspaces, listWorkspaces } from './dsh/workspaces.js';
 import type { HostContext } from './host-api.js';
 import { reportToLog, reportToText, runProbe, type ProbeReport } from './probe.js';
 import { DEFAULT_PORT, startCompanionServer } from './server.js';
+import type { Capability } from '@dsh-mobile/protocol';
 
 /**
  * dsh-mobile companion — plugin host.
@@ -211,14 +213,22 @@ export function apply(ctx: HostContext): void {
   const webRoot = findWebRoot();
   log(webRoot ? `PWA servida desde ${webRoot}` : 'PWA no encontrada; el host sirve solo la API');
 
+  // Se anuncia solo lo que este host sabe hacer, y se **evalúa en cada hello**: el
+  // controlador de workspaces puede montarse después del arranque, y una bandera
+  // congelada mentiría en las dos direcciones.
+  const limits = (): Capability[] => (hasWorkspaces(ctx) ? ['workspace.list'] : []);
+
   void startCompanionServer({
     pairing,
     devices,
+    capabilities: limits,
     ...options,
     ...(publicUrl ? { publicUrl } : {}),
     ...(webRoot ? { webRoot } : {}),
     // Sesiones: la misma fuente que usa la lista del escritorio.
     listSessions: () => listSessions(ctx),
+    // Carpetas: la proyección de workspaces del escritorio, o vacío si no existe.
+    listWorkspaces: () => listWorkspaces(ctx),
     // Preguntas: proyección `userQuestions` y respuesta por lote.
     listQuestions: () => listPendingQuestions(ctx),
     answerQuestion: (input) => answerQuestion(ctx, input),

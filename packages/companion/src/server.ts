@@ -18,6 +18,7 @@ import {
   type QuestionAnswerItem,
   type QuestionBatch,
   type ServerMessage,
+  type Workspace,
 } from '@dsh-mobile/protocol';
 import type { Device, DeviceRegistry } from './core/devices.js';
 import type { PairingService } from './core/pairing.js';
@@ -52,11 +53,22 @@ export interface ServerDeps {
   port?: number;
   /** Origen público donde se sirve la PWA. Se usa para construir el QR. */
   publicUrl?: string;
-  capabilities?: Capability[];
+  /**
+   * What this host can do. A function is resolved on every `hello`, so a service that
+   * mounts later is not reported missing forever, and one that goes away stops being
+   * promised.
+   */
+  capabilities?: Capability[] | (() => Capability[]);
   report?: () => ProbeReport;
   /** Raíz de la PWA compilada. Sin ella el host sirve solo la API. */
   webRoot?: string;
-  /** Fuente de sesiones. Sin ella `sessions.list` devuelve una lista vacía. */
+  /**
+   * Folders of the desktop. Without it `workspace.list` answers with an empty list,
+   * which is the honest answer for a host that has no workspaces.
+   */
+  listWorkspaces?: () => Promise<Workspace[]>;
+
+  /** Source of sessions. Without it `sessions.list` returns an empty list. */
   listSessions?: () => Promise<SessionRecord[]>;
   /** Lotes de preguntas pendientes. Se empujan tras listar sesiones. */
   listQuestions?: () => QuestionBatch[];
@@ -192,15 +204,17 @@ function pairingPage(
 
 export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
   const { pairing, devices } = deps;
-  const capabilities = deps.capabilities ?? [];
+  const capabilities = (): Capability[] =>
+    typeof deps.capabilities === 'function' ? deps.capabilities() : (deps.capabilities ?? []);
   const requestedPort = deps.port ?? DEFAULT_PORT;
 
-  const hostInfo: HostInfo = {
+  // Sin capacidades: se resuelven en cada `hello`. Congelarlas al arrancar mentía en
+  // las dos direcciones cuando un servicio se monta o se desmonta después.
+  const baseHostInfo: Omit<HostInfo, 'capabilities'> = {
     id: hostname(),
     name: 'DSH Mobile',
     version: '0.1.0',
     platform: process.platform,
-    capabilities,
   };
 
   // Se conoce al escuchar; mientras tanto vale el puerto pedido.
@@ -232,7 +246,7 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
           ok: true,
           name: 'dsh-mobile-companion',
           proto: PROTOCOL_VERSION,
-          capabilities,
+          capabilities: capabilities(),
           devices: devices.list().length,
           // Diagnóstico: si abres esto desde la dirección que usará el teléfono,
           // el aviso tiene que desaparecer.
@@ -366,7 +380,7 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
               message.id,
               'proto-unsupported',
               `This host speaks dsh-mobile/${PROTOCOL_VERSION}; you asked for ${message.proto}.`,
-              capabilities,
+              capabilities(),
             ),
           );
           socket.close();
@@ -392,7 +406,7 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
           id: message.id,
           at: Date.now(),
           type: 'hello.ok',
-          host: hostInfo,
+          host: { ...baseHostInfo, capabilities: capabilities() },
           ...(connection.device ? { device: toDeviceInfo(connection.device) } : {}),
         });
         return;
@@ -426,7 +440,7 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
           at: Date.now(),
           type: 'pair.ok',
           deviceToken: enrolled.token,
-          host: hostInfo,
+          host: { ...baseHostInfo, capabilities: capabilities() },
           device: toDeviceInfo(enrolled.device),
         });
         return;
@@ -442,6 +456,22 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
             `Without a paired device, ${message.type} is not available.`,
           ),
         );
+        return;
+      }
+
+      if (message.type === 'workspace.list') {
+        // Una lista vacía es una respuesta válida: significa que este host no tiene
+        // carpetas, y el cliente pinta la lista plana sin tratarlo como error.
+        const workspaces = deps.listWorkspaces ? await deps.listWorkspaces() : [];
+        if (socket.readyState !== socket.OPEN) return;
+
+        send(socket, {
+          v: PROTOCOL_VERSION,
+          id: message.id,
+          at: Date.now(),
+          type: 'workspace.ok',
+          workspaces,
+        });
         return;
       }
 

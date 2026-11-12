@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   PROTOCOL_NAME,
   PROTOCOL_VERSION,
@@ -10,6 +10,7 @@ import {
   type SessionSummary,
 } from '@dsh-mobile/protocol';
 import { CompanionClient, endpointFromLocation, normalizeEndpoint } from './lib/connection.js';
+import { classifyFailure, retryDelay } from './lib/reconnect.js';
 import { storage } from './lib/storage.js';
 import { QuestionsCard } from './components/Questions.js';
 import { SessionView } from './components/SessionView.js';
@@ -17,7 +18,8 @@ import { SessionList } from './components/SessionList.js';
 
 type View =
   | { kind: 'checking' }
-  | { kind: 'pairing'; endpoint: string; message?: string }
+  | { kind: 'pairing'; endpoint: string; notice?: string }
+  | { kind: 'reconnecting'; endpoint: string; attempt: number; retryInMs: number }
   | { kind: 'connecting'; endpoint: string }
   | { kind: 'sessions'; endpoint: string; host: HostInfo; sessions: SessionSummary[] }
   | { kind: 'error'; endpoint: string; message: string };
@@ -34,14 +36,108 @@ export function App() {
 
   const client = useMemo(() => ({ current: undefined as CompanionClient | undefined }), []);
 
-  /** Conecta, opcionalmente empareja con un código, y carga sesiones. */
+  /** Failed attempts in a row. A ref: scheduling a retry must not re-render. */
+  const retry = useRef(0);
+  const retryTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  /** The open session, so it can be resubscribed after a reconnect. */
+  const openSessionId = useRef<string | undefined>(undefined);
+  const reopenRef = useRef<((sessionId: string) => Promise<void>) | undefined>(undefined);
+
+  /** `start` calls itself to retry; the ref breaks the dependency cycle. */
+  const startRef = useRef<((endpoint: string, pairingCode?: string) => Promise<void>) | undefined>(
+    undefined,
+  );
+
+  /** Cancels any pending retry. Called when connecting or forgetting. */
+  const cancelRetry = useCallback(() => {
+    clearTimeout(retryTimer.current);
+    retryTimer.current = undefined;
+  }, []);
+
+  /**
+   * Schedules one more attempt.
+   *
+   * The link drops all the time on a phone: it changes networks, the screen turns
+   * off, the tailnet blips. Before this, any of those left an error screen whose
+   * only button **deleted the pairing**.
+   */
+  const scheduleRetry = useCallback(
+    (endpoint: string) => {
+      // Un solo reloj por fallo. Un intento fallido avisa dos veces (el catch y el
+      // cierre del socket); sin esta guarda el contador avanzaba de dos en dos y el
+      // reintento manual se pisaba.
+      if (retryTimer.current !== undefined) return;
+      cancelRetry();
+
+      const wait = retryDelay(retry.current);
+      retry.current += 1;
+
+      setView({ kind: 'reconnecting', endpoint, attempt: retry.current, retryInMs: wait });
+
+      retryTimer.current = setTimeout(() => {
+        retryTimer.current = undefined;
+        void startRef.current?.(endpoint);
+      }, wait);
+    },
+    [cancelRetry],
+  );
+
+  /**
+   * Decides what a failure means.
+   *
+   * The rule: **the token is only dropped when the host says it is no longer
+   * valid**. Everything else keeps the pairing, because losing it costs a full
+   * round trip to the desktop.
+   */
+  const handleFailure = useCallback(
+    (error: unknown, endpoint: string) => {
+      switch (classifyFailure(error)) {
+        case 'auth':
+          cancelRetry();
+          storage.saveToken(undefined);
+          setView({
+            kind: 'pairing',
+            endpoint,
+            notice: 'The host no longer recognises this device. Pair it again.',
+          });
+          return;
+
+        case 'pairing':
+          cancelRetry();
+          setView({ kind: 'pairing', endpoint, notice: messageOf(error) });
+          return;
+
+        case 'fatal':
+          cancelRetry();
+          setView({ kind: 'error', endpoint, message: messageOf(error) });
+          return;
+
+        default:
+          scheduleRetry(endpoint);
+      }
+    },
+    [cancelRetry, scheduleRetry],
+  );
+
+  /** Connects, optionally redeems a pairing code, and loads the session list. */
   const start = useCallback(
     async (endpoint: string, pairingCode?: string) => {
+      // Any deliberate start cancels a pending retry: otherwise the timer fires
+      // later and tears down the connection that just succeeded.
+      cancelRetry();
+
       client.current?.close();
       const connection = new CompanionClient(endpoint);
       client.current = connection;
       setQuestions([]);
       setView({ kind: 'connecting', endpoint });
+
+      // If the socket drops, retry. The pairing is never touched here.
+      connection.onState((state) => {
+        if (state.kind !== 'offline') return;
+        scheduleRetry(endpoint);
+      });
 
       // Se registra antes de pedir nada: los lotes llegan empujados detrás de la lista.
       connection.onPush((message) => {
@@ -99,13 +195,58 @@ export function App() {
         }
 
         const sessions = await connection.listSessions();
+        retry.current = 0;
         setView({ kind: 'sessions', endpoint, host: hello.host, sessions });
+
+        // After a reconnect the open session must be resubscribed, or the
+        // transcript stays frozen and stops receiving live events.
+        const stillOpen = openSessionId.current;
+        if (stillOpen) void reopenRef.current?.(stillOpen);
       } catch (error) {
-        setView({ kind: 'error', endpoint, message: messageOf(error) });
+        handleFailure(error, endpoint);
       }
+    },
+    [client, cancelRetry, handleFailure, scheduleRetry],
+  );
+
+  /**
+   * Retries when the app comes back to the foreground.
+   *
+   * The phone suspends the tab when the screen turns off, so the socket is gone
+   * by the time the user looks again. Without this they had to reload by hand —
+   * and before, that cost the pairing.
+   */
+  useEffect(() => {
+    const resume = (): void => {
+      if (document.visibilityState !== 'visible') return;
+      if (view.kind !== 'error' && view.kind !== 'reconnecting') return;
+      retry.current = 0;
+      void start(view.endpoint);
+    };
+
+    document.addEventListener('visibilitychange', resume);
+    globalThis.addEventListener('online', resume);
+
+    return () => {
+      document.removeEventListener('visibilitychange', resume);
+      globalThis.removeEventListener('online', resume);
+    };
+  }, [start, view]);
+
+  /** A pending retry must not outlive the component, and neither must the socket. */
+  useEffect(
+    () => () => {
+      clearTimeout(retryTimer.current);
+      client.current?.close();
+      client.current = undefined;
     },
     [client],
   );
+  // The retry calls the current version of `start`, not a stale closure. Updated in
+  // an effect: writing to a ref during render is a side effect React may repeat.
+  useEffect(() => {
+    startRef.current = start;
+  }, [start]);
 
   const answer = useCallback(
     async (callId: string, sessionId: string, answers: QuestionAnswerItem[]) => {
@@ -121,9 +262,47 @@ export function App() {
     [client],
   );
 
-  /** Abre una sesión: historial y flujo de eventos. */
+  /**
+   * Reloads a session after reconnecting.
+   *
+   * It exists separately from `open` because `open` needs the full summary to
+   * render the header, and after a reconnect all we have is the id. It also
+   * starts from a clean transcript: the resubscription replays from the cursor,
+   * so keeping the old entries would duplicate everything.
+   */
+  const reopen = useCallback(
+    async (sessionId: string) => {
+      const connection = client.current;
+      if (!connection) return;
+
+      setLoadingHistory(true);
+      try {
+        const page = await connection.history(sessionId, { limit: 40 });
+        setEntries([...page.entries].sort((a, b) => a.seq - b.seq));
+        setHasMore(page.hasMore);
+        const last = page.entries.at(-1)?.seq ?? 0;
+        await connection.subscribe(sessionId, last);
+      } catch {
+        // The list still works; leaving the stale transcript would be worse.
+        setEntries([]);
+      } finally {
+        setLoadingHistory(false);
+      }
+    },
+    [client],
+  );
+
+  // El reintento usa la versión vigente, sin arrastrar una copia vieja.
+
+  // The reconnect path calls the current version of `reopen`, not a stale one.
+  useEffect(() => {
+    reopenRef.current = reopen;
+  }, [reopen]);
+
+  /** Opens a session: history plus the live event stream. */
   const open = useCallback(
     async (session: SessionSummary) => {
+      openSessionId.current = session.id;
       const connection = client.current;
       if (!connection) return;
 
@@ -228,8 +407,18 @@ export function App() {
     }
   };
 
+  /**
+   * Forgets the device. This is the **only** deliberate way to lose the pairing.
+   *
+   * The retry is cancelled first, and the client is closed as intentional, so
+   * neither schedules a reconnect for a device that no longer exists.
+   */
   const forget = () => {
+    cancelRetry();
+    retry.current = 0;
     client.current?.close();
+    client.current = undefined;
+    openSessionId.current = undefined;
     storage.saveToken(undefined);
     storage.saveEndpoint(undefined);
     setView({ kind: 'pairing', endpoint: endpointFromLocation() });
@@ -292,16 +481,35 @@ export function App() {
           >
             Emparejar
           </button>
-          {view.message && <p className="error">{view.message}</p>}
+          {view.notice && <p className="error">{view.notice}</p>}
+        </section>
+      )}
+
+      {view.kind === 'reconnecting' && (
+        <section className="card">
+          <h2>Reconnecting…</h2>
+          <p className="muted">
+            The pairing is still saved. Attempt {view.attempt}, retrying in{' '}
+            {Math.round(view.retryInMs / 1000)} s.
+          </p>
+          <p className="muted small">{view.endpoint}</p>
+          <button type="button" onClick={() => void start(view.endpoint)}>
+            Retry now
+          </button>
         </section>
       )}
 
       {view.kind === 'error' && (
         <section className="card">
-          <h2>No pude conectar</h2>
+          <h2>Could not connect</h2>
           <p className="error">{view.message}</p>
-          <button type="button" onClick={forget}>
-            Volver a emparejar
+          <button type="button" onClick={() => void start(view.endpoint)}>
+            Retry
+          </button>
+          {/* Forgetting the device is a separate decision: it used to be the only
+              button, so a network failure cost a full re-pairing. */}
+          <button type="button" className="ghost" onClick={forget}>
+            Forget this device
           </button>
         </section>
       )}
@@ -321,6 +529,7 @@ export function App() {
               hasMore={hasMore}
               loading={loadingHistory}
               onBack={() => {
+                openSessionId.current = undefined;
                 setOpenSession(undefined);
                 setEntries([]);
               }}

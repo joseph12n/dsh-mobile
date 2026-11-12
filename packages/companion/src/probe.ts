@@ -24,7 +24,10 @@ import {
  */
 
 /** Servicios que podrían servir para leer o inyectar conversación. */
-const RELEVANT_SERVICE = /agent|turn|prompt|input|inbox|rpc|session|question|tool/i;
+// `workspace` se incluye a proposito: el escritorio agrupa por workspace y el
+// plugin necesita saber si ese servicio esta montado antes de prometer carpetas.
+const RELEVANT_SERVICE =
+  /agent|turn|prompt|input|inbox|rpc|session|question|tool|workspace|project/i;
 
 export interface ServiceDetail {
   name: string;
@@ -119,12 +122,16 @@ export function runProbe(ctx: HostContext): ProbeReport {
     .filter((name) => RELEVANT_SERVICE.test(name))
     .map((name) => ({ name, methods: methodNames(service(ctx, name)) }));
 
+  const workspaceController = service<Record<string, unknown>>(ctx, 'workspaceController');
+
   const services: Record<string, string> = {
     sessions: describe(sessions),
     sessionProjections: describe(projections),
     commands: describe(service(ctx, 'commands')),
     userQuestions: describe(userQuestions),
     tools: describe(service(ctx, 'tools')),
+    // Si existe, el escritorio agrupa por carpeta y el plugin puede hacer lo mismo.
+    workspaceController: describe(workspaceController),
   };
 
   let sessionCount: number | undefined;
