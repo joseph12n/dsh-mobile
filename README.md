@@ -34,17 +34,18 @@ and without breaking on upstream updates.
 changes, one adapter changes and the client never notices.
 
 **A single artifact.** The plugin serves the built PWA, so host and client cannot drift
-apart: they are the same version by construction.
+apart: they are the same version by construction. Today that means running both from the same
+checkout; packaging them together is still an open issue (#12).
 
 ### Pairing
 
 The desktop shows a **QR** that is not a bare code but a **direct link**:
 
 ```
-https://<host>/#/pair?v=1&c=<code>&e=<endpoint>
+https://<host>/#/pair?v=1&c=<code>
 ```
 
-One scan answers _where_ to connect and _who_ you are. The code travels in the URL fragment,
+One scan answers _who_ you are; the connection goes to the host serving that page. The code travels in the URL fragment,
 so it never reaches the server or a log. It expires in 10 minutes, works once, and redeeming
 it creates a **device token** stored as a hash.
 
@@ -81,7 +82,7 @@ incompatible change breaks the build instead of the user.
 
 ```bash
 pnpm install
-pnpm build        # protocol → companion → app (topological order)
+pnpm build        # protocol first: the other two import its types
 pnpm test         # vitest
 pnpm smoke        # starts the built server and checks the PWA and pairing
 pnpm typecheck
@@ -105,28 +106,24 @@ Link it from your DSH profile (`~/.dsh/profiles/<profile>/package.json`):
 
 The plugin listens on `127.0.0.1:6768` and exposes:
 
-| Route         | What it does                                      |
-| ------------- | ------------------------------------------------- |
-| `GET /`       | The installable PWA                               |
-| `GET /pair`   | Pairing QR and the code as text                   |
-| `GET /health` | State, protocol version, capabilities and devices |
-| `WS /ws`      | The `dsh-mobile/1` contract                       |
+| Route         | What it does                                       |
+| ------------- | -------------------------------------------------- |
+| `GET /`       | The installable PWA                                |
+| `GET /pair`   | Pairing QR and the code as text                    |
+| `GET /health` | State, protocol version, capabilities and devices  |
+| `GET /probe`  | The same diagnostic report `/mobile estado` prints |
+| `WS /ws`      | The `dsh-mobile/1` contract                        |
 
 ### The `/mobile` command
 
-Inside DSH, `/mobile` opens the pairing page in the desktop browser, where the QR is an
-image and scans with any font. Subcommands:
+Inside DSH, `/mobile` prints **the pairing link, the code and when it expires**, so you do not
+have to hand-build a URL or dig the code out of the console. `/mobile estado` prints the
+diagnostic probe: which services are mounted, what the projections expose, and which ones can
+take text.
 
-| Command          | What it does                                                  |
-| ---------------- | ------------------------------------------------------------- |
-| `/mobile`        | Opens `/pair`; also prints the link and the code              |
-| `/mobile open`   | The same, spelled out                                         |
-| `/mobile qr`     | Prints the QR **as text**, for a terminal with line height 1  |
-| `/mobile link`   | Only the link and the code                                    |
-| `/mobile status` | Diagnostic probe: services, projections, where text can go in |
-
-The QR as text only scans where the line height equals the font size; the DSH chat does not
-do that, which is why opening the page is the default.
+The link comes out with the tailnet name when Tailscale is installed, so it can be opened
+straight from the phone. When it cannot — no Tailscale, or a loopback origin — the message says
+so instead of handing you a link that goes nowhere.
 
 Environment variables: `DSH_MOBILE_PORT`, `DSH_MOBILE_PUBLIC_URL`, `DSH_MOBILE_WEB_ROOT`.
 `DSH_MOBILE_LOG_FILE=0` turns off the plugin's evidence file, which the tests and the preview

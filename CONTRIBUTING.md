@@ -25,17 +25,26 @@ pnpm test
 
 ## Commands
 
-| Command          | What it does                                   |
-| ---------------- | ---------------------------------------------- |
-| `pnpm build`     | Builds the three packages in topological order |
-| `pnpm test`      | Vitest, the whole suite                        |
-| `pnpm typecheck` | `tsc --noEmit` per package                     |
-| `pnpm lint`      | ESLint                                         |
-| `pnpm format`    | Prettier                                       |
-| `pnpm dev`       | PWA in development mode                        |
+| Command             | What it does                                   |
+| ------------------- | ---------------------------------------------- |
+| `pnpm build`        | Builds the three packages in dependency order  |
+| `pnpm test`         | Vitest, the whole suite                        |
+| `pnpm test:watch`   | Vitest in watch mode                           |
+| `pnpm typecheck`    | `tsc --noEmit` per package                     |
+| `pnpm lint`         | ESLint                                         |
+| `pnpm lint:fix`     | ESLint, fixing what it can                     |
+| `pnpm format`       | Prettier, writing                              |
+| `pnpm format:check` | Prettier, checking only                        |
+| `pnpm smoke`        | Starts the built server and walks the contract |
+| `pnpm clean`        | Removes build output                           |
+| `pnpm dev`          | PWA in development mode                        |
 
 Before proposing a change, `pnpm lint && pnpm typecheck && pnpm test && pnpm build` must pass
 clean.
+
+`DSH_HOME` decides where the plugin keeps its `companion/` folder (device registry and evidence
+file); the tests and the preview tool point it at a temporary directory so they never touch
+yours.
 
 ## Structure
 
@@ -43,9 +52,11 @@ clean.
 packages/
   protocol/    the contract: Zod schemas + types + constants
   companion/   host plugin
-    src/core/    pure domain (no DSH, no I/O)
-    src/dsh/     the ONLY place that knows DSH
-    src/routes/  serving the built PWA
+    src/core/      pure domain (no DSH, no I/O)
+    src/dsh/       the ONLY place that talks to DSH
+    src/persist/   the little that reaches disk (the device file)
+    src/routes/    static serving and origin checks
+    src/server.ts  the WebSocket listener and the contract wiring
   app/         PWA (React + Vite)
 ```
 
@@ -53,9 +64,11 @@ packages/
 
 1. **`core` imports nothing from `@deepseek-ai/*` and touches neither disk nor network.** Pure
    domain: tested with in-memory data.
-2. **Only `dsh` knows DSH.** All the coupling with the host lives there, behind interfaces
-   declared in `core`.
-3. **`routes` does not know the domain.** It serialises the contract and nothing else.
+2. **Only `dsh` talks to DSH.** It is the only folder that calls host services; the shapes
+   those services have are declared in `src/host-api.ts`, which is a type contract and no
+   runtime.
+3. **`routes` does not know the domain.** It serves static files and computes the public
+   origin; the contract is serialised in `server.ts`.
 4. **`app` does not know DSH.** Only `@dsh-mobile/protocol`.
 
 Breaking rule 2 is the fastest way for a DSH update to break the project.
@@ -78,7 +91,9 @@ Every new message needs its validation test in `protocol.test.ts`.
 
 - **Strict TypeScript.** No `any` without a reason.
 - **ESM.** Relative imports with the `.js` extension.
-- **English** in comments, identifiers and commit messages.
+- **Identifiers in English**, always. Comments and commit messages are **moving to English**:
+  new and edited code is written in English, and older comments still to be translated are
+  not worth a whitespace-only diff on their own.
 - Prettier owns the formatting; do not argue about formatting in a PR.
 
 ## Tests
@@ -117,19 +132,25 @@ This repository follows **[Conventional Commits 1.0.0](https://www.conventionalc
 | `chore`    | Maintenance that fits none of the above |
 | `revert`   | Undoing an earlier commit               |
 
-Real examples from this repository:
+Real subjects from this repository's history:
 
 ```
-feat(app): adopt the real DeepSeek Harness palette and typography
-fix(app): write the icon buffer without re-encoding it
-ci: run the smoke test and the icon check
-docs: align the documentation on LAN and tailnet
+feat(protocol): define workspaces and let the probe find the service
+fix(app): keep the pairing through network drops
+feat(app): agrupa el detalle de la sesión por turnos
+ci: valida los mensajes de commit con commitlint
 ```
+
+**The history is mixed on purpose, and you should know it before you read it as an
+inconsistency:** commits written before the project moved to English have Spanish subjects
+(the last two above), and everything since has English ones. History that is already published
+is not rewritten — it costs more than it tidies. `commitlint` therefore accepts both: it
+checks the _shape_, not the language.
 
 Subject rules:
 
-- **In English**, in the imperative ("add", not "added").
-- No full stop. **The whole line, prefix included, stays under 100 characters**: that is what
+- **In English** for new commits, in the imperative ("add", not "added").
+- No full stop. **The whole line, prefix included, is at most 100 characters**: that is what
   `header-max-length` measures. If it does not fit, shorten the subject and explain in the
   body.
 - The scope, in parentheses, names the area: `app`, `companion`, `protocol`, `docs`, `ci`.
@@ -143,7 +164,7 @@ Reference the issue in a footer, not in the subject:
 ```
 fix(app): correct the PWA path
 
-web-root computed the package root one level too high.
+web-root computed the package root one level too few.
 
 Refs: #16
 ```

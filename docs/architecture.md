@@ -84,12 +84,14 @@ what the client cannot do.
 
 Transport: **WebSocket**, JSON messages, shared envelope `{ v, id, at, type }`.
 
-- **`hello` first.** Without it, any other request is rejected with `auth-required`.
+- **`hello` first.** Without it, any other request is rejected with `auth-required`, with one
+  exception: `ping` answers `pong` unauthenticated, so a client can measure the link before it
+  has a token.
 - **`id` correlates.** The reply repeats the request `id`.
 - **Errors carry a stable code** (`errors.ts`). A client branches on the code, never on the
   text.
 - **Host messages with no request** are spontaneous sends: `question.pending`,
-  `question.settled`, `session.event`.
+  `question.settled`, `session.event`, `session.state`, `devices.changed`.
 - Unknown version ⇒ `proto-unsupported` with the host's capabilities, never a strange
   failure.
 
@@ -106,6 +108,7 @@ Transport: **WebSocket**, JSON messages, shared envelope `{ v, id, at, type }`.
 | `reply.send`        | `reply.ok`                              |
 | `question.answer`   | `answer.ok`                             |
 | `run.cancel`        | `run.ok`                                |
+| `run.start`         | `error` (not implemented in this build) |
 | `ping`              | `pong`                                  |
 
 ## 8. Pairing
@@ -113,10 +116,11 @@ Transport: **WebSocket**, JSON messages, shared envelope `{ v, id, at, type }`.
 The QR carries no bare code but a **direct link**:
 
 ```
-https://<host>/#/pair?v=1&c=<code>&e=<endpoint>
+https://<host>/#/pair?v=1&c=<code>
 ```
 
 - The code travels in the **fragment**, so it is neither sent to the server nor logged.
+  The endpoint, when it is pinned, travels as an `e=` parameter next to the code.
 - **128 bits** in Crockford base32 (no `I`, `L`, `O` or `U`, so nobody misreads a character
   while typing it).
 - **Single use, 10 minutes.** A failed attempt distinguishes _expired_, _already used_ and
