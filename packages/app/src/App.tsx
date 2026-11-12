@@ -60,6 +60,27 @@ export function App() {
               ? previous
               : [...previous, { seq: message.seq, at: message.at, event: message.event }],
           );
+
+          // La cabecera es **viva**. El estado llega dentro de la transcripción, no
+          // en un mensaje aparte: sin esto se quedaba congelado en el de la última
+          // lista hasta volver atrás.
+          if (message.event.kind === 'state') {
+            const { sessionId, event } = message;
+            const state = event.state;
+            setOpenSession((previous) =>
+              previous && previous.id === sessionId ? { ...previous, state } : previous,
+            );
+            setView((previous) =>
+              previous.kind === 'sessions'
+                ? {
+                    ...previous,
+                    sessions: previous.sessions.map((session) =>
+                      session.id === sessionId ? { ...session, state } : session,
+                    ),
+                  }
+                : previous,
+            );
+          }
         }
       });
 

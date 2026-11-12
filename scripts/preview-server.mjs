@@ -133,7 +133,25 @@ const server = await startCompanionServer({
     ],
     hasMore: false,
   }),
-  subscribeSession: () => ({ stop: () => undefined }),
+  // Demostración de la **cabecera viva**: a los 2 s el host pasa a "trabajando" y
+  // se queda ahí. Sirve para ver que el estado del encabezado cambia sin recargar.
+  subscribeSession: (_sessionId, { onEvent }) => {
+    const primero = setTimeout(
+      () => onEvent({ seq: 900, at: Date.now(), event: { kind: 'state', state: 'working' } }),
+      2000,
+    );
+    const segundo = setTimeout(
+      () => onEvent({ seq: 901, at: Date.now(), event: { kind: 'state', state: 'waiting' } }),
+      30000,
+    );
+
+    return {
+      stop: () => {
+        clearTimeout(primero);
+        clearTimeout(segundo);
+      },
+    };
+  },
   sendReply: async () => ({ ok: true }),
   cancelRun: () => true,
   answerQuestion: () => ({ ok: true }),
