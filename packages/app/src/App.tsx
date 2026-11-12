@@ -16,11 +16,23 @@ import { QuestionsCard } from './components/Questions.js';
 import { SessionView } from './components/SessionView.js';
 import { SessionList } from './components/SessionList.js';
 import { useI18n } from './i18n/index.js';
-import { LOCALES, LOCALE_LABELS, type Locale } from './i18n/locales.js';
+import { LOCALES, LOCALE_LABELS, type Locale, type MessageKey } from './i18n/locales.js';
 
 type View =
   | { kind: 'checking' }
-  | { kind: 'pairing'; endpoint: string; notice?: string }
+  | {
+      kind: 'pairing';
+      endpoint: string;
+      /**
+       * A catalogue key, not the translated text.
+       *
+       * Storing the text froze the notice in whatever language was active when the
+       * failure happened: switching language left it behind in the old one.
+       */
+      noticeKey?: MessageKey;
+      /** For messages that come from somewhere else (the host, a thrown error). */
+      notice?: string;
+    }
   | { kind: 'reconnecting'; endpoint: string; attempt: number; retryInMs: number }
   | { kind: 'connecting'; endpoint: string }
   | { kind: 'sessions'; endpoint: string; host: HostInfo; sessions: SessionSummary[] }
@@ -102,7 +114,7 @@ export function App() {
           setView({
             kind: 'pairing',
             endpoint,
-            notice: t('error.authLost'),
+            noticeKey: 'error.authLost',
           });
           return;
 
@@ -465,7 +477,7 @@ export function App() {
             <input
               value={endpointInput || view.endpoint}
               onChange={(event) => setEndpointInput(event.target.value)}
-              placeholder="wss://maquina.tailnet.ts.net/ws"
+              placeholder="wss://machine.tailnet.ts.net/ws"
               autoCapitalize="none"
               autoComplete="url"
               inputMode="url"
@@ -481,7 +493,9 @@ export function App() {
           >
             {t('pairing.submit')}
           </button>
-          {view.notice && <p className="error">{view.notice}</p>}
+          {(view.noticeKey || view.notice) && (
+            <p className="error">{view.noticeKey ? t(view.noticeKey) : view.notice}</p>
+          )}
         </section>
       )}
 
@@ -589,7 +603,7 @@ function deviceName(): string {
   const ua = navigator.userAgent;
   if (/iPhone|iPad/i.test(ua)) return 'iPhone';
   if (/Android/i.test(ua)) return 'Android';
-  return 'Navegador';
+  return 'Browser';
 }
 
 function messageOf(error: unknown): string {

@@ -177,7 +177,7 @@ const ptBR: Catalogue = {
   'pairing.submit': 'Emparelhar',
 
   'reconnect.kept': 'O emparelhamento continua salvo.',
-  'reconnect.attempt': 'Tentativa {attempt}, novo intento em {seconds} s.',
+  'reconnect.attempt': 'Tentativa {attempt} · nova tentativa em {seconds} s.',
   'reconnect.now': 'Tentar agora',
 
   'error.authLost': 'O host não reconhece mais este dispositivo. Emparelhe de novo.',
