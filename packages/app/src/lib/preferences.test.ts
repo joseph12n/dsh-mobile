@@ -5,6 +5,7 @@ import {
   applyFolderPreferences,
   DEFAULT_FOLDER_PREFERENCES,
   folderListState,
+  folderView,
   isFolderOrder,
   storeFolderPreferences,
   storedFolderPreferences,
@@ -157,6 +158,37 @@ describe('which message the empty list gets', () => {
 
   it('does not warn when hidden folders coexist with sessions that have no folder', () => {
     expect(folderListState([section('a'), orphans()], prefs({ hidden: ['a'] }))).toBe('folders');
+  });
+});
+
+describe('what the list actually shows', () => {
+  it('hides the folders the user turned off', () => {
+    const view = folderView([section('a', [1]), section('b', [2])], prefs({ hidden: ['a'] }));
+    expect(view.sections.map((item) => item.title)).toEqual(['b']);
+    expect(view.state).toBe('folders');
+  });
+
+  it('falls back to the empty folders instead of leaving nothing to tap', () => {
+    // «Ocultar vacías» despeja la lista; no puede quitar los botones de sesión nueva.
+    const view = folderView([section('a'), section('b')], prefs({ hideEmpty: true }));
+    expect(view.state).toBe('only-empty-hidden');
+    expect(view.sections.map((item) => item.title)).toEqual(['a', 'b']);
+  });
+
+  it('reports all-hidden and leaves no sections', () => {
+    const view = folderView([section('a')], prefs({ hidden: ['a'] }));
+    expect(view.state).toBe('all-hidden');
+    expect(view.sections).toEqual([]);
+  });
+
+  it('orders the folders in the language it is given', () => {
+    const view = folderView([section('b'), section('a')], prefs({ order: 'name' }), 'es');
+    expect(view.sections.map((item) => item.title)).toEqual(['a', 'b']);
+  });
+
+  it('keeps the group without folder at the end', () => {
+    const view = folderView([section('b'), orphans(), section('a')], prefs({ order: 'name' }));
+    expect(view.sections.at(-1)?.title).toBe('');
   });
 });
 

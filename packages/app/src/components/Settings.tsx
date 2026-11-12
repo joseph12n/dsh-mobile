@@ -67,8 +67,7 @@ export function Settings({
       </label>
 
       {workspaces.length > 0 && (
-        <fieldset className="settings-folders">
-          <legend>{t('settings.folders')}</legend>
+        <div className="settings-folders" role="group" aria-label={t('settings.title')}>
           {workspaces.map((workspace) => (
             <label
               className="settings-row"
@@ -85,7 +84,7 @@ export function Settings({
               <span>{displayTitle(workspace)}</span>
             </label>
           ))}
-        </fieldset>
+        </div>
       )}
     </details>
   );

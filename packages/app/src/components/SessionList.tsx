@@ -2,11 +2,7 @@ import { useId, useState } from 'react';
 import type { SessionSummary, Workspace } from '@dsh-mobile/protocol';
 import { groupSessions, elapsed } from '../lib/sessions.js';
 import { displayTitle, groupByFolder, usesFolders } from '../lib/folders.js';
-import {
-  applyFolderPreferences,
-  folderListState,
-  type FolderPreferences,
-} from '../lib/preferences.js';
+import { folderView, type FolderPreferences } from '../lib/preferences.js';
 import { plural, useI18n } from '../i18n/index.js';
 
 /**
@@ -68,7 +64,9 @@ export function SessionList({
   const [showStale, setShowStale] = useState(false);
 
   const grouped = groupByFolder(sessions, workspaces);
-  const folders = preferences ? applyFolderPreferences(grouped, preferences, locale) : grouped;
+  const view = preferences
+    ? folderView(grouped, preferences, locale)
+    : { state: 'folders' as const, sections: grouped };
 
   // Sin carpetas y sin sesiones, el aviso. Con carpetas, se pintan igual: es donde
   // irían las sesiones nuevas y esconderlas borraba la agrupación entera.
@@ -76,15 +74,13 @@ export function SessionList({
     return <p className="muted">{t('sessions.empty')}</p>;
   }
 
-  // Sin nada que pintar se dice el motivo, y solo el motivo correcto: «todas ocultas»
-  // con todo marcado en Ajustes era un aviso falso.
-  if (preferences && usesFolders(workspaces)) {
-    const state = folderListState(grouped, preferences);
-    if (state === 'all-hidden') return <p className="muted">{t('settings.allHidden')}</p>;
-    if (state === 'only-empty-hidden') {
-      return <p className="muted">{t('settings.noneVisible')}</p>;
-    }
+  // Solo se avisa cuando no hay nada que pintar y el motivo es que el usuario ocultó
+  // las carpetas. Si no queda ninguna por «ocultar vacías», se muestran igual.
+  if (view.state === 'all-hidden') {
+    return <p className="muted">{t('settings.allHidden')}</p>;
   }
+
+  const folders = view.sections;
 
   if (usesFolders(workspaces)) {
     return (

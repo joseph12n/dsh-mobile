@@ -156,11 +156,16 @@ export function applyFolderPreferences(
 /** Qué enseñar cuando la lista agrupada no tiene ninguna carpeta que pintar. */
 export type FolderListState = 'folders' | 'all-hidden' | 'only-empty-hidden';
 
+/** Lo que la lista pinta, ya decidido. */
+export interface FolderView {
+  state: FolderListState;
+  sections: FolderSection[];
+}
+
 /**
  * Distingue "el usuario ocultó todo" de "no queda nada porque las vacías se ocultan".
  *
- * Confundirlos mostraba «todas las carpetas están ocultas» con todo marcado en Ajustes, y
- * de paso borraba los botones de sesión nueva, que viven en cada carpeta.
+ * Confundirlos mostraba «todas las carpetas están ocultas» con todo marcado en Ajustes.
  */
 export function folderListState(
   sections: readonly FolderSection[],
@@ -183,4 +188,23 @@ export function folderListState(
 
   const allHidden = folders.every((section) => preferences.hidden.includes(section.workspace!.id));
   return allHidden ? 'all-hidden' : 'only-empty-hidden';
+}
+
+/**
+ * Aplica las preferencias y decide qué se enseña.
+ *
+ * **Ocultar las vacías nunca deja la pantalla vacía**: si con eso no quedara ninguna
+ * carpeta, se muestran igual. El ajuste sirve para despejar la lista, no para quitar los
+ * botones de sesión nueva.
+ */
+export function folderView(
+  sections: readonly FolderSection[],
+  preferences: FolderPreferences,
+  locale?: string,
+): FolderView {
+  const state = folderListState(sections, preferences);
+  const effective =
+    state === 'only-empty-hidden' ? { ...preferences, hideEmpty: false } : preferences;
+
+  return { state, sections: applyFolderPreferences(sections, effective, locale) };
 }
