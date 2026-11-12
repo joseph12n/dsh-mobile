@@ -7,6 +7,8 @@ import {
   type DeviceInfo,
   type HistoryEntry,
   type HostInfo,
+  type ModelCatalog,
+  type ModelSelection,
   type QuestionAnswerItem,
   type ServerMessage,
   type SessionSummary,
@@ -249,6 +251,45 @@ export class CompanionClient {
     const response = await this.#request({ type: 'sessions.list' });
     if (response.type === 'error') throw new ConnectionError(response.message, response.code);
     return response.type === 'sessions.ok' ? response.sessions : [];
+  }
+
+  /**
+   * The host's model catalog.
+   *
+   * A host that does not implement `models.list` answers `bad-request`: that means
+   * "nothing to offer", not a failure. An empty catalog is a valid answer too.
+   */
+  async listModels(): Promise<ModelCatalog> {
+    const response = await this.#request({ type: 'models.list' });
+
+    if (response.type === 'error') {
+      if (response.code === 'bad-request') return { groups: [], failures: [] };
+      throw new ConnectionError(response.message, response.code);
+    }
+
+    return response.type === 'models.ok' ? response.catalog : { groups: [], failures: [] };
+  }
+
+  /**
+   * Changes the model of one session.
+   *
+   * Returns the selection the host normalized, so the UI shows what will actually
+   * run rather than what was asked for.
+   */
+  async selectModel(sessionId: string, selection: ModelSelection): Promise<ModelSelection> {
+    const response = await this.#request({
+      type: 'model.select',
+      sessionId,
+      provider: selection.provider,
+      model: selection.model,
+      ...(selection.reasoningEffort ? { reasoningEffort: selection.reasoningEffort } : {}),
+    });
+
+    if (response.type === 'error') throw new ConnectionError(response.message, response.code);
+    if (response.type !== 'model.selected') {
+      throw new ConnectionError('The host did not confirm the model.', 'internal');
+    }
+    return response.selection;
   }
 
   /** Responde un lote completo. El host rechaza un lote parcial. */

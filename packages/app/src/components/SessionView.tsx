@@ -1,5 +1,11 @@
 import { useState } from 'react';
-import type { HistoryEntry, SessionSummary, TranscriptEvent } from '@dsh-mobile/protocol';
+import type {
+  HistoryEntry,
+  ModelCatalog,
+  ModelSelection,
+  SessionSummary,
+  TranscriptEvent,
+} from '@dsh-mobile/protocol';
 import { groupTurns, partTurn, type Turn } from '../lib/turns.js';
 import { plural, useI18n } from '../i18n/index.js';
 
@@ -131,24 +137,173 @@ function TurnBlock({ turn, number }: { turn: Turn; number: number }) {
   );
 }
 
+/**
+ * Modelo y nivel de razonamiento de la sesión.
+ *
+ * Es el mismo catálogo que ofrece el escritorio: el host lo describe con
+ * `session.modelCatalog` y el cambio va por `session.selectModel`, así que la
+ * lista no puede quedarse corta respecto a lo que el host admite de verdad.
+ *
+ * Se usa un `<select>` nativo porque en un teléfono ya trae el selector del
+ * sistema, con búsqueda y accesibilidad resueltas.
+ */
+function ModelBar({
+  model,
+  catalog,
+  onSelect,
+}: {
+  /** Puede faltar mientras la lista no conozca el modelo de la sesión. */
+  model: ModelSelection | undefined;
+  catalog: ModelCatalog;
+  onSelect: (selection: ModelSelection) => void;
+}) {
+  const { t } = useI18n();
+
+  const choices = catalog.groups.flatMap((group) =>
+    group.models.map((option) => ({ provider: group.id, option })),
+  );
+
+  // Lo que la sesión usará si nadie ha elegido: el modelo del despliegue.
+  const current = model ?? catalog.default;
+  const index = choices.findIndex(
+    (choice) => choice.provider === current?.provider && choice.option.id === current?.model,
+  );
+  const selected = choices[index];
+  const efforts = selected?.option.reasoningEfforts ?? [];
+  // El elegido de verdad, si lo hay. El `defaultReasoningEffort` es lo que el host
+  // aplicaría sin elección: sirve para mostrarlo, no para arrastrarlo como si el
+  // usuario lo hubiera elegido.
+  const explicitEffort = model?.reasoningEffort;
+  const effort = explicitEffort ?? selected?.option.defaultReasoningEffort ?? '';
+
+  const choose = (next: number): void => {
+    const choice = choices[next];
+    if (!choice) return;
+
+    // El nivel anterior puede no existir en el modelo nuevo: se conserva solo si lo
+    // anuncia, y si no se usa el que ese modelo trae por defecto.
+    const available = choice.option.reasoningEfforts ?? [];
+    const keep =
+      explicitEffort && available.some((item) => item.id === explicitEffort)
+        ? explicitEffort
+        : undefined;
+    const effortId = keep ?? choice.option.defaultReasoningEffort;
+
+    onSelect({
+      provider: choice.provider,
+      model: choice.option.id,
+      ...(effortId ? { reasoningEffort: effortId } : {}),
+    });
+  };
+
+  const chooseEffort = (next: string): void => {
+    if (!selected) return;
+    onSelect({
+      provider: selected.provider,
+      model: selected.option.id,
+      ...(next ? { reasoningEffort: next } : {}),
+    });
+  };
+
+  if (choices.length === 0) {
+    return catalog.failures.length > 0 ? (
+      <p className="muted small">{failuresText(catalog)}</p>
+    ) : (
+      <p className="muted small">{t('model.none')}</p>
+    );
+  }
+
+  return (
+    <>
+      <div className="model-bar">
+        <label className="model-field">
+          <span className="muted small">{t('model.label')}</span>
+          <select
+            value={index >= 0 ? String(index) : ''}
+            onChange={(event) => {
+              // El hueco no es una opción: `Number('')` es 0 y elegiría el primero.
+              if (event.target.value === '') return;
+              choose(Number(event.target.value));
+            }}
+          >
+            {index < 0 && (
+              <option value="" disabled>
+                {t('model.choose')}
+              </option>
+            )}
+            {catalog.groups.map((group) => (
+              <optgroup key={group.id} label={group.name}>
+                {group.models.map((option) => {
+                  const at = choices.findIndex(
+                    (choice) => choice.provider === group.id && choice.option.id === option.id,
+                  );
+                  return (
+                    <option key={option.id} value={String(at)}>
+                      {option.name}
+                    </option>
+                  );
+                })}
+              </optgroup>
+            ))}
+          </select>
+        </label>
+
+        {efforts.length > 0 && (
+          <label className="model-field">
+            <span className="muted small">{t('model.effort')}</span>
+            <select value={effort} onChange={(event) => chooseEffort(event.target.value)}>
+              <option value="">{t('model.effortDefault')}</option>
+              {efforts.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+      </div>
+
+      {/* Un proveedor que no se pudo leer se dice: un catálogo corto sin motivo
+          parece un fallo de la app. */}
+      {catalog.failures.length > 0 && <p className="muted small">{failuresText(catalog)}</p>}
+    </>
+  );
+}
+
+/** Proveedores que el host no pudo leer, en una línea. */
+function failuresText(catalog: ModelCatalog): string {
+  return catalog.failures.map((failure) => `${failure.name}: ${failure.message}`).join(' · ');
+}
+
 export function SessionView({
   session,
   entries,
   hasMore,
   loading,
+  model,
+  catalog,
+  error,
   onBack,
   onLoadMore,
   onCancel,
   onSend,
+  onSelectModel,
 }: {
   session: SessionSummary;
   entries: HistoryEntry[];
   hasMore: boolean;
   loading: boolean;
+  /** Modelo con el que seguirá la sesión, si el host lo proyecta. */
+  model?: ModelSelection;
+  /** Catálogo de modelos, cuando el host anunció `model.select`. */
+  catalog?: ModelCatalog;
+  /** Error del último cambio de modelo. */
+  error?: string;
   onBack: () => void;
   onLoadMore: () => void;
   onCancel: () => void;
   onSend: (text: string) => void;
+  onSelectModel?: (selection: ModelSelection) => void;
 }) {
   const { t } = useI18n();
   const [draft, setDraft] = useState('');
@@ -173,6 +328,16 @@ export function SessionView({
 
       <h2 className="session-heading">{session.title}</h2>
       <p className="muted small">{t(STATE_KEY[session.state] ?? 'session.idle')}</p>
+
+      {error && (
+        <p className="error" role="alert">
+          {error}
+        </p>
+      )}
+
+      {catalog && onSelectModel && (
+        <ModelBar model={model} catalog={catalog} onSelect={onSelectModel} />
+      )}
 
       {hasMore && (
         <button type="button" className="ghost load-more" onClick={onLoadMore} disabled={loading}>

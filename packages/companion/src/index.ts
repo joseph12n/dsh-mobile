@@ -21,6 +21,7 @@ import {
   canCreateSession,
   createSession,
 } from './dsh/lifecycle.js';
+import { canListModels, canSelectModel, listModels, selectModel } from './dsh/models.js';
 import type { HostContext } from './host-api.js';
 import { reportToLog, reportToText, runProbe, type ProbeReport } from './probe.js';
 import { DEFAULT_PORT, startCompanionServer } from './server.js';
@@ -227,6 +228,9 @@ export function apply(ctx: HostContext): void {
     if (hasWorkspaces(ctx)) list.push('workspace.list');
     if (canCreateSession(ctx)) list.push('session.create');
     if (canArchiveSession(ctx)) list.push('workspace.archive');
+    // Las dos mitades o ninguna: un selector que no puede cambiar el modelo no
+    // debería siquiera ofrecerse.
+    if (canListModels(ctx) && canSelectModel(ctx)) list.push('model.select');
     return list;
   };
 
@@ -243,6 +247,9 @@ export function apply(ctx: HostContext): void {
     listWorkspaces: () => listWorkspaces(ctx),
     createSession: (request) => createSession(ctx, request),
     archiveSession: (request) => archiveSession(ctx, request),
+    // Modelos: el catálogo y el cambio salen del mismo controlador que el escritorio.
+    listModels: () => listModels(ctx),
+    selectModel: (request) => selectModel(ctx, request),
     // Preguntas: proyección `userQuestions` y respuesta por lote.
     listQuestions: () => listPendingQuestions(ctx),
     answerQuestion: (input) => answerQuestion(ctx, input),

@@ -98,6 +98,12 @@ const en = {
   'session.questionCount': '{count} question',
   'session.questionCount_plural': '{count} questions',
 
+  'model.label': 'Model',
+  'model.effort': 'Reasoning',
+  'model.effortDefault': 'Default',
+  'model.none': 'No models available',
+  'model.choose': 'Select model',
+
   'questions.title': 'Waiting for you',
   'questions.other': 'Or write another answer…',
   'questions.submit': 'Send answer',
@@ -189,6 +195,12 @@ const es: Catalogue = {
   'session.questionCount': '{count} pregunta',
   'session.questionCount_plural': '{count} preguntas',
 
+  'model.label': 'Modelo',
+  'model.effort': 'Razonamiento',
+  'model.effortDefault': 'Por defecto',
+  'model.none': 'No hay modelos disponibles',
+  'model.choose': 'Elegir modelo',
+
   'questions.title': 'Te está esperando',
   'questions.other': 'O escribe otra respuesta…',
   'questions.submit': 'Enviar respuesta',
@@ -275,6 +287,12 @@ const ptBR: Catalogue = {
   'session.questionCount': '{count} pergunta',
   'session.questionCount_plural': '{count} perguntas',
 
+  'model.label': 'Modelo',
+  'model.effort': 'Raciocínio',
+  'model.effortDefault': 'Padrão',
+  'model.none': 'Nenhum modelo disponível',
+  'model.choose': 'Escolher modelo',
+
   'questions.title': 'Esperando você',
   'questions.other': 'Ou escreva outra resposta…',
   'questions.submit': 'Enviar resposta',
@@ -359,6 +377,12 @@ const zhHans: Catalogue = {
   'session.hideTools': '隐藏',
   'session.questionCount': '{count} 个问题',
   'session.questionCount_plural': '{count} 个问题',
+
+  'model.label': '模型',
+  'model.effort': '推理强度',
+  'model.effortDefault': '默认',
+  'model.none': '没有可用的模型',
+  'model.choose': '选择模型',
 
   'questions.title': '等待你回复',
   'questions.other': '或者写另一个回答…',

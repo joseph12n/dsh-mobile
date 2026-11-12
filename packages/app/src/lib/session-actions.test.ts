@@ -86,3 +86,75 @@ describe('archivar una sesión', () => {
     await expect(archiving).rejects.toBeInstanceOf(ConnectionError);
   });
 });
+
+describe('modelos', () => {
+  const catalog = {
+    default: { provider: 'deepseek', model: 'chat' },
+    groups: [{ id: 'deepseek', name: 'DeepSeek', models: [{ id: 'chat', name: 'Chat' }] }],
+    failures: [],
+  };
+
+  it('lee el catálogo', async () => {
+    stubSocket();
+    const { socket, client } = await connected(['model.select']);
+
+    const listing = client.listModels();
+    await flush();
+    answer(socket, { type: 'models.ok', catalog });
+
+    await expect(listing).resolves.toEqual(catalog);
+  });
+
+  it('trata bad-request como "sin modelos", no como fallo', async () => {
+    stubSocket();
+    const { socket, client } = await connected();
+
+    const listing = client.listModels();
+    await flush();
+    answer(socket, { type: 'error', code: 'bad-request', message: 'no' });
+
+    await expect(listing).resolves.toEqual({ groups: [], failures: [] });
+  });
+
+  it('manda el esfuerzo solo cuando existe y devuelve el normalizado', async () => {
+    stubSocket();
+    const { socket, client } = await connected(['model.select']);
+
+    const choosing = client.selectModel('session-1', {
+      provider: 'deepseek',
+      model: 'chat',
+      reasoningEffort: 'high',
+    });
+    await flush();
+    expect(lastSent(socket)).toMatchObject({
+      type: 'model.select',
+      sessionId: 'session-1',
+      provider: 'deepseek',
+      model: 'chat',
+      reasoningEffort: 'high',
+    });
+
+    answer(socket, {
+      type: 'model.selected',
+      sessionId: 'session-1',
+      selection: { provider: 'deepseek', model: 'chat' },
+    });
+    await expect(choosing).resolves.toEqual({ provider: 'deepseek', model: 'chat' });
+  });
+
+  it('no manda la clave del esfuerzo cuando no hay', async () => {
+    stubSocket();
+    const { socket, client } = await connected(['model.select']);
+
+    const choosing = client.selectModel('session-1', { provider: 'p', model: 'm' });
+    await flush();
+    expect(lastSent(socket)).not.toHaveProperty('reasoningEffort');
+
+    answer(socket, {
+      type: 'model.selected',
+      sessionId: 'session-1',
+      selection: { provider: 'p', model: 'm' },
+    });
+    await choosing;
+  });
+});

@@ -10,6 +10,7 @@
  * resumen no las trae.
  */
 import type {
+  ModelSelection,
   SessionState as WireState,
   SessionSummary as WireSession,
 } from '@dsh-mobile/protocol';
@@ -20,6 +21,7 @@ import {
   type SessionsService,
 } from '../host-api.js';
 import { listArchivedSessions, listWorkspaces } from './workspaces.js';
+import { selectionOf } from './models.js';
 
 /** Una entrada del registro de sesiones, tal como la ve el móvil. */
 export interface SessionRecord {
@@ -34,6 +36,8 @@ export interface SessionRecord {
   pendingQuestions: number;
   /** Folder that contains it, when the host exposes workspaces. */
   workspaceId?: string;
+  /** Modelo con el que seguirá la sesión, si el host lo proyecta. */
+  model?: ModelSelection;
 }
 
 /** Resumen que devuelve `sessionController.list()`. Subconjunto de lo que usamos. */
@@ -83,6 +87,17 @@ function pendingFor(
   }
 }
 
+/** Lee el modelo vigente de la proyección `modelSelection`. */
+function modelFor(item: ControllerSummary): ModelSelection | undefined {
+  const snapshot = item.projections?.values?.['modelSelection'];
+  if (typeof snapshot !== 'object' || snapshot === null) return undefined;
+  const record = snapshot as Record<string, unknown>;
+
+  // La vista de la proyección es `{ lastUsed, next }`: `next` es lo que se aplicará
+  // al próximo turno, que es justo lo que el usuario acaba de elegir.
+  return selectionOf(record['next']) ?? selectionOf(record['lastUsed']) ?? selectionOf(record);
+}
+
 /** Traduce el estado del controlador a nuestro vocabulario, sin inventarlo. */
 function wireState(record: SessionRecord): WireState {
   if (record.pendingQuestions > 0) return 'waiting';
@@ -116,6 +131,7 @@ export async function listSessions(ctx: HostContext): Promise<SessionRecord[]> {
       const id = typeof item.sessionId === 'string' ? item.sessionId : '';
       const titleValue = item.projections?.values?.['title'];
       const pendingQuestions = id ? pendingFor(ctx, id, projections) : 0;
+      const model = id ? modelFor(item) : undefined;
 
       return {
         id,
@@ -125,6 +141,7 @@ export async function listSessions(ctx: HostContext): Promise<SessionRecord[]> {
         agentAvailable: item.agentAvailable === true,
         running: item.running === true,
         pendingQuestions,
+        ...(model ? { model } : {}),
       };
     })
     .filter((record) => record.id !== '');
@@ -167,5 +184,6 @@ export function toWireSession(record: SessionRecord): WireSession {
     pendingQuestions: record.pendingQuestions,
     // Se omite, never empty: el contrato acepta cualquier cadena, pero un `''` no es un id.
     ...(record.workspaceId ? { workspaceId: record.workspaceId } : {}),
+    ...(record.model ? { model: record.model } : {}),
   };
 }
