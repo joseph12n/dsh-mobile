@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { CONTRASTS, isContrast, storeContrast, storedContrast } from './contrast.js';
+import { fakeStorage, restoreStorage } from './test-storage.js';
 
 /**
  * The contrast choice.
@@ -11,32 +12,9 @@ import { CONTRASTS, isContrast, storeContrast, storedContrast } from './contrast
  */
 
 const KEY = 'dsh-mobile.contrast';
-const original = globalThis.localStorage;
-
-/** A `localStorage` good enough for the module, in a Node environment. */
-function fakeStorage(options: { throwOnGet?: boolean; throwOnSet?: boolean } = {}): void {
-  const data = new Map<string, string>();
-
-  (globalThis as unknown as { localStorage: unknown }).localStorage = {
-    getItem(key: string): string | null {
-      if (options.throwOnGet) throw new Error('denied');
-      return data.get(key) ?? null;
-    },
-    setItem(key: string, value: string): void {
-      if (options.throwOnSet) throw new Error('full');
-      data.set(key, value);
-    },
-    removeItem(key: string): void {
-      data.delete(key);
-    },
-    clear(): void {
-      data.clear();
-    },
-  };
-}
 
 afterEach(() => {
-  (globalThis as unknown as { localStorage: unknown }).localStorage = original;
+  restoreStorage();
 });
 
 describe('reading the stored level', () => {

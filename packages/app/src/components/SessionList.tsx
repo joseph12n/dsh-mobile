@@ -2,6 +2,7 @@ import { useId, useState } from 'react';
 import type { SessionSummary, Workspace } from '@dsh-mobile/protocol';
 import { groupSessions, elapsed } from '../lib/sessions.js';
 import { displayTitle, groupByFolder, usesFolders } from '../lib/folders.js';
+import { folderView, type FolderPreferences } from '../lib/preferences.js';
 import { plural, useI18n } from '../i18n/index.js';
 
 /**
@@ -42,6 +43,7 @@ export function SessionList({
   canArchive = false,
   createPending,
   archivePending,
+  preferences,
 }: {
   sessions: SessionSummary[];
   workspaces: Workspace[];
@@ -55,17 +57,30 @@ export function SessionList({
   createPending?: string;
   /** Session whose archive is in flight, for the same reason. */
   archivePending?: string;
+  /** How the user wants the folders shown. Without them, the host order. */
+  preferences?: FolderPreferences;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [showStale, setShowStale] = useState(false);
 
-  const folders = groupByFolder(sessions, workspaces);
+  const grouped = groupByFolder(sessions, workspaces);
+  const view = preferences
+    ? folderView(grouped, preferences, locale)
+    : { state: 'folders' as const, sections: grouped };
 
   // Sin carpetas y sin sesiones, el aviso. Con carpetas, se pintan igual: es donde
   // irían las sesiones nuevas y esconderlas borraba la agrupación entera.
   if (sessions.length === 0 && !usesFolders(workspaces)) {
     return <p className="muted">{t('sessions.empty')}</p>;
   }
+
+  // Solo se avisa cuando no hay nada que pintar y el motivo es que el usuario ocultó
+  // las carpetas. Si no queda ninguna por «ocultar vacías», se muestran igual.
+  if (view.state === 'all-hidden') {
+    return <p className="muted">{t('settings.allHidden')}</p>;
+  }
+
+  const folders = view.sections;
 
   if (usesFolders(workspaces)) {
     return (

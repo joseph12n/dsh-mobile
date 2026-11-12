@@ -491,6 +491,63 @@ button.ghost.tiny {
   font-size: 16px;
 }
 
+/* --- Ajustes --------------------------------------------------------------- */
+
+.settings {
+  margin: 4px 0 12px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.settings > summary {
+  /* Sin `display: flex`, que borraba el triángulo: el panel dejaba de parecer
+     desplegable justo cuando un aviso manda a Ajustes. */
+  min-height: 44px;
+  padding: 12px 0;
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.settings[open] > summary {
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  /* Cada opción es una fila de 44 px: una casilla de 20 px se falla. */
+  min-height: 44px;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.settings-row input[type='checkbox'] {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--accent);
+}
+
+.settings-row select {
+  margin-left: auto;
+}
+
+.settings-folders {
+  margin: 0;
+  padding: 4px 0 8px;
+  border: 0;
+}
+
+.settings-folders legend {
+  padding-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
 /* --- Transcripción -------------------------------------------------------- */
 
 .session-row {

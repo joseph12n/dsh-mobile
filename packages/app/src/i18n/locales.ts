@@ -68,6 +68,14 @@ const en = {
   'group.show': 'Show',
   'group.hide': 'Hide',
 
+  'settings.title': 'Settings',
+  'settings.folderOrder': 'Folder order',
+  'settings.order.host': 'Host order',
+  'settings.order.name': 'Name',
+  'settings.order.recent': 'Recent activity',
+  'settings.hideEmpty': 'Hide empty folders',
+  'settings.allHidden': 'All folders are hidden. Show one in Settings.',
+
   'session.working': 'working',
   'session.waiting': 'waiting',
   'session.idle': 'idle',
@@ -156,6 +164,14 @@ const es: Catalogue = {
   'group.show': 'Mostrar',
   'group.hide': 'Ocultar',
 
+  'settings.title': 'Ajustes',
+  'settings.folderOrder': 'Orden de carpetas',
+  'settings.order.host': 'Orden del host',
+  'settings.order.name': 'Nombre',
+  'settings.order.recent': 'Actividad reciente',
+  'settings.hideEmpty': 'Ocultar carpetas vacías',
+  'settings.allHidden': 'Todas las carpetas están ocultas. Muestra alguna en Ajustes.',
+
   'session.working': 'trabajando',
   'session.waiting': 'espera respuesta',
   'session.idle': 'en reposo',
@@ -239,6 +255,14 @@ const ptBR: Catalogue = {
   'group.show': 'Mostrar',
   'group.hide': 'Ocultar',
 
+  'settings.title': 'Ajustes',
+  'settings.folderOrder': 'Ordem das pastas',
+  'settings.order.host': 'Ordem do host',
+  'settings.order.name': 'Nome',
+  'settings.order.recent': 'Atividade recente',
+  'settings.hideEmpty': 'Ocultar pastas vazias',
+  'settings.allHidden': 'Todas as pastas estão ocultas. Mostre uma em Ajustes.',
+
   'session.working': 'trabalhando',
   'session.waiting': 'espera resposta',
   'session.idle': 'parada',
@@ -320,6 +344,14 @@ const zhHans: Catalogue = {
   'group.emptyFolder': '这里还没有会话。',
   'group.show': '显示',
   'group.hide': '隐藏',
+
+  'settings.title': '设置',
+  'settings.folderOrder': '文件夹顺序',
+  'settings.order.host': '主机顺序',
+  'settings.order.name': '名称',
+  'settings.order.recent': '最近活动',
+  'settings.hideEmpty': '隐藏空文件夹',
+  'settings.allHidden': '所有文件夹都已隐藏。请在设置中显示一个。',
 
   'session.working': '进行中',
   'session.waiting': '等待回复',
