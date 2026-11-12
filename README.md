@@ -1,169 +1,174 @@
 # DSH Mobile
 
-Cliente móvil (**PWA** instalable) + plugin host para **[DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)**.
+Installable mobile **PWA** plus a host plugin for **[DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)**.
 
-Controla tus sesiones desde el teléfono: mira el estado, lee la transcripción, responde,
-aprueba preguntas y lanza o cancela ejecuciones. El PC sigue siendo el que ejecuta todo;
-el móvil es un control remoto, no un segundo agente.
+Control your sessions from your phone: see the state, read the transcript, answer and approve
+questions, send messages and cancel runs. The PC still does all the work; the phone is a
+remote control, not a second agent.
 
-> **Estado: fase 2 funcional.** Emparejar por QR, listar sesiones, leer la transcripción en
-> vivo, responder preguntas y aprobaciones, escribir y cancelar ejecuciones. Faltan las
-> tareas de despliegue y pulido, que están como issues en GitHub.
+> **Status: phase 2, working.** Pair by QR, list sessions, read the transcript live, answer
+> questions and approvals, write, and cancel runs. Deployment and polish are still open as
+> GitHub issues.
 
 ---
 
-## Cómo funciona
+## How it works
 
 ```
-PC (ejecuta DSH)                                  Teléfono
+PC (runs DSH)                                      Phone
 ┌──────────────────────────────────────┐   ┌──────────────────────────┐
 │ plugin @dsh-mobile/companion         │   │ PWA @dsh-mobile/app      │
-│  · listener propio :6768             │◄─►│  · emparejamiento        │
-│  · sirve la PWA compilada            │WS │  · sesiones y estado     │
-│  · emparejamiento por QR             │   │  · transcripción         │
-│  · token por dispositivo             │   │  · preguntas y respuestas│
-│  · puente a los servicios de DSH     │   │  · composer              │
+│  · its own listener :6768            │◄─►│  · pairing               │
+│  · serves the built PWA              │WS │  · sessions and state    │
+│  · pairing by QR                     │   │  · transcript            │
+│  · one token per device              │   │  · questions and answers │
+│  · bridge to the DSH services        │   │  · composer              │
 └──────────────────────────────────────┘   └──────────────────────────┘
 ```
 
-El plugin corre **dentro** del proceso de DSH, así que ve las sesiones sin forkear el
-núcleo y sin romperse con las actualizaciones del upstream.
+The plugin runs **inside** the DSH process, so it sees the sessions without forking the core
+and without breaking on upstream updates.
 
-**La frontera es el contrato.** El móvil nunca habla con las tripas de DSH: habla
-`dsh-mobile/1`, un protocolo propio y versionado. Solo el plugin conoce DSH. Si upstream
-cambia, se toca un adaptador y el cliente no se entera.
+**The boundary is the contract.** The phone never talks to DSH's internals: it talks
+`dsh-mobile/1`, a protocol of our own, versioned. Only the plugin knows DSH. If upstream
+changes, one adapter changes and the client never notices.
 
-**Un solo artefacto.** El plugin sirve la PWA compilada, así que host y cliente no pueden
-desincronizarse: son la misma versión por construcción.
+**A single artifact.** The plugin serves the built PWA, so host and client cannot drift
+apart: they are the same version by construction.
 
-### Emparejamiento
+### Pairing
 
-El escritorio muestra un **QR** que no es un código suelto, sino un **enlace directo**:
+The desktop shows a **QR** that is not a bare code but a **direct link**:
 
 ```
-https://<host>/#/pair?v=1&c=<código>&e=<endpoint>
+https://<host>/#/pair?v=1&c=<code>&e=<endpoint>
 ```
 
-Un solo escaneo resuelve _a dónde_ conectarse y _quién_ eres. El código va en el fragmento
-de la URL, así que no viaja al servidor ni queda en logs. Caduca a los 10 minutos, es de
-un solo uso y el canje crea un **token de dispositivo** guardado en hash.
+One scan answers _where_ to connect and _who_ you are. The code travels in the URL fragment,
+so it never reaches the server or a log. It expires in 10 minutes, works once, and redeeming
+it creates a **device token** stored as a hash.
 
-El token es del dispositivo, no de la red, así que **el protocolo no ata la conexión a una
-dirección**. Dicho eso, con honestidad: **la app todavía no ofrece cambiar el endpoint**;
-hoy, para apuntar a otra dirección hay que volver a emparejar. Está en el issue #22.
+The token belongs to the device, not the network, so **the protocol does not tie a connection
+to one address**. That said, honestly: **the app does not offer changing the endpoint yet**;
+today, pointing at another address means pairing again.
 
-Y el único camino que llega al plugin es el **nombre del tailnet**, porque escucha solo en
-loopback. La LAN directa no está implementada.
+And the only path that reaches the plugin is the **tailnet name**, because it listens on
+loopback only. Direct LAN access is not implemented.
 
 ---
 
-## Paquetes
+## Packages
 
-| Paquete                                       | Qué es                                                      |
-| --------------------------------------------- | ----------------------------------------------------------- |
-| [`@dsh-mobile/protocol`](packages/protocol)   | Contrato: esquemas Zod, tipos y constantes. Isomorfo        |
-| [`@dsh-mobile/companion`](packages/companion) | Plugin host: listener, emparejamiento, PWA, adaptador a DSH |
-| [`@dsh-mobile/app`](packages/app)             | PWA: React + Vite                                           |
+| Package                                       | What it is                                              |
+| --------------------------------------------- | ------------------------------------------------------- |
+| [`@dsh-mobile/protocol`](packages/protocol)   | The contract: Zod schemas, types, constants. Isomorphic |
+| [`@dsh-mobile/companion`](packages/companion) | Host plugin: listener, pairing, PWA, DSH adapter        |
+| [`@dsh-mobile/app`](packages/app)             | PWA: React + Vite                                       |
 
-El contrato exige **TypeScript** en todo el repo: un esquema, dos consumidores, y un
-cambio incompatible rompe el build en vez de al usuario.
+The contract requires **TypeScript** everywhere: one schema, two consumers, and an
+incompatible change breaks the build instead of the user.
 
 ---
 
-## Requisitos
+## Requirements
 
-- **Node.js 24** (el plugin corre en el Node que embebe DSH; se desarrolla con la misma
-  versión para no usar APIs que el host no tiene).
+- **Node.js 24** (the plugin runs on the Node DSH embeds; development uses the same version so
+  we do not rely on APIs the host lacks).
 - **pnpm 12**.
-- DeepSeek Harness instalado en el PC.
+- DeepSeek Harness installed on the PC.
 
-## Desarrollo
+## Development
 
 ```bash
 pnpm install
-pnpm build        # protocol → companion → app (orden topológico)
+pnpm build        # protocol → companion → app (topological order)
 pnpm test         # vitest
-pnpm smoke        # arranca el servidor compilado y comprueba PWA + emparejamiento
+pnpm smoke        # starts the built server and checks the PWA and pairing
 pnpm typecheck
 pnpm lint
-pnpm dev          # PWA en http://127.0.0.1:5173
+pnpm dev          # PWA on http://127.0.0.1:5173
 ```
 
-`pnpm smoke` es la comprobación de que **el paquete que se publicaría** funciona: levanta
-el servidor de `dist/` sirviendo la PWA de `dist/` en un puerto efímero y recorre
-emparejamiento y listado de sesiones.
+`pnpm smoke` checks that **the package we would publish** works: it starts the `dist/` server
+serving the `dist/` PWA on an ephemeral port and walks through pairing and listing sessions.
 
-## Uso del plugin
+## Using the plugin
 
-Enlázalo desde tu perfil de DSH (`~/.dsh/profiles/<perfil>/package.json`):
+Link it from your DSH profile (`~/.dsh/profiles/<profile>/package.json`):
 
 ```json
 {
   "dsh": { "profile": { "bundles": ["@dsh-mobile/companion"] } },
-  "dependencies": { "@dsh-mobile/companion": "link:/ruta/a/dsh-mobile/packages/companion" }
+  "dependencies": { "@dsh-mobile/companion": "link:/path/to/dsh-mobile/packages/companion" }
 }
 ```
 
-El plugin escucha en `127.0.0.1:6768` y expone:
+The plugin listens on `127.0.0.1:6768` and exposes:
 
-| Ruta          | Qué hace                                                 |
-| ------------- | -------------------------------------------------------- |
-| `GET /`       | La PWA instalable                                        |
-| `GET /pair`   | QR de emparejamiento y código en texto                   |
-| `GET /health` | Estado, versión de protocolo, capacidades y dispositivos |
-| `WS /ws`      | El contrato `dsh-mobile/1`                               |
+| Route         | What it does                                      |
+| ------------- | ------------------------------------------------- |
+| `GET /`       | The installable PWA                               |
+| `GET /pair`   | Pairing QR and the code as text                   |
+| `GET /health` | State, protocol version, capabilities and devices |
+| `WS /ws`      | The `dsh-mobile/1` contract                       |
 
-### El comando `/mobile`
+### The `/mobile` command
 
-Dentro de DSH, `/mobile` imprime **el enlace de emparejamiento, el código y su caducidad**,
-sin tener que abrir `/pair` a mano ni copiar una URL de la consola. `/mobile estado` muestra
-el sondeo de diagnóstico.
+Inside DSH, `/mobile` opens the pairing page in the desktop browser, where the QR is an
+image and scans with any font. Subcommands:
 
-El enlace sale con el nombre del tailnet si Tailscale está instalado, así que se puede abrir
-directamente desde el teléfono. Si no lo está, avisa de que el enlace apunta a loopback.
+| Command          | What it does                                                  |
+| ---------------- | ------------------------------------------------------------- |
+| `/mobile`        | Opens `/pair`; also prints the link and the code              |
+| `/mobile open`   | The same, spelled out                                         |
+| `/mobile qr`     | Prints the QR **as text**, for a terminal with line height 1  |
+| `/mobile link`   | Only the link and the code                                    |
+| `/mobile status` | Diagnostic probe: services, projections, where text can go in |
 
-Variables de entorno: `DSH_MOBILE_PORT`, `DSH_MOBILE_PUBLIC_URL`, `DSH_MOBILE_WEB_ROOT`.
-`DSH_MOBILE_LOG_FILE=0` desactiva el archivo de evidencia del plugin (lo usan las pruebas y
-las herramientas de vista previa para no ensuciar el log del usuario).
+The QR as text only scans where the line height equals the font size; the DSH chat does not
+do that, which is why opening the page is the default.
 
-### Qué puedes hacer desde el teléfono
+Environment variables: `DSH_MOBILE_PORT`, `DSH_MOBILE_PUBLIC_URL`, `DSH_MOBILE_WEB_ROOT`.
+`DSH_MOBILE_LOG_FILE=0` turns off the plugin's evidence file, which the tests and the preview
+tool use so they do not dirty your log.
 
-- Ver las sesiones vivas con su estado y cuántas preguntas esperan.
-- Abrir una sesión y leer la transcripción, con historial paginado y eventos en vivo.
-- **Responder preguntas y aprobaciones**, con el texto completo y las opciones.
-- **Escribir** al agente y **cancelar** el turno en curso.
+### What you can do from the phone
 
----
-
-## Seguridad
-
-- **Solo loopback.** La dirección de escucha es una constante en el código, no una opción: el
-  plugin atiende en `127.0.0.1` y se publica por el nombre del tailnet con `tailscale serve`.
-  **No acepta conexiones directas desde la LAN** porque nunca abre ese socket.
-- **Nunca a internet sin autenticación sólida.** Esto es un cliente que puede ejecutar
-  acciones en tu máquina. Hoy la red privada del tailnet es el único camino soportado;
-  exponerlo a internet no lo es.
-- **Token por dispositivo, guardado en hash.** Revocar uno no afecta a los demás.
-- **El host decide.** El cliente no oculta por CSS lo que no puede hacer: el servidor no
-  lo envía.
-- **Alcance acotado.** El móvil no cambia ajustes, credenciales ni plugins.
-
-Para usarlo fuera de casa se recomienda **Tailscale**, sirviendo la PWA por HTTPS en el
-nombre del tailnet: contexto seguro, certificado propio y una sola URL para casa y para
-la calle.
+- See live sessions with their state and how many questions are waiting.
+- Open a session and read the transcript, with paged history and live events.
+- **Answer questions and approvals**, with the full text and the options.
+- **Write** to the agent and **cancel** the running turn.
 
 ---
 
-## Documentación
+## Security
 
-- [`docs/phone-setup.md`](docs/phone-setup.md) — **cómo usarlo desde el teléfono**, paso a
-  paso, con Tailscale y los problemas típicos.
-- [`docs/architecture.md`](docs/architecture.md) — **por qué** está construido así: capas,
-  protocolo, emparejamiento y decisiones descartadas.
-- [`CONTRIBUTING.md`](CONTRIBUTING.md) — cómo trabajar en el repo.
-- [`packages/protocol/src/messages.ts`](packages/protocol/src/messages.ts) — el contrato,
-  como código y como fuente de verdad.
+- **Loopback only.** The listen address is a constant in the code, not an option: the plugin
+  serves `127.0.0.1` and is published through the tailnet name with `tailscale serve`. **It
+  accepts no direct connections from the LAN** because it never opens that socket.
+- **Never to the internet without solid authentication.** This is a client that can run
+  actions on your machine. Today the tailnet's private network is the only supported path;
+  exposing it to the internet is not.
+- **One token per device, stored as a hash.** Revoking one does not affect the others.
+- **The host decides.** The client does not hide with CSS what it cannot do: the server does
+  not send it.
+- **Narrow scope.** The phone does not change settings, credentials or plugins.
 
-## Licencia
+To use it away from home, **Tailscale** is the recommendation: serve the PWA over HTTPS on the
+tailnet name — a secure context, its own certificate, and one URL for home and for the street.
+
+---
+
+## Documentation
+
+- [`docs/phone-setup.md`](docs/phone-setup.md) — **how to use it from the phone**, step by
+  step, with Tailscale and the usual problems.
+- [`docs/architecture.md`](docs/architecture.md) — **why** it is built this way: layers,
+  protocol, pairing, and the decisions we rejected.
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) — how to work on the repo.
+- [`packages/protocol/src/messages.ts`](packages/protocol/src/messages.ts) — the contract, as
+  code and as the source of truth.
+
+## License
 
 [MIT](LICENSE).
