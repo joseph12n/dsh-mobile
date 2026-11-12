@@ -27,6 +27,7 @@ interface WorkspaceRow {
 interface WorkspaceFeed {
   items?: unknown;
   value?: unknown;
+  archivedSessionIds?: unknown;
 }
 
 /** The Host service. Only the parts we use, and all optional. */
@@ -99,6 +100,46 @@ export function rowsOf(payload: unknown): unknown[] {
   return rowsFrom(payload);
 }
 
+/** Session ids the desktop has archived, from the same baseline. */
+function archivedFrom(node: unknown, depth = 0): string[] {
+  if (depth > 3 || typeof node !== 'object' || node === null) return [];
+  const record = node as WorkspaceFeed;
+
+  if (Array.isArray(record.archivedSessionIds)) {
+    return record.archivedSessionIds.filter(
+      (id): id is string => typeof id === 'string' && id.length > 0,
+    );
+  }
+
+  return 'value' in record ? archivedFrom(record.value, depth + 1) : [];
+}
+
+/**
+ * Sessions the desktop has archived.
+ *
+ * The session list does **not** consult this: the host keeps the row and the archive only
+ * marks it. Without this, archiving from the phone looks broken — the user taps Archive,
+ * the host obeys, and the row is still there.
+ */
+export async function listArchivedSessions(ctx: HostContext): Promise<Set<string>> {
+  const controller = service<WorkspaceController>(ctx, 'workspaceController');
+  if (!controller) return new Set();
+
+  try {
+    if (typeof controller.list === 'function') {
+      return new Set(archivedFrom(await controller.list()));
+    }
+
+    if (typeof controller.follow === 'function') {
+      return new Set(archivedFrom(await firstFrame(controller.follow.bind(controller))));
+    }
+  } catch {
+    // Sin dato, no se oculta nada: es peor esconder una sesión viva que mostrar una cerrada.
+  }
+
+  return new Set();
+}
+
 /** Maps a payload of rows, dropping the unusable ones. */
 export function toWorkspaces(payload: unknown): Workspace[] {
   return rowsOf(payload)
@@ -114,7 +155,7 @@ export function toWorkspaces(payload: unknown): Workspace[] {
  * earlier version aborted and hoped, which meant a host that ignores aborts hung the
  * command despite the comment saying it could not.
  */
-async function firstRows(
+async function firstFrame(
   follow: NonNullable<WorkspaceController['follow']>,
 ): Promise<unknown | undefined> {
   const controller = new AbortController();
@@ -126,8 +167,12 @@ async function firstRows(
 
   const reading = (async (): Promise<unknown | undefined> => {
     for await (const frame of follow(controller.signal)) {
-      const rows = rowsOf(frame);
-      if (rows.length > 0) return rows;
+      // El baseline llega siempre primero y es la foto completa, aunque esté vacío.
+      // Esperar a que traiga algo convertía "no hay carpetas" en 1,5 s de espera, y
+      // `listSessions` lee dos veces: la primera pantalla tardaba tres segundos.
+      const tipo = (frame as { type?: unknown }).type;
+      if (tipo === 'baseline') return frame;
+      if (rowsOf(frame).length > 0 || archivedFrom(frame).length > 0) return frame;
     }
     return undefined;
   })().catch(() => undefined);
@@ -162,7 +207,7 @@ export async function listWorkspaces(ctx: HostContext): Promise<Workspace[]> {
     }
 
     if (typeof controller.follow === 'function') {
-      return toWorkspaces(await firstRows(controller.follow.bind(controller)));
+      return toWorkspaces(await firstFrame(controller.follow.bind(controller)));
     }
   } catch {
     // A host that answers with something unexpected is a host without folders.

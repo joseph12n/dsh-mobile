@@ -19,7 +19,7 @@ import {
   type ProjectionsService,
   type SessionsService,
 } from '../host-api.js';
-import { listWorkspaces } from './workspaces.js';
+import { listArchivedSessions, listWorkspaces } from './workspaces.js';
 
 /** Una entrada del registro de sesiones, tal como la ve el móvil. */
 export interface SessionRecord {
@@ -146,9 +146,14 @@ export async function listSessions(ctx: HostContext): Promise<SessionRecord[]> {
     // Sin carpetas, la lista plana es la respuesta correcta.
   }
 
+  // Archivadas: el host mantiene la fila y solo marca el id, así que sin esto archivar
+  // desde el teléfono parecía no hacer nada. Se piden aparte y un fallo no esconde nada.
+  const archived = await listArchivedSessions(ctx).catch(() => new Set<string>());
+
   // Lo más reciente primero: es lo que uno mira al coger el teléfono.
-  records.sort((a, b) => b.updatedAt - a.updatedAt);
-  return records;
+  return records
+    .filter((record) => !archived.has(record.id))
+    .sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
 /** Convierte un registro interno en el mensaje del contrato. */
