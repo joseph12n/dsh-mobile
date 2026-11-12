@@ -23,9 +23,10 @@ interface WorkspaceRow {
   sessionIds?: unknown;
 }
 
-/** The `baseline` frame, or an object that carries the rows under `items`. */
+/** A frame or payload that carries the rows, under `items` or under `value`. */
 interface WorkspaceFeed {
   items?: unknown;
+  value?: unknown;
 }
 
 /** The Host service. Only the parts we use, and all optional. */
@@ -74,14 +75,28 @@ export function toWorkspace(row: unknown): Workspace | undefined {
   };
 }
 
+/** Reads a list of rows from one of the shapes the host uses. */
+function rowsFrom(node: unknown, depth = 0): unknown[] {
+  if (depth > 3) return [];
+  if (Array.isArray(node)) return node;
+  if (typeof node !== 'object' || node === null) return [];
+
+  const record = node as WorkspaceFeed;
+
+  // `{ items }` — the baseline payload.
+  if (Array.isArray(record.items)) return record.items;
+
+  // `{ type: 'baseline', value: { items } }` — what the Host controller really
+  // yields. Missing this made folders silently empty on the desktop while the
+  // capability said they were supported.
+  if ('value' in record) return rowsFrom(record.value, depth + 1);
+
+  return [];
+}
+
 /** Extracts the rows from whatever wrapper the host used. */
 export function rowsOf(payload: unknown): unknown[] {
-  if (Array.isArray(payload)) return payload;
-  if (typeof payload === 'object' && payload !== null) {
-    const items = (payload as WorkspaceFeed).items;
-    if (Array.isArray(items)) return items;
-  }
-  return [];
+  return rowsFrom(payload);
 }
 
 /** Maps a payload of rows, dropping the unusable ones. */
@@ -91,20 +106,36 @@ export function toWorkspaces(payload: unknown): Workspace[] {
     .filter((workspace): workspace is Workspace => workspace !== undefined);
 }
 
-/** Takes the first frame of `follow`, or `undefined` if it does not arrive in time. */
-async function firstFrame(
+/**
+ * Takes the first frame that carries rows.
+ *
+ * The abort is only a request: a stream that ignores the signal would keep the
+ * `for await` waiting forever, so the reading is **raced against the timer**. The
+ * earlier version aborted and hoped, which meant a host that ignores aborts hung the
+ * command despite the comment saying it could not.
+ */
+async function firstRows(
   follow: NonNullable<WorkspaceController['follow']>,
 ): Promise<unknown | undefined> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), FOLLOW_TIMEOUT_MS);
+
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<undefined>((resolve) => {
+    timer = setTimeout(() => resolve(undefined), FOLLOW_TIMEOUT_MS);
+  });
+
+  const reading = (async (): Promise<unknown | undefined> => {
+    for await (const frame of follow(controller.signal)) {
+      const rows = rowsOf(frame);
+      if (rows.length > 0) return rows;
+    }
+    return undefined;
+  })().catch(() => undefined);
 
   try {
-    for await (const frame of follow(controller.signal)) return frame;
-    return undefined;
-  } catch {
-    return undefined;
+    return await Promise.race([reading, deadline]);
   } finally {
-    clearTimeout(timer);
+    if (timer) clearTimeout(timer);
     controller.abort();
   }
 }
@@ -125,11 +156,13 @@ export async function listWorkspaces(ctx: HostContext): Promise<Workspace[]> {
 
   try {
     if (typeof controller.list === 'function') {
-      return toWorkspaces(controller.list());
+      // Puede devolver una promesa: sin `await` una lista asíncrona se mapeaba como
+      // si fuera un array vacío.
+      return toWorkspaces(await controller.list());
     }
 
     if (typeof controller.follow === 'function') {
-      return toWorkspaces(await firstFrame(controller.follow.bind(controller)));
+      return toWorkspaces(await firstRows(controller.follow.bind(controller)));
     }
   } catch {
     // A host that answers with something unexpected is a host without folders.
@@ -138,9 +171,18 @@ export async function listWorkspaces(ctx: HostContext): Promise<Workspace[]> {
   return [];
 }
 
-/** `true` if this host can answer `workspace.list`. */
+/**
+ * `true` if this host can answer `workspace.list`.
+ *
+ * **Never throws.** It is called while the plugin loads, so a host whose controller
+ * has a throwing getter would take the whole plugin down over a capability flag.
+ */
 export function hasWorkspaces(ctx: HostContext): boolean {
-  const controller = service<WorkspaceController>(ctx, 'workspaceController');
-  if (!controller) return false;
-  return typeof controller.list === 'function' || typeof controller.follow === 'function';
+  try {
+    const controller = service<WorkspaceController>(ctx, 'workspaceController');
+    if (!controller) return false;
+    return typeof controller.list === 'function' || typeof controller.follow === 'function';
+  } catch {
+    return false;
+  }
 }

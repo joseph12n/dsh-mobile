@@ -918,4 +918,40 @@ describe('folders over the WebSocket', () => {
       expect(response['workspaces']).toEqual([]);
     });
   });
+  it('resolves capabilities on every hello, not once at startup', async () => {
+    // The workspace controller can mount after the plugin starts, so a capability
+    // sampled once lies in both directions.
+    let available = false;
+    const registry = new DeviceRegistry({ persistence: new MemoryPersistence() });
+    const { token } = registry.enroll('Pixel', 'android');
+
+    const server = await startCompanionServer({
+      pairing: new PairingService(),
+      devices: registry,
+      port: 0,
+      listSessions: () => Promise.resolve([]),
+      capabilities: () => (available ? ['workspace.list'] : []),
+    });
+
+    try {
+      const first = await openClient(server.port);
+      first.send(hello({ deviceToken: token }));
+      const before = await first.next();
+      // Sin capacidades el campo no viaja: `undefined`, no una lista vacía.
+      expect((before['host'] as { capabilities?: unknown }).capabilities).toEqual([]);
+      first.close();
+
+      available = true;
+
+      const second = await openClient(server.port);
+      second.send(hello({ deviceToken: token }));
+      const after = await second.next();
+      expect((after['host'] as { capabilities?: unknown }).capabilities).toEqual([
+        'workspace.list',
+      ]);
+      second.close();
+    } finally {
+      await server.close();
+    }
+  });
 });

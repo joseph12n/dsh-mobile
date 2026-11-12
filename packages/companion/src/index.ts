@@ -170,10 +170,10 @@ export function apply(ctx: HostContext): void {
   const webRoot = findWebRoot();
   log(webRoot ? `PWA servida desde ${webRoot}` : 'PWA no encontrada; el host sirve solo la API');
 
-  // Se anuncia solo lo que este host sabe hacer. `workspace.list` viaja únicamente
-  // si hay controlador de workspaces: un cliente puede distinguir "no hay carpetas"
-  // de "no lo soporta" sin adivinar por el error.
-  const limits: Capability[] = hasWorkspaces(ctx) ? ['workspace.list'] : [];
+  // Se anuncia solo lo que este host sabe hacer, y se **evalúa en cada hello**: el
+  // controlador de workspaces puede montarse después del arranque, y una bandera
+  // congelada mentiría en las dos direcciones.
+  const limits = (): Capability[] => (hasWorkspaces(ctx) ? ['workspace.list'] : []);
 
   void startCompanionServer({
     pairing,

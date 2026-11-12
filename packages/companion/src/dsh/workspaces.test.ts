@@ -80,17 +80,52 @@ describe('reading from a host', () => {
     expect(workspaces).toHaveLength(1);
   });
 
-  it('falls back to the first baseline of follow()', async () => {
+  it('reads the real frame shape: { type: baseline, value: {...} }', async () => {
+    // This is what the Host controller actually yields. The first version of this
+    // file tested `{ items }`, so it passed while the real host returned nothing and
+    // folders were silently dead.
     const controller = {
       async *follow() {
-        yield { items: [row], archivedSessionIds: [], pinnedSessionIds: [] };
-        yield { items: [] };
+        yield {
+          type: 'baseline',
+          value: { items: [row], archivedSessionIds: [], pinnedSessionIds: [] },
+        };
       },
     };
 
     const workspaces = await listWorkspaces(ctxWith(controller));
     expect(workspaces).toHaveLength(1);
     expect(workspaces[0]?.id).toBe('ws-1');
+  });
+
+  it('keeps reading until a frame carries rows', async () => {
+    const controller = {
+      async *follow() {
+        yield { type: 'order', value: [] };
+        yield { type: 'baseline', value: { items: [row] } };
+      },
+    };
+
+    expect(await listWorkspaces(ctxWith(controller))).toHaveLength(1);
+  });
+
+  it('does not hang when the stream ignores the abort', async () => {
+    // A host that never yields must not hold the command open.
+    const controller = {
+      // eslint-disable-next-line require-yield
+      async *follow() {
+        await new Promise(() => undefined);
+      },
+    };
+
+    const started = Date.now();
+    expect(await listWorkspaces(ctxWith(controller))).toEqual([]);
+    expect(Date.now() - started).toBeLessThan(5_000);
+  });
+
+  it('awaits an async list()', async () => {
+    const workspaces = await listWorkspaces(ctxWith({ list: async () => [row] }));
+    expect(workspaces).toHaveLength(1);
   });
 
   it('returns no folders when the host has neither', async () => {
@@ -133,5 +168,18 @@ describe('availability', () => {
     expect(hasWorkspaces(ctxWith({ follow: async function* () {} }))).toBe(true);
     expect(hasWorkspaces(ctxWith({}))).toBe(false);
     expect(hasWorkspaces({} as HostContext)).toBe(false);
+  });
+
+  it('does not throw when the controller getter throws', () => {
+    // It runs while the plugin loads: a throwing getter must not take DSH down over a
+    // capability flag.
+    const hostile = {
+      get workspaceController(): never {
+        throw new Error('boom');
+      },
+    } as unknown as HostContext;
+
+    expect(() => hasWorkspaces(hostile)).not.toThrow();
+    expect(hasWorkspaces(hostile)).toBe(false);
   });
 });
