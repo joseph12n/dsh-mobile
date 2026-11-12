@@ -2,6 +2,7 @@ import { useId, useState } from 'react';
 import type { SessionSummary, Workspace } from '@dsh-mobile/protocol';
 import { groupSessions, elapsed } from '../lib/sessions.js';
 import { displayTitle, groupByFolder, usesFolders } from '../lib/folders.js';
+import { applyFolderPreferences, type FolderPreferences } from '../lib/preferences.js';
 import { plural, useI18n } from '../i18n/index.js';
 
 /**
@@ -42,6 +43,7 @@ export function SessionList({
   canArchive = false,
   createPending,
   archivePending,
+  preferences,
 }: {
   sessions: SessionSummary[];
   workspaces: Workspace[];
@@ -55,16 +57,24 @@ export function SessionList({
   createPending?: string;
   /** Session whose archive is in flight, for the same reason. */
   archivePending?: string;
+  /** How the user wants the folders shown. Without them, the host order. */
+  preferences?: FolderPreferences;
 }) {
   const { t } = useI18n();
   const [showStale, setShowStale] = useState(false);
 
-  const folders = groupByFolder(sessions, workspaces);
+  const grouped = groupByFolder(sessions, workspaces);
+  const folders = preferences ? applyFolderPreferences(grouped, preferences) : grouped;
 
   // Sin carpetas y sin sesiones, el aviso. Con carpetas, se pintan igual: es donde
   // irían las sesiones nuevas y esconderlas borraba la agrupación entera.
   if (sessions.length === 0 && !usesFolders(workspaces)) {
     return <p className="muted">{t('sessions.empty')}</p>;
+  }
+
+  // Todas las carpetas ocultas: se dice, en vez de dejar un hueco en blanco.
+  if (usesFolders(workspaces) && folders.length === 0) {
+    return <p className="muted">{t('settings.allHidden')}</p>;
   }
 
   if (usesFolders(workspaces)) {

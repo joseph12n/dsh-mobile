@@ -21,9 +21,12 @@ import { storage } from './lib/storage.js';
 import { QuestionsCard } from './components/Questions.js';
 import { SessionView } from './components/SessionView.js';
 import { SessionList } from './components/SessionList.js';
+import { Settings } from './components/Settings.js';
 import { useI18n } from './i18n/index.js';
 import { LOCALES, LOCALE_LABELS, type Locale, type MessageKey } from './i18n/locales.js';
 import { CONTRASTS, useContrast, type Contrast } from './lib/contrast.js';
+import { useFolderPreferences } from './lib/preferences.js';
+import { usesFolders } from './lib/folders.js';
 
 type View =
   | { kind: 'checking' }
@@ -64,6 +67,7 @@ type ActionNotice = { key: MessageKey } | { text: string };
 export function App() {
   const { t, locale, setLocale } = useI18n();
   const { contrast, setContrast } = useContrast();
+  const { preferences, setPreferences } = useFolderPreferences();
   const [view, setView] = useState<View>({ kind: 'checking' });
   const [code, setCode] = useState('');
   /** Last failed session action, shown above the list. */
@@ -702,6 +706,14 @@ export function App() {
                 </p>
               )}
 
+              {usesFolders(view.workspaces) && (
+                <Settings
+                  workspaces={view.workspaces}
+                  preferences={preferences}
+                  onChange={setPreferences}
+                />
+              )}
+
               <SessionList
                 sessions={view.sessions}
                 workspaces={view.workspaces}
@@ -712,6 +724,7 @@ export function App() {
                 canArchive={view.host.capabilities.includes('workspace.archive')}
                 {...(creatingIn ? { createPending: creatingIn } : {})}
                 {...(archiving ? { archivePending: archiving } : {})}
+                preferences={preferences}
               />
 
               <button type="button" className="ghost" onClick={forget}>
