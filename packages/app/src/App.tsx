@@ -64,7 +64,10 @@ export function App() {
    */
   const scheduleRetry = useCallback(
     (endpoint: string) => {
-      // A single timer: scheduling twice meant one attempt killed the other.
+      // Un solo reloj por fallo. Un intento fallido avisa dos veces (el catch y el
+      // cierre del socket); sin esta guarda el contador avanzaba de dos en dos y el
+      // reintento manual se pisaba.
+      if (retryTimer.current !== undefined) return;
       cancelRetry();
 
       const wait = retryDelay(retry.current);
@@ -230,10 +233,20 @@ export function App() {
     };
   }, [start, view]);
 
-  /** A pending retry must not outlive the component. */
-  useEffect(() => () => clearTimeout(retryTimer.current), []);
-  // The retry calls the current version of `start`, not a stale closure.
-  startRef.current = start;
+  /** A pending retry must not outlive the component, and neither must the socket. */
+  useEffect(
+    () => () => {
+      clearTimeout(retryTimer.current);
+      client.current?.close();
+      client.current = undefined;
+    },
+    [client],
+  );
+  // The retry calls the current version of `start`, not a stale closure. Updated in
+  // an effect: writing to a ref during render is a side effect React may repeat.
+  useEffect(() => {
+    startRef.current = start;
+  }, [start]);
 
   const answer = useCallback(
     async (callId: string, sessionId: string, answers: QuestionAnswerItem[]) => {
@@ -280,7 +293,11 @@ export function App() {
   );
 
   // El reintento usa la versión vigente, sin arrastrar una copia vieja.
-  reopenRef.current = reopen;
+
+  // The reconnect path calls the current version of `reopen`, not a stale one.
+  useEffect(() => {
+    reopenRef.current = reopen;
+  }, [reopen]);
 
   /** Opens a session: history plus the live event stream. */
   const open = useCallback(
@@ -512,6 +529,7 @@ export function App() {
               hasMore={hasMore}
               loading={loadingHistory}
               onBack={() => {
+                openSessionId.current = undefined;
                 setOpenSession(undefined);
                 setEntries([]);
               }}

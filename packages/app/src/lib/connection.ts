@@ -53,14 +53,6 @@ export class PairingError extends Error {
   }
 }
 
-/** `true` si el fallo es del token, no de la red. */
-export function isAuthFailure(error: unknown): boolean {
-  return (
-    error instanceof ConnectionError &&
-    (error.code === 'auth-required' || error.code === 'auth-invalid')
-  );
-}
-
 export interface PairResult {
   deviceToken: string;
   device: DeviceInfo;
@@ -151,8 +143,11 @@ export class CompanionClient {
       const reason = 'El host cerró la conexión.';
       this.#failAll(new Error(reason));
 
-      // Un cierre pedido por la app no es una caída: no debe disparar reintentos.
-      if (!this.#intentionalClose) this.#onState({ kind: 'offline', reason });
+      // Ni un cierre pedido por la app ni un rechazo del host son una caída: no
+      // deben disparar reintentos.
+      if (!this.#intentionalClose && !this.#hostRejected) {
+        this.#onState({ kind: 'offline', reason });
+      }
     };
     socket.onerror = () => this.#failAll(new Error('Error de WebSocket.'));
 
@@ -163,8 +158,10 @@ export class CompanionClient {
     });
 
     if (response.type === 'error') {
-      // Sin emitir offline: si además se programara un reintento desde aquí, el
-      // intento y el reintento se pisarían (dos relojes para lo mismo).
+      // El socket se cierra a continuación. Se marca como cierre propio para que
+      // onclose no lo anuncie como caída: si lo hiciera, el reintento pisaría la
+      // decisión de quien lanzó (un proto-unsupported acababa reintentando siempre).
+      this.#intentionalClose = true;
       throw new ConnectionError(response.message, response.code);
     }
 
@@ -179,8 +176,13 @@ export class CompanionClient {
   /** Canjea un código de emparejamiento. Debe llamarse tras `connect()` sin token. */
   async pair(code: string, deviceName: string, platform: string): Promise<PairResult> {
     const response = await this.#request({ type: 'pair.redeem', code, deviceName, platform });
-    if (response.type === 'error') throw new Error(response.message);
-    if (response.type !== 'pair.ok') throw new Error(`Respuesta inesperada: ${response.type}`);
+
+    // Un código inválido no se arregla reintentando: la app tiene que poder
+    // distinguirlo para devolver el formulario en vez de reintentar sin el código.
+    if (response.type === 'error') throw new PairingError(response.message, response.code);
+    if (response.type !== 'pair.ok') {
+      throw new PairingError(`Respuesta inesperada: ${response.type}`);
+    }
 
     this.#onState({ kind: 'connected', host: response.host, device: response.device });
     return { deviceToken: response.deviceToken, device: response.device, host: response.host };
@@ -238,6 +240,15 @@ export class CompanionClient {
     if (response.type === 'error') throw new Error(response.message);
   }
 
+  /**
+   * `true` cuando el host contestó con un marco de error.
+   *
+   * Un rechazo del host no es una caída: el cierre que viene detrás no debe
+   * anunciarse como pérdida, o el reintento pisaría la decisión de quien lo
+   * recibió (un `proto-unsupported` acababa reintentando para siempre).
+   */
+  #hostRejected = false;
+
   /** `true` mientras el cierre lo pide la propia app. */
   #intentionalClose = false;
 
@@ -275,6 +286,10 @@ export class CompanionClient {
   #receive(raw: string): void {
     const message = parseServerMessage(raw);
     if (!message) return;
+
+    // Antes de resolver: el cierre puede llegar en el mismo tick y la carrera
+    // hacía que se anunciara como caída.
+    if (message.type === 'error') this.#hostRejected = true;
 
     const pending = this.#pending.get(message.id);
     if (pending) {
