@@ -18,6 +18,7 @@ import { SessionView } from './components/SessionView.js';
 import { SessionList } from './components/SessionList.js';
 import { useI18n } from './i18n/index.js';
 import { LOCALES, LOCALE_LABELS, type Locale, type MessageKey } from './i18n/locales.js';
+import { CONTRASTS, useContrast, type Contrast } from './lib/contrast.js';
 
 type View =
   | { kind: 'checking' }
@@ -48,6 +49,7 @@ type View =
 
 export function App() {
   const { t, locale, setLocale } = useI18n();
+  const { contrast, setContrast } = useContrast();
   const [view, setView] = useState<View>({ kind: 'checking' });
   const [code, setCode] = useState('');
   const [endpointInput, setEndpointInput] = useState('');
@@ -609,6 +611,21 @@ export function App() {
             {LOCALES.map((code) => (
               <option key={code} value={code}>
                 {LOCALE_LABELS[code]}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="locale-picker">
+          <span className="visually-hidden">{t('settings.contrast')}</span>
+          <select
+            className="locale"
+            value={contrast}
+            onChange={(event) => setContrast(event.target.value as Contrast)}
+          >
+            {CONTRASTS.map((level) => (
+              <option key={level} value={level}>
+                {t(`contrast.${level}`)}
               </option>
             ))}
           </select>
