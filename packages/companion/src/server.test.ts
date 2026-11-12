@@ -957,23 +957,31 @@ describe('folders over the WebSocket', () => {
 });
 
 describe('models over the WebSocket', () => {
-  /** A server whose model surface is whatever the test needs. */
-  async function withModels(
-    deps: {
-      listModels?: () => Promise<{
-        default?: { provider: string; model: string };
-        groups: unknown[];
-        failures: unknown[];
-      }>;
-      selectModel?: (request: unknown) => Promise<{
-        ok: boolean;
-        code?: 'unavailable' | 'not-found' | 'failed';
-        message?: string;
-        selection?: { provider: string; model: string; reasoningEffort?: string };
-      }>;
-    },
-    run: (client: TestClient) => Promise<void>,
-  ): Promise<void> {
+  /** What the host can do in one scenario. */
+  interface ModelDeps {
+    listModels?: () => Promise<{
+      default?: { provider: string; model: string };
+      groups: unknown[];
+      failures: unknown[];
+    }>;
+    selectModel?: (request: unknown) => Promise<{
+      ok: boolean;
+      code?: string;
+      message?: string;
+      selection?: { provider: string; model: string; reasoningEffort?: string };
+    }>;
+  }
+
+  /**
+   * Empareja, manda un marco y devuelve la respuesta.
+   *
+   * Sin esto cada caso repetía el arranque del servidor y el `send`; el analizador lo
+   * contaba como duplicación y, peor, ocultaba qué cambiaba entre un caso y otro.
+   */
+  async function exchange(
+    deps: ModelDeps,
+    payload: Record<string, unknown>,
+  ): Promise<Record<string, unknown>> {
     const registry = new DeviceRegistry({ persistence: new MemoryPersistence() });
     const { token } = registry.enroll('Pixel', 'android');
 
@@ -990,8 +998,10 @@ describe('models over the WebSocket', () => {
       const client = await openClient(server.port);
       client.send(hello({ deviceToken: token }));
       expect((await client.next())['type']).toBe('hello.ok');
-      await run(client);
+      client.send({ v: PROTOCOL_VERSION, id: 'x', at: Date.now(), ...payload } as never);
+      const response = await client.next();
       client.close();
+      return response;
     } finally {
       await server.close();
     }
@@ -1004,104 +1014,56 @@ describe('models over the WebSocket', () => {
   };
 
   it('hands the catalog to a paired device', async () => {
-    await withModels({ listModels: async () => catalog }, async (client) => {
-      client.send({ v: PROTOCOL_VERSION, id: 'm1', at: Date.now(), type: 'models.list' } as never);
-      const response = await client.next();
-      expect(response['type']).toBe('models.ok');
-      expect(response['catalog']).toEqual(catalog);
-    });
+    const response = await exchange({ listModels: async () => catalog }, { type: 'models.list' });
+    expect(response).toMatchObject({ type: 'models.ok', catalog });
   });
 
   it('refuses models.list when the host cannot describe them', async () => {
-    await withModels({}, async (client) => {
-      client.send({ v: PROTOCOL_VERSION, id: 'm2', at: Date.now(), type: 'models.list' } as never);
-      const response = await client.next();
-      expect(response['type']).toBe('error');
-      expect(response['code']).toBe('bad-request');
-    });
+    const response = await exchange({}, { type: 'models.list' });
+    expect(response).toMatchObject({ type: 'error', code: 'bad-request' });
   });
 
   it('confirms the selection the host normalized', async () => {
     const seen: unknown[] = [];
-    await withModels(
+    const response = await exchange(
       {
         selectModel: async (request) => {
           seen.push(request);
           return { ok: true, selection: { provider: 'deepseek', model: 'chat' } };
         },
       },
-      async (client) => {
-        client.send({
-          v: PROTOCOL_VERSION,
-          id: 's1',
-          at: Date.now(),
-          type: 'model.select',
-          sessionId: 'session-1',
-          provider: 'deepseek',
-          model: 'chat',
-          reasoningEffort: 'high',
-        } as never);
-        const response = await client.next();
-        expect(response['type']).toBe('model.selected');
-        expect(response['selection']).toEqual({ provider: 'deepseek', model: 'chat' });
-      },
-    );
-
-    expect(seen).toEqual([
       {
+        type: 'model.select',
         sessionId: 'session-1',
         provider: 'deepseek',
         model: 'chat',
         reasoningEffort: 'high',
       },
+    );
+
+    expect(response).toMatchObject({
+      type: 'model.selected',
+      selection: { provider: 'deepseek', model: 'chat' },
+    });
+    expect(seen).toEqual([
+      { sessionId: 'session-1', provider: 'deepseek', model: 'chat', reasoningEffort: 'high' },
     ]);
   });
 
-  it('treats a model that disappeared as a bad request, not as an internal fault', async () => {
-    await withModels(
-      {
-        selectModel: async () => ({ ok: false, code: 'unavailable', message: 'gone' }),
-      },
-      async (client) => {
-        client.send({
-          v: PROTOCOL_VERSION,
-          id: 's2',
-          at: Date.now(),
-          type: 'model.select',
-          sessionId: 'session-1',
-          provider: 'deepseek',
-          model: 'gone',
-        } as never);
-        const response = await client.next();
-        expect(response['type']).toBe('error');
-        expect(response['code']).toBe('bad-request');
-      },
+  // Cada fallo del adaptador tiene su código: `unavailable` es culpa de la petición
+  // (recarga el catálogo), `not-found` de la sesión y `failed` es una avería.
+  it.each([
+    ['unavailable', 'bad-request'],
+    ['not-found', 'not-found'],
+    ['failed', 'internal'],
+  ])('maps a %s selection fault to %s', async (code, expected) => {
+    const response = await exchange(
+      { selectModel: async () => ({ ok: false, code, message: code }) },
+      { type: 'model.select', sessionId: 'session-1', provider: 'deepseek', model: 'chat' },
     );
-  });
-
-  it('reports a vanished session as not-found', async () => {
-    await withModels(
-      {
-        selectModel: async () => ({ ok: false, code: 'not-found', message: 'gone' }),
-      },
-      async (client) => {
-        client.send({
-          v: PROTOCOL_VERSION,
-          id: 's3',
-          at: Date.now(),
-          type: 'model.select',
-          sessionId: 'gone',
-          provider: 'deepseek',
-          model: 'chat',
-        } as never);
-        const response = await client.next();
-        expect(response['type']).toBe('error');
-        expect(response['code']).toBe('not-found');
-      },
-    );
+    expect(response).toMatchObject({ type: 'error', code: expected });
   });
 });
-
 describe('session actions over the WebSocket', () => {
   /** What the host can do in one scenario. */
   interface ActionDeps {
