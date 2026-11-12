@@ -44,11 +44,13 @@ export function SessionList({
   const { t } = useI18n();
   const [showStale, setShowStale] = useState(false);
 
-  if (sessions.length === 0) {
+  const folders = groupByFolder(sessions, workspaces);
+
+  // Sin carpetas y sin sesiones, el aviso. Con carpetas, se pintan igual: es donde
+  // irían las sesiones nuevas y esconderlas borraba la agrupación entera.
+  if (sessions.length === 0 && !usesFolders(workspaces)) {
     return <p className="muted">{t('sessions.empty')}</p>;
   }
-
-  const folders = groupByFolder(sessions, workspaces);
 
   if (usesFolders(workspaces)) {
     return (

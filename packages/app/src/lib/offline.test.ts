@@ -149,3 +149,69 @@ describe('offline reporting', () => {
     expect(states.some((state) => state.kind === 'offline')).toBe(false);
   });
 });
+
+describe('asking for folders', () => {
+  /** Connects a client to the fake socket and answers `hello.ok`. */
+  async function connected(capabilities: string[] = []): Promise<FakeSocket> {
+    const client = new CompanionClient('ws://host/ws');
+    const connecting = client.connect('token');
+    const socket = FakeSocket.instances.at(-1)!;
+    socket.open();
+    await flush();
+    answer(socket, {
+      type: 'hello.ok',
+      host: { id: 'h', name: 'n', version: '1', platform: 'p', capabilities },
+    });
+    await connecting;
+    (socket as unknown as { client: CompanionClient }).client = client;
+    return socket;
+  }
+
+  it('relays the folders the host sends', async () => {
+    stubSocket();
+    const socket = await connected(['workspace.list']);
+    const client = (socket as unknown as { client: CompanionClient }).client;
+
+    const listing = client.listWorkspaces();
+    await flush();
+    answer(socket, {
+      type: 'workspace.ok',
+      workspaces: [{ id: 'w1', title: 't', directory: '/w/1', sessionIds: [] }],
+    });
+
+    await expect(listing).resolves.toHaveLength(1);
+  });
+
+  it('treats bad-request as "this host has no folders", not as a failure', async () => {
+    // An older host without the handler answers this way; the list must stay flat
+    // rather than showing an error.
+    stubSocket();
+    const socket = await connected();
+    const client = (socket as unknown as { client: CompanionClient }).client;
+
+    const listing = client.listWorkspaces();
+    await flush();
+    answer(socket, { type: 'error', code: 'bad-request', message: 'no' });
+
+    await expect(listing).resolves.toEqual([]);
+  });
+
+  it('other errors do propagate', async () => {
+    stubSocket();
+    const socket = await connected();
+    const client = (socket as unknown as { client: CompanionClient }).client;
+
+    const listing = client.listWorkspaces();
+    await flush();
+    answer(socket, { type: 'error', code: 'internal', message: 'boom' });
+
+    await expect(listing).rejects.toThrow();
+  });
+
+  it('the capabilities announced at hello are remembered', async () => {
+    stubSocket();
+    const socket = await connected(['workspace.list']);
+    const client = (socket as unknown as { client: CompanionClient }).client;
+    expect(client.capabilities()).toEqual(['workspace.list']);
+  });
+});

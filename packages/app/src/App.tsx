@@ -217,10 +217,15 @@ export function App() {
           storage.saveEndpoint(endpoint);
         }
 
-        const [sessions, workspaces] = await Promise.all([
-          connection.listSessions(),
-          connection.listWorkspaces(),
-        ]);
+        const sessions = await connection.listSessions();
+
+        // Las carpetas son un extra: si fallan, la lista plana sigue siendo correcta.
+        // Antes iban en un `Promise.all` con las sesiones, así que un fallo de carpetas
+        // tiraba datos que ya estaban cargados.
+        const workspaces = hello.host.capabilities.includes('workspace.list')
+          ? await connection.listWorkspaces().catch(() => [])
+          : [];
+
         retry.current = 0;
         setView({ kind: 'sessions', endpoint, host: hello.host, sessions, workspaces });
 
@@ -422,13 +427,11 @@ export function App() {
     const connection = client.current;
     if (!connection) return;
     try {
-      const [sessions, workspaces] = await Promise.all([
-        connection.listSessions(),
-        connection.listWorkspaces(),
-      ]);
-      setView((previous) =>
-        previous.kind === 'sessions' ? { ...previous, sessions, workspaces } : previous,
-      );
+      const sessions = await connection.listSessions();
+      const admiteCarpetas = connection.capabilities().includes('workspace.list');
+      const workspaces = admiteCarpetas ? await connection.listWorkspaces().catch(() => []) : [];
+
+      setView((state) => (state.kind === 'sessions' ? { ...state, sessions, workspaces } : state));
     } catch (error) {
       setView((previous) =>
         previous.kind === 'sessions'

@@ -45,6 +45,7 @@ const server = await startCompanionServer({
   devices,
   port,
   webRoot: findWebRoot(),
+  capabilities: ['workspace.list'],
   listWorkspaces: async () => [
     {
       id: 'ws-1',
@@ -87,6 +88,27 @@ const server = await startCompanionServer({
       title: 'Documentar la API de facturación',
       updatedAt: now - 3 * 60 * 60 * 1000,
       seq: 88,
+      agentAvailable: true,
+      running: false,
+      pendingQuestions: 0,
+    },
+    // Sin carpeta asignada: el grupo final de la lista agrupada.
+    {
+      id: 'session-orphan',
+      title: 'Sesión sin carpeta',
+      updatedAt: now - 6 * 60 * 1000,
+      seq: 90,
+      agentAvailable: true,
+      running: false,
+      pendingQuestions: 0,
+    },
+    // Apunta a una carpeta que ya no existe: no se puede perder.
+    {
+      id: 'session-lost-folder',
+      title: 'Sesión de una carpeta borrada',
+      workspaceId: 'ws-borrada',
+      updatedAt: now - 7 * 60 * 1000,
+      seq: 91,
       agentAvailable: true,
       running: false,
       pendingQuestions: 0,
