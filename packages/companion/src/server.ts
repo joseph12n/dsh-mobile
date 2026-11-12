@@ -665,7 +665,7 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
       );
     }
 
-    socket.on('error', (error: Error) => log(`error de WebSocket: ${error.message}`));
+    socket.on('error', (error: Error) => log(`WebSocket error: ${error.message}`));
     socket.on('close', () => {
       for (const [, subscription] of subscriptions) subscription.stop();
       subscriptions.clear();

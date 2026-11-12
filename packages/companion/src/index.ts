@@ -171,7 +171,7 @@ export function apply(ctx: HostContext): void {
           if (!resolution.ok) return { kind: 'error', text: resolution.error };
 
           const text = raw.slice(split + 1).trim();
-          log(`E0.3: inyectando ${text.length} caracteres en ${resolution.id}`);
+          log(`E0.3: injecting ${text.length} characters into ${resolution.id}`);
 
           void injectText(ctx, resolution.id, text).then((result) =>
             log(`E0.3 resultado: ok=${result.ok} · ${result.detail}`),
