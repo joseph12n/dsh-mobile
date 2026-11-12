@@ -231,3 +231,24 @@ describe('archived sessions', () => {
     expect([...(await listArchivedSessions(ctxWith(controller)))].sort()).toEqual(['a', 'b']);
   });
 });
+
+describe('an empty baseline is not a reason to wait', () => {
+  it('returns immediately when the baseline carries nothing', async () => {
+    // Un host sin carpetas manda `{ items: [] }`. Si se rechaza por estar vacío, cada
+    // lectura espera el timeout entero y la primera pantalla tarda segundos.
+    const controller = {
+      async *follow() {
+        yield {
+          type: 'baseline',
+          value: { items: [], archivedSessionIds: [], pinnedSessionIds: [] },
+        };
+        await new Promise(() => undefined);
+      },
+    };
+
+    const empezado = Date.now();
+    expect(await listWorkspaces(ctxWith(controller))).toEqual([]);
+    expect(await listArchivedSessions(ctxWith(controller))).toEqual(new Set());
+    expect(Date.now() - empezado).toBeLessThan(500);
+  });
+});

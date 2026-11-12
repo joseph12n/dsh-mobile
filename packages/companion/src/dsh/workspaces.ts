@@ -167,7 +167,11 @@ async function firstFrame(
 
   const reading = (async (): Promise<unknown | undefined> => {
     for await (const frame of follow(controller.signal)) {
-      // Cualquier marco con filas o con archivadas sirve: es el baseline.
+      // El baseline llega siempre primero y es la foto completa, aunque esté vacío.
+      // Esperar a que traiga algo convertía "no hay carpetas" en 1,5 s de espera, y
+      // `listSessions` lee dos veces: la primera pantalla tardaba tres segundos.
+      const tipo = (frame as { type?: unknown }).type;
+      if (tipo === 'baseline') return frame;
       if (rowsOf(frame).length > 0 || archivedFrom(frame).length > 0) return frame;
     }
     return undefined;
