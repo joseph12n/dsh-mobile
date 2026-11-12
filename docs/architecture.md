@@ -1,103 +1,106 @@
-# Arquitectura y protocolo
+# Architecture and protocol
 
-Este documento explica **por qué** el sistema está construido así. Si vas a cambiar algo,
-lee primero esta página: la mitad del diseño son las decisiones descartadas.
+This document explains **why** the system is built this way. If you are going to change
+something, read this page first: half the design is the decisions we rejected.
 
 ---
 
-## 1. La forma en una frase
+## 1. The shape in one sentence
 
-El PC ejecuta DeepSeek Harness y posee las sesiones; el teléfono es un **control remoto**
-que habla un **contrato propio y versionado** con un plugin que corre dentro de DSH.
+The PC runs DeepSeek Harness and owns the sessions; the phone is a **remote control** that
+speaks a **contract of its own, versioned**, to a plugin running inside DSH.
 
 ```
-PC (ejecuta DSH)                                  Teléfono
+PC (runs DSH)                                      Phone
 ┌──────────────────────────────────────┐   ┌──────────────────────────┐
 │ plugin @dsh-mobile/companion         │   │ PWA @dsh-mobile/app      │
-│  · listener propio :6768             │◄─►│  · emparejamiento        │
-│  · sirve la PWA compilada            │WS │  · sesiones y estado     │
-│  · emparejamiento por QR             │   │  · transcripción         │
-│  · token por dispositivo             │   │  · preguntas             │
-│  · adaptador a los servicios de DSH  │   │  · compositor            │
+│  · its own listener :6768            │◄─►│  · pairing               │
+│  · serves the built PWA              │WS │  · sessions and state    │
+│  · pairing by QR                     │   │  · transcript            │
+│  · one token per device              │   │  · questions             │
+│  · adapter to the DSH services       │   │  · composer              │
 └──────────────────────────────────────┘   └──────────────────────────┘
 ```
 
-## 2. La frontera es el contrato
+## 2. The boundary is the contract
 
-El móvil **nunca** habla con las tripas de DSH. Habla `dsh-mobile/1`, definido en
-`packages/protocol` con esquemas Zod. Las consecuencias son deliberadas:
+The phone **never** talks to DSH's internals. It talks `dsh-mobile/1`, defined in
+`packages/protocol` with Zod schemas. The consequences are deliberate:
 
-- Upstream puede reorganizar sus servicios internos y el cliente **no se entera**: se
-  toca `packages/companion/src/dsh/` y ya está.
-- Un cambio incompatible rompe el **build**, no al usuario en el teléfono.
-- Cualquiera puede escribir otro cliente sin leer el código de DSH.
+- Upstream can reorganise its internal services and the client **does not notice**: you
+  change `packages/companion/src/dsh/` and that is it.
+- An incompatible change breaks the **build**, not the user on the phone.
+- Anyone can write another client without reading DSH's code.
 
-## 3. Las capas
+## 3. The layers
 
 ```
 packages/companion/src/
-  core/      dominio puro: emparejamiento, dispositivos. Sin DSH, sin I/O
-  dsh/       ÚNICO lugar que conoce DSH. Un archivo por preocupación
-  net/       nada: el servidor vive en server.ts y no conoce el dominio
-  routes/    sirvido de la PWA compilada
+  core/      pure domain: pairing, devices. No DSH, no I/O
+  dsh/       the ONLY place that knows DSH. One file per concern
+  routes/    serving the built PWA
 ```
 
-Las reglas que no se rompen:
+The rules that do not bend:
 
-1. **`core/` no importa `@deepseek-ai/*`** ni toca disco ni red. Se prueba con datos en
-   memoria y reloj inyectado.
-2. **Solo `dsh/` conoce DSH.** Es el parachoques: cuando upstream cambia, el daño está
-   acotado a esa carpeta.
-3. **`app/` no conoce DSH.** Solo `@dsh-mobile/protocol`.
+1. **`core/` does not import `@deepseek-ai/*`** and touches neither disk nor network. It is
+   tested with in-memory data and an injected clock.
+2. **Only `dsh/` talks to DSH**, plus `probe.ts`, which reads host services on purpose: it is
+   the diagnostic report, and routing it through the adapter would hide what it measures. That
+   folder is the bumper: when upstream changes, the damage is confined there.
+3. **`app/` does not know DSH.** Only `@dsh-mobile/protocol`.
 
-Romper la regla 2 es la forma más rápida de que una actualización de DSH rompa el proyecto.
+Breaking rule 2 is the fastest way for a DSH update to break the project.
 
-## 4. Un solo artefacto
+## 4. A single artifact
 
-El plugin sirve la PWA compilada. Eso significa que **host y cliente son la misma versión
-por construcción**: no existe el escenario "el móvil tiene una app vieja contra un plugin
-nuevo".
+The plugin serves the built PWA. That means **host and client are the same version by
+construction**: the "old app against a new plugin" scenario cannot happen.
 
-## 5. Cómo se accede a los servicios de DSH
+## 5. How DSH services are reached
 
-Regla aprendida a golpes: **nada de lo que no esté en `inject` se lee por propiedad**.
+A rule learned the hard way: **nothing outside `inject` is read as a property**.
 
 ```ts
-ctx.sessions; // funciona: está declarado en inject
-ctx.get('sessionController'); // funciona: proxy de reflexión
-ctx.reflect.store; // se indexa por SÍMBOLOS, no por cadenas
+ctx.sessions; // works: it is declared in inject
+ctx.get('sessionController'); // works: the reflection proxy
+ctx.reflect.store; // indexed by SYMBOLS, not by strings
 ```
 
-Si algo aparece como `undefined`, casi siempre es esto.
+If something shows up as `undefined`, it is almost always this.
 
-## 6. Decisiones descartadas, y por qué
+## 6. Decisions we rejected, and why
 
-| Opción                                  | Motivo del descarte                                                                                             |
-| --------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| Reutilizar `dsh-experimental-liveshare` | Sirve la **UI de escritorio** a un teléfono — lo contrario del objetivo — y exige un Relay con OAuth            |
-| Proxear la UI web                       | El token lo inyecta Electron y no es recuperable desde fuera                                                    |
-| Cliente sobre el API Gateway interno    | Protocolo `rc` atado al escritorio; cambia sin avisar                                                           |
-| Sidecar en Go/Rust                      | Segundo runtime, IPC propio y doble autenticación, para hablar con un proceso Node que ya nos da acceso directo |
+| Option                                 | Why it was rejected                                                                                             |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Reusing `dsh-experimental-liveshare`   | It serves the **desktop UI** to a phone — the opposite of the goal — and needs a Relay with OAuth               |
+| Proxying the web UI                    | The token is injected by Electron and cannot be recovered from outside                                          |
+| A client over the internal API Gateway | The `rc` protocol is tied to the desktop and changes without notice                                             |
+| A sidecar in Go/Rust                   | A second runtime, its own IPC and double authentication, to talk to a Node process that already gives us access |
 
-La lección de LiveShare que **sí** se adoptó: _CSS no es autorización_. El servidor no
-envía lo que el cliente no puede hacer.
+The LiveShare lesson we **did** adopt: _CSS is not authorisation_. The server does not send
+what the client cannot do.
 
-## 7. El protocolo
+## 7. The protocol
 
-Transporte: **WebSocket**, mensajes JSON, sobre común `{ v, id, at, type }`.
+Transport: **WebSocket**, JSON messages, shared envelope `{ v, id, at, type }`.
 
-- **`hello` primero.** Sin él, cualquier otra petición se rechaza con `auth-required`.
-- **El `id` correlaciona.** La respuesta repite el `id` de la petición.
-- **Los errores tienen código estable** (`errors.ts`). Un cliente ramifica sobre el código,
-  nunca sobre el texto.
-- **Los mensajes del host sin petición** son envíos espontáneos: `question.pending`,
-  `question.settled`, `session.event`.
-- Versión desconocida ⇒ `proto-unsupported` con las capacidades del host, nunca un fallo
-  raro.
+- **`hello` first.** Without it, any other request is rejected with `auth-required`, with one
+  exception: `ping` answers `pong` unauthenticated, so a client can measure the link before it
+  has a token.
+- **`id` correlates.** The reply repeats the request `id`.
+- **Errors carry a stable code** (`errors.ts`). A client branches on the code, never on the
+  text.
+- **Host messages with no request** are spontaneous sends. The contract defines
+  `question.pending`, `question.settled`, `session.event`, `session.state` and
+  `devices.changed`; this host emits the first, the third, and nothing else yet — the rest are
+  declared so a client can already branch on them.
+- Unknown version ⇒ `proto-unsupported` with the host's capabilities, never a strange
+  failure.
 
-### Mensajes
+### Messages
 
-| Cliente → Host      | Host → Cliente                          |
+| Client → Host       | Host → Client                           |
 | ------------------- | --------------------------------------- |
 | `hello`             | `hello.ok` / `error`                    |
 | `pair.redeem`       | `pair.ok`                               |
@@ -108,67 +111,70 @@ Transporte: **WebSocket**, mensajes JSON, sobre común `{ v, id, at, type }`.
 | `reply.send`        | `reply.ok`                              |
 | `question.answer`   | `answer.ok`                             |
 | `run.cancel`        | `run.ok`                                |
+| `run.start`         | `error` (not implemented in this build) |
 | `ping`              | `pong`                                  |
 
-## 8. Emparejamiento
+## 8. Pairing
 
-El QR no lleva un código suelto, sino un **enlace directo**:
+The QR carries no bare code but a **direct link**:
 
 ```
-https://<host>/#/pair?v=1&c=<código>&e=<endpoint>
+https://<host>/#/pair?v=1&c=<code>
 ```
 
-- El código viaja en el **fragmento**, así que no se manda al servidor ni queda en logs.
-- **128 bits** en base32 Crockford (sin `I`, `L`, `O` ni `U`, para que nadie confunda
-  caracteres al teclearlo).
-- **Un solo uso, 10 minutos.** El intento distingue _caducado_, _ya usado_ y _no existe_:
-  es el mensaje que de verdad ayuda.
-- El canje crea un **token de dispositivo** de 32 bytes que se entrega **una vez**. En
-  disco solo queda su **SHA-256**, comparado en tiempo constante.
+- The code travels in the **fragment**, so it is neither sent to the server nor logged.
+  The endpoint, when it is pinned, travels as an `e=` parameter next to the code.
+- **128 bits** in Crockford base32 (no `I`, `L`, `O` or `U`, so nobody misreads a character
+  while typing it).
+- **Single use, 10 minutes.** A failed attempt distinguishes _expired_, _already used_ and
+  _does not exist_: that is the message that actually helps.
+- Redeeming creates a **device token** of 32 bytes handed over **once**. Only its
+  **SHA-256** stays on disk, compared in constant time.
 
-El token es del dispositivo, no de la red: **el protocolo no ata la conexión a una dirección**.
+The token belongs to the device, not the network: **the protocol does not tie a connection
+to one address**.
 
-Dicho eso, con honestidad: **la app todavía no ofrece cambiar el endpoint**. Hoy, para
-apuntar a otra dirección hay que volver a emparejar. Que el token no esté atado a la red es
-una propiedad del diseño, no una función disponible. El ajuste está en el issue #22.
+That said, honestly: **the app does not offer changing the endpoint yet**. Today, pointing at
+another address means pairing again. The token not being tied to the network is a property of
+the design, not a feature you can use.
 
-Y hoy el plugin escucha **solo en loopback**, así que la LAN directa no funciona. Se publica
-por el nombre del tailnet con `tailscale serve`, que sí llega al loopback y además aporta
-HTTPS.
+And today the plugin listens **on loopback only**, so direct LAN access does not work. It is
+published through the tailnet name with `tailscale serve`, which reaches loopback and brings
+HTTPS with it.
 
-## 9. Preguntas: el lote es la unidad
+## 9. Questions: the batch is the unit
 
-DSH agrupa las preguntas de una llamada a `ask_user_question` y **valida la respuesta por
-lote**: cada pregunta debe aparecer exactamente una vez. Por eso el contrato modela
-`QuestionBatch`, no preguntas sueltas.
+DSH groups the questions of one `ask_user_question` call and **validates the answer per
+batch**: every question must appear exactly once. That is why the contract models
+`QuestionBatch`, not loose questions.
 
-`selected: []` sin `custom` significa **omitida**, y es una respuesta legítima — distinta de
-no responder. Responder requiere el **agente raíz vivo** de la sesión; si no lo está, el
-host responde `not-found` diciéndolo.
+`selected: []` without `custom` means **skipped**, and that is a legitimate answer — different
+from not answering. Answering needs the session's **root agent alive**; if it is not, the host
+answers `not-found` saying so.
 
-## 10. Transcripción
+## 10. Transcript
 
-- **Historial**: `sessionController.page()` devuelve una página del registro.
-- **En vivo**: `observeEvent()` entrega un flujo de eventos según se confirman.
-- La traducción es **tolerante a propósito**: se reconocen los eventos que el móvil sabe
-  pintar y el resto se descarta. Inventar un renglón es peor que dejar un hueco.
-- El cliente fusiona ambas fuentes por `seq`, así que reconectar no duplica.
+- **History**: `sessionController.page()` returns a page of the log.
+- **Live**: `observeEvent()` delivers a stream of events as they are committed.
+- The translation is **tolerant on purpose**: events the phone knows how to draw are
+  recognised and the rest is discarded. Inventing a line is worse than leaving a gap.
+- The client merges both sources by `seq`, so reconnecting does not duplicate.
 
-## 11. Seguridad
+## 11. Security
 
-- **Solo loopback.** La dirección de escucha es una constante (`HOST = '127.0.0.1'`), no una
-  opción de configuración: no existe un modo de red. Se publica por el nombre del tailnet con
-  `tailscale serve`, que sí alcanza el loopback y aporta HTTPS. La autenticación por
-  dispositivo ya existe; lo que no se quiere es un puerto abierto.
-- **Token por dispositivo**, guardado en hash; revocar uno no afecta a los demás.
-- **Alcance acotado**: sesiones, preguntas y ejecuciones. Nada de ajustes, credenciales ni
-  gestión de plugins.
-- **El host decide.** Las capacidades se anuncian en `hello.ok` y el servidor no envía lo
-  que el cliente no puede hacer.
+- **Loopback only.** The listen address is a constant (`HOST = '127.0.0.1'`), not a
+  configuration option: there is no network mode. It is published through the tailnet name
+  with `tailscale serve`, which reaches loopback and brings HTTPS. Device authentication
+  already exists; what we do not want is an open port.
+- **One token per device**, stored as a hash; revoking one does not affect the others.
+- **Narrow scope**: sessions, questions and runs. No settings, credentials or plugin
+  management.
+- **The host decides.** Capabilities are announced in `hello.ok` and the server does not send
+  what the client cannot do.
 
-## 12. Estado
+## 12. Status
 
-Fases 0 y 1 cerradas con evidencia; fase 2 funcional de punta a punta: emparejar, listar
-sesiones, leer transcripción, responder preguntas, escribir y cancelar.
+Phases 0 and 1 closed with evidence; phase 2 works end to end: pair, list sessions, read the
+transcript, answer questions, write and cancel.
 
-Las tareas pendientes están como issues en GitHub.
+The pending work is in GitHub issues.
