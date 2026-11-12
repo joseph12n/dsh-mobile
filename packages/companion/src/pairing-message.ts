@@ -8,10 +8,10 @@ import { buildPairingUrl } from '@dsh-mobile/protocol';
 import type { ResolvedOrigin } from './public-origin.js';
 
 const ORIGIN_LABEL: Record<string, string> = {
-  config: 'la dirección configurada',
-  tailscale: 'el nombre del tailnet',
-  loopback: 'solo esta máquina',
-  detectando: 'averiguándolo',
+  config: 'the configured address',
+  tailscale: 'the tailnet name',
+  loopback: 'this machine only',
+  detectando: 'working it out',
 };
 
 export interface PairingView {
@@ -64,33 +64,33 @@ export function buildPairingMessage(view: PairingView): PairingLink {
   const link = buildPairingUrl(base, view.code);
   const compromised = view.origin === undefined || view.origin.loopback;
 
-  const lines = ['Empareja el teléfono', ''];
+  const lines = ['Pair your phone', ''];
 
   if (view.qr) {
+    // Explicitly requested (`/mobile qr`). With a caveat: a text QR only scans
+    // when line height equals font size, which is not true in the DSH chat.
     lines.push(
-      'Escanea este código con la cámara del teléfono:',
+      'Scan this with your phone camera. It only works where line height equals',
+      'font size; if it does not scan, open the pairing page instead:',
       '',
       view.qr,
       '',
-      'Si no se lee, la fuente del chat no es monoespaciada: abre el enlace o usa',
-      '`/mobile abrir` para verlo en el navegador.',
     );
-  } else {
-    lines.push(link);
   }
 
-  lines.push('', `Enlace: ${link}`, `Código: ${view.code}`);
-  lines.push(`Caduca a las ${new Date(view.expiresAt).toLocaleTimeString()} · un solo uso`);
+  // The link appears exactly once, labelled.
+  lines.push(`Link: ${link}`, `Code: ${view.code}`);
+  lines.push(`Expires at ${new Date(view.expiresAt).toLocaleTimeString()} · single use`);
 
   if (compromised) {
     lines.push(
       '',
-      'Aviso: este enlace apunta a loopback, que en el teléfono es el propio teléfono.',
-      'Ábrelo desde el nombre del tailnet o configura DSH_MOBILE_PUBLIC_URL.',
+      'Heads up: this link points at loopback, which on a phone is the phone itself.',
+      'Open it through the tailnet name, or set DSH_MOBILE_PUBLIC_URL.',
     );
   }
 
   const source = view.origin?.source ?? 'detectando';
-  lines.push('', `Origen: ${ORIGIN_LABEL[source] ?? source}`);
+  lines.push('', `Origin: ${ORIGIN_LABEL[source] ?? source}`);
   return { text: lines.join('\n'), compromised };
 }

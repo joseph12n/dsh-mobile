@@ -36,7 +36,7 @@ export const name = 'dsh-mobile-companion';
  */
 export const inject = ['sessions', 'sessionProjections', 'commands'];
 
-const COMMAND_DESCRIPTION = 'Empareja el teléfono o consulta el estado del compañero móvil';
+const COMMAND_DESCRIPTION = 'Pair your phone, or check the companion status';
 
 export function apply(ctx: HostContext): void {
   log(`plugin cargado · evidencia en ${PROBE_LOG_PATH}`);
@@ -95,32 +95,38 @@ export function apply(ctx: HostContext): void {
     }
   };
 
-  // --- Comando /mobile: emparejamiento; /mobile estado: sondeo ------------------
+  // --- /mobile: pairing. `open` is the default; `qr` and `link` are opt-ins ------
   if (ctx.commands) {
     const register = (): (() => void) =>
       ctx.commands!.register({
         name: 'mobile',
         description: COMMAND_DESCRIPTION,
-        input: { hint: '[estado|abrir]' },
+        input: { hint: '[open|qr|link|status]' },
         handler: (invocation) => {
           const argument = (invocation.rawInput ?? '').trim().toLowerCase();
 
-          // `estado` mantiene el sondeo de desarrollo, que ya no estorba en la
-          // ruta principal.
-          if (argument === 'estado' || argument === 'probe') {
+          // `status` keeps the diagnostic probe out of the main path.
+
+          if (argument === 'status' || argument === 'probe') {
             try {
               const report = probe();
               return {
                 kind: 'success',
-                text: `${reportToText(report)}\n\nEvidencia completa: ${PROBE_LOG_PATH}`,
+                text: `${reportToText(report)}\n\nFull evidence: ${PROBE_LOG_PATH}`,
               };
             } catch (error) {
-              return { kind: 'error', text: `El sondeo falló: ${String(error)}` };
+              return { kind: 'error', text: `The probe failed: ${String(error)}` };
             }
           }
 
           try {
             const current = pairing.pending()[0] ?? pairing.issue();
+
+            // `qr` is opt-in on purpose: a text QR only scans when line height
+            // equals font size, which the DSH chat does not do. Printing it by
+            // default would look right and not scan.
+            const wantsQr = argument === 'qr';
+            const wantsProbeOnly = argument === 'link';
 
             const message = buildPairingMessage({
               code: current.code,
@@ -129,22 +135,19 @@ export function apply(ctx: HostContext): void {
               port: listeningPort,
               listenerError,
               fallbackPort: DEFAULT_PORT,
-              qr: qrFor(current.code),
+              qr: wantsQr ? qrFor(current.code) : undefined,
             });
 
-            // `/mobile abrir` pinta el QR en el navegador, por si la fuente del
-            // chat no es monoespaciada y el QR en texto no se lee.
-            const wantsBrowser = argument === 'abrir' || argument === 'open';
+            // Opening the pairing page is the default: the QR there is an image,
+            // so it scans whatever the chat font is.
+            const opensBrowser = !wantsQr && !wantsProbeOnly && !listenerError;
 
             return {
               kind: message.compromised && listenerError ? 'error' : 'success',
-              text:
-                wantsBrowser && !listenerError
-                  ? `${message.text}\n\n${openPairingPage()}`
-                  : message.text,
+              text: opensBrowser ? `${message.text}\n\n${openPairingPage()}` : message.text,
             };
           } catch (error) {
-            return { kind: 'error', text: `No pude preparar el emparejamiento: ${String(error)}` };
+            return { kind: 'error', text: `Could not prepare the pairing: ${String(error)}` };
           }
         },
       });

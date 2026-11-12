@@ -3,62 +3,79 @@ import QRCode from 'qrcode';
 import { qrText } from './qr-text.js';
 
 /**
- * El QR en texto es lo único que hace que emparejar no sea copiar 26 caracteres
- * a mano. Si se pinta mal, no se lee, y el comando vuelve a ser inútil.
+ * The text QR.
+ *
+ * It is opt-in (`/mobile qr`) because a text QR only scans when line height equals
+ * font size, which the DSH chat does not do. In a plain terminal it does scan, and
+ * that is what this renders.
+ *
+ * Decoding was verified by hand with two independent readers (JSQR and ZXing) from
+ * a browser screenshot. These tests pin the structure, which a decoder needs:
+ * uniform width, quiet zone on both sides, and no escape sequences.
  */
 
 const URL = 'https://maquina.tailnet.ts.net/#/pair?v=1&c=ABCD1234EFGH5678';
 
-describe('QR en texto', () => {
-  it('coincide con el renderizador de la propia librería', async () => {
-    // `qrcode` sabe pintarlo, pero devuelve una promesa y el handler del comando
-    // es síncrono. Esto comprueba que el apaño síncrono no cambia el dibujo.
-    const propio = qrText(URL)
-      .split('\n')
-      .filter((line) => line && !line.startsWith('(v'));
+/** Data lines only: the matrix, without the metadata footer. */
+function dataLines(text: string): string[] {
+  return text.split('\n').filter((line) => !line.startsWith('(v'));
+}
 
-    const libreria = (
-      await QRCode.toString(URL, { type: 'utf8', errorCorrectionLevel: 'M', margin: 2 })
-    )
-      .split('\n')
-      .map((line) => line.trimEnd())
-      .filter((line) => line.length > 0);
+describe('text QR', () => {
+  it('draws the same matrix as the library', () => {
+    // The library renders it too, but asynchronously, and the command handler is
+    // synchronous. Comparing the dark modules proves the reimplementation is exact.
+    const mine = dataLines(qrText(URL));
 
-    expect(propio).toEqual(libreria);
+    const theirMatrix = QRCode.create(URL, { errorCorrectionLevel: 'M' });
+    const size = theirMatrix.modules.size;
+    const get = (row: number, column: number): boolean => {
+      if (row < 0 || row >= size || column < 0 || column >= size) return false;
+      return theirMatrix.modules.get(row, column) === 1;
+    };
+
+    // Rebuild the expected half-block rows straight from the library matrix.
+    const expected: string[] = [];
+    for (let row = -2; row < size + 2; row += 2) {
+      let line = '';
+      for (let column = -2; column < size + 2; column += 1) {
+        const top = get(row, column);
+        const bottom = get(row + 1, column);
+        line += top && bottom ? '█' : top ? '▀' : bottom ? '▄' : ' ';
+      }
+      expected.push(line);
+    }
+
+    expect(mine).toEqual(expected);
   });
 
-  it('usa medias bloques y no secuencias de escape', () => {
+  it('every line is the same width, quiet zone included', () => {
+    // A QR needs its margin on all four sides. Trimming the right side removed
+    // part of it, and readers failed to find the code.
+    const lines = dataLines(qrText(URL));
+    const widths = new Set(lines.map((line) => line.length));
+    expect(widths.size).toBe(1);
+
+    // The quiet zone must be there, on both sides of a middle row.
+    const middle = lines[Math.floor(lines.length / 2)] ?? '';
+    expect(middle.startsWith(' ')).toBe(true);
+    expect(middle.endsWith(' ')).toBe(true);
+  });
+
+  it('uses half blocks and no escape sequences', () => {
     const text = qrText(URL);
     expect(text).toMatch(/[▀▄█]/);
-    // Escapes ANSI romperían el dibujo en cualquier chat: se comprueba el carácter.
+    // ANSI would break the drawing in any chat: check the character itself.
     expect(text.includes(String.fromCharCode(27))).toBe(false);
   });
 
-  it('el dibujo ocupa el ancho que anuncia su cabecera', () => {
-    // Sin recortar, todas las líneas miden lo mismo: módulos más el margen a los
-    // dos lados. Es lo que garantiza que las columnas queden alineadas al
-    // escanear, aunque se recorten los espacios finales.
-    const partes = qrText(URL).split('\n');
-    const cabecera = partes.find((line) => line.startsWith('(v'));
-    const modulo = /\(v\d+, (\d+)×\d+ módulos\)/.exec(cabecera ?? '');
-    expect(modulo).not.toBeNull();
-
-    const ancho = Math.max(...partes.filter((l) => l && !l.startsWith('(v')).map((l) => l.length));
-    const modulos = Number(modulo?.[1]);
-
-    // Recortadas las líneas, el ancho queda entre el código solo y el código con
-    // su margen a los dos lados. Fuera de ese rango, algo se pintó de más.
-    expect(ancho).toBeGreaterThanOrEqual(modulos);
-    expect(ancho).toBeLessThanOrEqual(modulos + 4);
-  });
-
-  it('dos enlaces distintos producen códigos distintos', () => {
+  it('different links produce different codes', () => {
     expect(qrText(URL)).not.toBe(qrText(`${URL}9`));
   });
 
-  it('un texto corto cabe en menos líneas que uno largo', () => {
-    const corto = qrText('hola').split('\n').length;
-    const largo = qrText(`${URL}?relleno=${'x'.repeat(200)}`).split('\n').length;
-    expect(largo).toBeGreaterThan(corto);
+  it('a longer text needs more lines', () => {
+    const short = dataLines(qrText('hi')).length;
+    const long = dataLines(qrText(`${URL}?pad=${'x'.repeat(200)}`)).length;
+    expect(long).toBeGreaterThan(short);
   });
 });

@@ -1,3 +1,4 @@
+import { isAbsolute } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { browserOpener, openInBrowser } from './open-browser.js';
 
@@ -14,11 +15,15 @@ describe('abridor de navegador', () => {
     }
   });
 
-  it('devuelve undefined sin lanzar si no hay ninguno', () => {
-    expect(browserOpener()).toBeDefined();
+  it('solo devuelve rutas absolutas', () => {
+    // Una ruta relativa lanzaría lo que hubiera en el directorio actual, que es
+    // justo lo que se evita al no usar PATH.
+    const opener = browserOpener();
+    if (opener) expect(isAbsolute(opener)).toBe(true);
   });
 
   it('sin abridor no intenta nada y responde false', async () => {
-    await expect(openInBrowser('https://ejemplo', undefined)).resolves.toBe(false);
+    // Cadena vacía, no `undefined`: pasar `undefined` activa el valor por defecto.
+    await expect(openInBrowser('https://ejemplo', '')).resolves.toBe(false);
   });
 });

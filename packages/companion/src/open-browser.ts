@@ -1,36 +1,41 @@
 /**
- * Abre una URL en el navegador del escritorio.
+ * Opens a URL in the desktop browser.
  *
- * Es la red de seguridad del QR en texto: si la fuente del chat no es
- * monoespaciada, el QR se ve y no se lee. Abrir `/pair` en el navegador da el
- * mismo código pintado como imagen.
+ * This is the **main** path for pairing: the QR is a real image on `/pair`, so it
+ * scans regardless of what font the chat uses. A text QR cannot promise that.
  *
- * Los ejecutables se buscan en **rutas absolutas**, nunca por `PATH`: lanzar algo
- * resuelto por `PATH` es una vulnerabilidad (Sonar S4036), porque cualquier cosa
- * que se cuele antes se ejecuta con nuestros permisos.
+ * Executables are looked up by **absolute path**, never through `PATH`: launching
+ * something resolved by `PATH` is a real vulnerability (Sonar S4036), because
+ * anything earlier in `PATH` runs with our permissions.
+ *
+ * The exit code is deliberately ignored. On Windows, `explorer.exe <url>` exits
+ * with code 1 **even when it opens the page**, so trusting the code reported
+ * failures for successes.
  */
-import { execFile } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { isAbsolute, join } from 'node:path';
 
-const TIMEOUT_MS = 3000;
-
-/** Ruta absoluta del abridor de URLs, por plataforma. */
+/** Absolute path of the URL opener, per platform. */
 export function browserOpener(): string | undefined {
-  const candidatos: string[] = [];
+  const candidates: string[] = [];
 
   if (process.platform === 'win32') {
-    const system = process.env['SystemRoot'] ?? String.raw`C:\Windows`;
-    candidatos.push(join(system, 'explorer.exe'));
+    const systemRoot = process.env['SystemRoot'];
+    // Only an absolute `SystemRoot` is usable: an empty or relative one would make
+    // `join` return a relative path, and a relative path is what we are avoiding.
+    if (systemRoot && isAbsolute(systemRoot)) candidates.push(join(systemRoot, 'explorer.exe'));
+    candidates.push(join('C:\\Windows', 'explorer.exe'));
   } else if (process.platform === 'darwin') {
-    candidatos.push('/usr/bin/open');
+    candidates.push('/usr/bin/open');
   } else {
-    candidatos.push('/usr/bin/xdg-open', '/usr/local/bin/xdg-open', '/bin/xdg-open');
+    candidates.push('/usr/bin/xdg-open', '/usr/local/bin/xdg-open', '/bin/xdg-open');
   }
 
-  return candidatos.find((candidato) => {
+  return candidates.find((candidate) => {
+    if (!isAbsolute(candidate)) return false;
     try {
-      return existsSync(candidato);
+      return existsSync(candidate);
     } catch {
       return false;
     }
@@ -38,15 +43,25 @@ export function browserOpener(): string | undefined {
 }
 
 /**
- * Abre la URL si se puede. **Nunca lanza**: que no se abra el navegador no puede
- * tumbar el comando que ya tiene el enlace en la mano.
+ * Opens the URL if it can. **Never throws.**
+ *
+ * Resolves `true` when the process starts. It resolves on spawn rather than on
+ * exit because the exit code of `explorer.exe` says nothing about whether the page
+ * opened.
  */
 export function openInBrowser(url: string, opener = browserOpener()): Promise<boolean> {
   if (!opener) return Promise.resolve(false);
 
   return new Promise((resolve) => {
-    execFile(opener, [url], { timeout: TIMEOUT_MS, windowsHide: true }, (error) =>
-      resolve(error === null),
-    );
+    try {
+      const child = spawn(opener, [url], { detached: true, stdio: 'ignore', windowsHide: true });
+      child.once('error', () => resolve(false));
+      child.once('spawn', () => {
+        child.unref();
+        resolve(true);
+      });
+    } catch {
+      resolve(false);
+    }
   });
 }

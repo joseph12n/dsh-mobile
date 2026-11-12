@@ -32,19 +32,19 @@ describe('mensaje de emparejamiento', () => {
     expect(compromised).toBe(false);
     expect(text).toContain('https://maquina.tailnet.ts.net/#/pair?v=1&c=ABCD1234EFGH5678');
     expect(text).toContain('ABCD1234EFGH5678');
-    expect(text).toContain('un solo uso');
+    expect(text).toContain('single use');
   });
 
   it('no avisa cuando el origen es bueno', () => {
     const { text } = buildPairingMessage({ ...base, origin: TAILNET, port: 6768 });
-    expect(text).not.toContain('Aviso');
+    expect(text).not.toContain('Heads up');
   });
 
   it('avisa cuando el origen es loopback', () => {
     const { text, compromised } = buildPairingMessage({ ...base, origin: LOOPBACK, port: 6768 });
 
     expect(compromised).toBe(true);
-    expect(text).toContain('Aviso');
+    expect(text).toContain('Heads up');
     expect(text).toContain('loopback');
   });
 
@@ -89,7 +89,7 @@ describe('el QR sustituye al código copiado a mano', () => {
       qr: '  █▀▀▀█\n  █   █\n  █▄▄▄█',
     });
 
-    expect(text).toContain('Escanea');
+    expect(text).toContain('Scan this');
     expect(text).toContain('█▀▀▀█');
   });
 
@@ -98,13 +98,13 @@ describe('el QR sustituye al código copiado a mano', () => {
     // comando tiene que seguir sirviendo.
     const { text } = buildPairingMessage({ ...base, origin: TAILNET, port: 6768 });
     expect(text).toContain('https://maquina.tailnet.ts.net/#/pair?v=1&c=ABCD1234EFGH5678');
-    expect(text).not.toContain('Escanea');
+    expect(text).not.toContain('Scan this');
   });
 
   it('el enlace aparece siempre, con QR o sin él', () => {
     const conQr = buildPairingMessage({ ...base, origin: TAILNET, qr: '███' });
     const sinQr = buildPairingMessage({ ...base, origin: TAILNET });
-    expect(conQr.text).toContain('Enlace: https://maquina.tailnet.ts.net');
-    expect(sinQr.text).toContain('Enlace: https://maquina.tailnet.ts.net');
+    expect(conQr.text).toContain('Link: https://maquina.tailnet.ts.net');
+    expect(sinQr.text).toContain('Link: https://maquina.tailnet.ts.net');
   });
 });

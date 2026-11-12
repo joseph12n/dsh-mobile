@@ -1,20 +1,23 @@
 /**
- * QR en texto, para que el comando `/mobile` lo pueda pintar en el chat.
+ * Renders a QR code as text, so the `/mobile qr` command can print it.
  *
- * El comando antes daba un enlace y un código para copiar a mano, y nadie va a
- * teclear 26 caracteres con el teléfono en la otra mano.
+ * Why this is not the default path: **a text QR only scans when the line height
+ * equals the font size**. Measured in the DeepSeek Harness chat, code blocks use
+ * 11px text over 19px lines, which leaves horizontal gaps between module rows and
+ * breaks the code for both JSQR and ZXing. Printing it there looks like it works
+ * and does not, so the command opens the pairing page instead, where the QR is a
+ * real image.
  *
- * `qrcode` sabe pintar `type: 'utf8'`, pero devuelve una promesa y el handler del
- * comando es síncrono. Aquí se construye la matriz (`QRCode.create`, síncrono) y
- * se pinta con medios bloques: dos filas de módulos por línea de texto.
+ * In a plain terminal — where line height usually is 1 — it does scan, and that is
+ * what `qrcode`'s own `type: 'utf8'` produces too.
  *
- * **Esto necesita una fuente monoespaciada para escanearse.** Si el chat no la
- * usa, el QR se ve pero no se lee; por eso el comando también abre la página de
- * emparejamiento, que lo pinta como imagen.
+ * `qrcode` can render it directly, but returns a promise and the command handler is
+ * synchronous. `QRCode.create` is synchronous and gives the matrix, so the drawing
+ * happens here.
  */
 import QRCode from 'qrcode';
 
-/** Módulos de margen alrededor del código. El estándar pide 4; con 2 basta y ocupa menos. */
+/** Modules of margin around the code. The standard asks for 4; 2 keeps it small. */
 const QUIET_ZONE = 2;
 
 interface ModuleMatrix {
@@ -22,21 +25,22 @@ interface ModuleMatrix {
   get(row: number, column: number): number;
 }
 
-/** `1` si el módulo está encendido; `0` fuera de la matriz. */
+/** `1` if the module is dark; `0` outside the matrix. */
 function bit(matrix: ModuleMatrix, row: number, column: number): number {
   if (row < 0 || row >= matrix.size || column < 0 || column >= matrix.size) return 0;
   return matrix.get(row, column);
 }
 
 /**
- * Pinta la matriz con `▀`, `▄`, `█` y espacio.
+ * Draws the matrix with `▀`, `▄`, `█` and space.
  *
- * Cada carácter cubre dos filas de módulos: la mitad de arriba y la de abajo. Por
- * eso las líneas de salida son la mitad que las filas del código.
+ * Each character covers two module rows: the top half and the bottom half, so the
+ * output has half as many lines as the code has rows.
+ *
+ * Lines are **padded** to the full width. Trimming them removed the right quiet
+ * zone, and a QR needs its margin on all four sides to be found by a reader.
  */
 export function qrText(text: string, quietZone: number = QUIET_ZONE): string {
-  // `create` es síncrono, que es lo que necesita un handler de comando.
-  // `modules` empaqueta los bits, así que se lee con `get`, no indexando `data`.
   const { modules, version } = QRCode.create(text, { errorCorrectionLevel: 'M' });
   const matrix = modules as unknown as ModuleMatrix;
   const total = matrix.size + quietZone * 2;
@@ -56,9 +60,8 @@ export function qrText(text: string, quietZone: number = QUIET_ZONE): string {
       else line += ' ';
     }
 
-    // Sin espacios al final: el chat no los necesita y ensucian el copiar.
-    lines.push(line.trimEnd());
+    lines.push(line);
   }
 
-  return `${lines.join('\n')}\n(v${version}, ${matrix.size}×${matrix.size} módulos)`;
+  return `${lines.join('\n')}\n(v${version}, ${matrix.size}×${matrix.size} modules)`;
 }
