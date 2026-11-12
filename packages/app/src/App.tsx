@@ -15,6 +15,8 @@ import { storage } from './lib/storage.js';
 import { QuestionsCard } from './components/Questions.js';
 import { SessionView } from './components/SessionView.js';
 import { SessionList } from './components/SessionList.js';
+import { useI18n } from './i18n/index.js';
+import { LOCALES, LOCALE_LABELS, type Locale } from './i18n/locales.js';
 
 type View =
   | { kind: 'checking' }
@@ -25,6 +27,7 @@ type View =
   | { kind: 'error'; endpoint: string; message: string };
 
 export function App() {
+  const { t, locale, setLocale } = useI18n();
   const [view, setView] = useState<View>({ kind: 'checking' });
   const [code, setCode] = useState('');
   const [endpointInput, setEndpointInput] = useState('');
@@ -428,28 +431,28 @@ export function App() {
     <main className="shell">
       <header className="head">
         <h1>DSH Mobile</h1>
-        <p className="muted">Control remoto de DeepSeek Harness</p>
+        <p className="muted">{t('app.subtitle')}</p>
       </header>
 
-      {view.kind === 'checking' && <section className="card">Comprobando…</section>}
+      {view.kind === 'checking' && <section className="card">{t('state.checking')}</section>}
 
       {view.kind === 'connecting' && (
         <section className="card">
-          <h2>Conectando</h2>
+          <h2>{t('state.connecting')}</h2>
           <p className="muted">{view.endpoint}</p>
         </section>
       )}
 
       {view.kind === 'pairing' && (
         <section className="card">
-          <h2>Sin emparejar</h2>
+          <h2>{t('state.pairing')}</h2>
           <p>
             Abre el QR en el escritorio y escanéalo con la cámara. Si no puedes, escribe el código y
             la dirección del host.
           </p>
 
           <label className="field">
-            <span>Código</span>
+            <span>{t('pairing.code')}</span>
             <input
               value={code}
               onChange={(event) => setCode(event.target.value.toUpperCase())}
@@ -461,7 +464,7 @@ export function App() {
           </label>
 
           <label className="field">
-            <span>Host</span>
+            <span>{t('pairing.host')}</span>
             <input
               value={endpointInput || view.endpoint}
               onChange={(event) => setEndpointInput(event.target.value)}
@@ -479,7 +482,7 @@ export function App() {
               void start(normalizeEndpoint(endpointInput || view.endpoint), code.trim())
             }
           >
-            Emparejar
+            {t('pairing.submit')}
           </button>
           {view.notice && <p className="error">{view.notice}</p>}
         </section>
@@ -487,29 +490,32 @@ export function App() {
 
       {view.kind === 'reconnecting' && (
         <section className="card">
-          <h2>Reconnecting…</h2>
+          <h2>{t('state.reconnecting')}</h2>
           <p className="muted">
-            The pairing is still saved. Attempt {view.attempt}, retrying in{' '}
-            {Math.round(view.retryInMs / 1000)} s.
+            {t('reconnect.kept')}{' '}
+            {t('reconnect.attempt', {
+              attempt: view.attempt,
+              seconds: Math.round(view.retryInMs / 1000),
+            })}
           </p>
           <p className="muted small">{view.endpoint}</p>
           <button type="button" onClick={() => void start(view.endpoint)}>
-            Retry now
+            {t('reconnect.now')}
           </button>
         </section>
       )}
 
       {view.kind === 'error' && (
         <section className="card">
-          <h2>Could not connect</h2>
+          <h2>{t('state.error')}</h2>
           <p className="error">{view.message}</p>
           <button type="button" onClick={() => void start(view.endpoint)}>
-            Retry
+            {t('error.retry')}
           </button>
           {/* Forgetting the device is a separate decision: it used to be the only
               button, so a network failure cost a full re-pairing. */}
           <button type="button" className="ghost" onClick={forget}>
-            Forget this device
+            {t('error.forget')}
           </button>
         </section>
       )}
@@ -540,16 +546,16 @@ export function App() {
           ) : (
             <section className="card">
               <div className="row">
-                <h2>Sesiones</h2>
+                <h2>{t('sessions.title')}</h2>
                 <button type="button" className="ghost" onClick={() => void refresh()}>
-                  Actualizar
+                  {t('sessions.refresh')}
                 </button>
               </div>
 
               <SessionList sessions={view.sessions} onOpen={(session) => void open(session)} />
 
               <button type="button" className="ghost" onClick={forget}>
-                Olvidar este dispositivo
+                {t('error.forget')}
               </button>
             </section>
           )}
@@ -557,6 +563,23 @@ export function App() {
       )}
 
       <footer className="foot">
+        {/* Language lives in the footer on purpose: it is reachable before pairing,
+            when a user who cannot read the screen has the most to gain from it. */}
+        <label className="locale-picker">
+          <span className="visually-hidden">Language</span>
+          <select
+            className="locale"
+            value={locale}
+            onChange={(event) => setLocale(event.target.value as Locale)}
+          >
+            {LOCALES.map((code) => (
+              <option key={code} value={code}>
+                {LOCALE_LABELS[code]}
+              </option>
+            ))}
+          </select>
+        </label>
+
         <span className="muted">
           {PROTOCOL_NAME} v{PROTOCOL_VERSION}
         </span>

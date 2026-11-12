@@ -631,3 +631,32 @@ button.ghost.tiny {
   padding-top: 12px;
   border-top: 1px solid var(--line);
 }
+
+/* --- Language picker ------------------------------------------------------ */
+
+.locale-picker {
+  display: inline-flex;
+}
+
+.locale {
+  min-height: 44px;
+  padding: 6px 10px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line-strong);
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  font-family: var(--font);
+  font-size: 12px;
+}
+
+/* Visible to screen readers, not on screen. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

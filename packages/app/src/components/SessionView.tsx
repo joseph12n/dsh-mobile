@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { HistoryEntry, SessionSummary, TranscriptEvent } from '@dsh-mobile/protocol';
 import { groupTurns, partTurn, type Turn } from '../lib/turns.js';
+import { plural, useI18n } from '../i18n/index.js';
 
 /**
  * Transcripción de una sesión.
@@ -10,13 +11,14 @@ import { groupTurns, partTurn, type Turn } from '../lib/turns.js';
  * —reconexión, solapamiento de página— no se pinta dos veces.
  */
 
-const STATE_LABEL: Record<string, string> = {
-  working: 'trabajando',
-  waiting: 'esperando respuesta',
-  idle: 'en reposo',
-  done: 'terminada',
-  error: 'error',
-};
+/** Catalogue key for a session state. */
+const STATE_KEY = {
+  working: 'session.working',
+  waiting: 'session.waiting',
+  idle: 'session.idle',
+  done: 'session.done',
+  error: 'session.error',
+} as const;
 
 function timeOf(timestamp: number): string {
   if (!timestamp) return '';
@@ -25,12 +27,15 @@ function timeOf(timestamp: number): string {
 }
 
 function EventRow({ entry }: { entry: HistoryEntry }) {
+  const { t } = useI18n();
   const event: TranscriptEvent = entry.event;
 
   if (event.kind === 'message') {
     return (
       <li className={`msg ${event.role}`}>
-        <span className="msg-role">{event.role === 'user' ? 'tú' : 'agente'}</span>
+        <span className="msg-role">
+          {event.role === 'user' ? t('session.you') : t('session.agent')}
+        </span>
         <p>{event.text}</p>
       </li>
     );
@@ -47,7 +52,7 @@ function EventRow({ entry }: { entry: HistoryEntry }) {
 
   return (
     <li className="state-row">
-      <span>{STATE_LABEL[event.state] ?? event.state}</span>
+      <span>{t(STATE_KEY[event.state as keyof typeof STATE_KEY] ?? 'session.idle')}</span>
       <span className="muted small">{timeOf(entry.at)}</span>
     </li>
   );
@@ -63,6 +68,7 @@ function EventRow({ entry }: { entry: HistoryEntry }) {
  * "1 herramienta".
  */
 function ToolRun({ entries }: { entries: HistoryEntry[] }) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const id = `herramientas-${entries[0]?.seq ?? 0}`;
 
@@ -77,8 +83,8 @@ function ToolRun({ entries }: { entries: HistoryEntry[] }) {
         // renderizado es ARIA inválido.
         aria-controls={open ? id : undefined}
       >
-        {entries.length} herramienta{entries.length > 1 ? 's' : ''}
-        {open ? ' · ocultar' : ''}
+        {plural(t, 'session.tools', entries.length)}
+        {open ? ` · ${t('session.hideTools')}` : ''}
       </button>
 
       {open && (
@@ -99,13 +105,16 @@ function ToolRun({ entries }: { entries: HistoryEntry[] }) {
  * los cambios de estado siempre se ven, dentro del turno y **en su orden real**.
  */
 function TurnBlock({ turn, number }: { turn: Turn; number: number }) {
+  const { t } = useI18n();
   const parts = partTurn(turn.entries);
-  const label = turn.prompt ? `Turno ${number}: ${turn.prompt}` : `Turno ${number}`;
+  const label = turn.prompt
+    ? `${t('session.turn', { number })}: ${turn.prompt}`
+    : t('session.turn', { number });
 
   return (
     <section className="turn" aria-label={label}>
       <header className="turn-head">
-        <span className="turn-number">Turno {number}</span>
+        <span className="turn-number">{t('session.turn', { number })}</span>
         <span className="muted small">{timeOf(turn.at)}</span>
       </header>
 
@@ -141,6 +150,7 @@ export function SessionView({
   onCancel: () => void;
   onSend: (text: string) => void;
 }) {
+  const { t } = useI18n();
   const [draft, setDraft] = useState('');
 
   const send = (): void => {
@@ -154,24 +164,24 @@ export function SessionView({
     <section className="card session-view">
       <div className="row">
         <button type="button" className="ghost" onClick={onBack}>
-          ← Volver
+          {t('session.back')}
         </button>
         <button type="button" className="ghost" onClick={onCancel}>
-          Detener
+          {t('session.stop')}
         </button>
       </div>
 
       <h2 className="session-heading">{session.title}</h2>
-      <p className="muted small">{STATE_LABEL[session.state] ?? session.state}</p>
+      <p className="muted small">{t(STATE_KEY[session.state] ?? 'session.idle')}</p>
 
       {hasMore && (
         <button type="button" className="ghost load-more" onClick={onLoadMore} disabled={loading}>
-          {loading ? 'Cargando…' : 'Cargar anteriores'}
+          {loading ? t('session.loading') : t('session.loadMore')}
         </button>
       )}
 
       {entries.length === 0 ? (
-        <p className="muted">{loading ? 'Cargando…' : 'Todavía no hay nada que mostrar.'}</p>
+        <p className="muted">{loading ? t('session.loading') : t('session.empty')}</p>
       ) : (
         <div className="transcript">
           {groupTurns(entries).map((turn, index) => (
@@ -192,12 +202,12 @@ export function SessionView({
               send();
             }
           }}
-          placeholder="Escribe al agente…"
+          placeholder={t('session.placeholder')}
           rows={2}
           autoCapitalize="sentences"
         />
         <button type="button" onClick={send} disabled={!draft.trim()}>
-          Enviar
+          {t('session.send')}
         </button>
       </div>
     </section>
