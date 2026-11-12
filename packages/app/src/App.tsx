@@ -461,8 +461,10 @@ export function App() {
       await refresh();
     } catch (error) {
       // El host se niega si hay un turno en marcha: se dice, no se mata el trabajo.
+      // El código es `denied`, no `internal`: con `internal` cualquier avería real
+      // acababa con el consejo de parar un turno que no existía.
       const code = error instanceof ConnectionError ? error.code : undefined;
-      setActionError(code === 'internal' ? t('action.stopFirst') : messageOf(error));
+      setActionError(code === 'denied' ? t('action.stopFirst') : messageOf(error));
     }
   };
 

@@ -305,11 +305,21 @@ button.ghost.tiny {
   background: var(--bg);
 }
 
-.session-main {
+.session-open {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 12px;
+  width: 100%;
+  /* Toda la fila abre la sesión, y en un móvil se pulsa con el pulgar. */
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 
 .session-title {
@@ -453,11 +463,15 @@ button.ghost.tiny {
 /* --- Transcripción -------------------------------------------------------- */
 
 .session-row {
-  cursor: pointer;
+  cursor: default;
 }
 
 .session-row:hover {
   border-color: var(--line-emphasis);
+}
+
+.session-row:hover .session-open .session-title {
+  text-decoration: underline;
 }
 
 /* Quitar el contorno sin poner otro dejaba el foco invisible: 1,63:1. La regla

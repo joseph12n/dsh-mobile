@@ -1059,4 +1059,42 @@ describe('session actions over the WebSocket', () => {
       expect(response['code']).toBe('bad-request');
     });
   });
+
+  it('reports a running session as denied, not as an internal failure', async () => {
+    // El usuario puede resolver esto parando el turno, así que la app necesita un
+    // código propio. Con `internal` no podía distinguirlo de una avería real.
+    await acting(
+      { archiveSession: async () => ({ ok: false, code: 'active', message: 'busy' }) },
+      async (client) => {
+        client.send({
+          v: PROTOCOL_VERSION,
+          id: 'a3',
+          at: Date.now(),
+          type: 'workspace.archive',
+          sessionId: 's1',
+        } as never);
+        const response = await client.next();
+        expect(response['type']).toBe('error');
+        expect(response['code']).toBe('denied');
+      },
+    );
+  });
+
+  it('keeps a genuine failure internal', async () => {
+    await acting(
+      { archiveSession: async () => ({ ok: false, code: 'failed', message: 'boom' }) },
+      async (client) => {
+        client.send({
+          v: PROTOCOL_VERSION,
+          id: 'a4',
+          at: Date.now(),
+          type: 'workspace.archive',
+          sessionId: 's1',
+        } as never);
+        const response = await client.next();
+        expect(response['type']).toBe('error');
+        expect(response['code']).toBe('internal');
+      },
+    );
+  });
 });

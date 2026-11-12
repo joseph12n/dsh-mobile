@@ -544,7 +544,15 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
             socket,
             errorMessage(
               message.id,
-              archived.code === 'not-found' ? 'not-found' : 'internal',
+              // `active` no es un fallo interno: es una negativa que el usuario puede
+              // resolver parando el turno. Con `internal` la app no podía distinguirla
+              // de un error de verdad y acababa diciendo "para el turno" ante cualquier
+              // avería.
+              archived.code === 'active'
+                ? 'denied'
+                : archived.code === 'not-found'
+                  ? 'not-found'
+                  : 'internal',
               archived.message ?? 'The session could not be archived.',
             ),
           );

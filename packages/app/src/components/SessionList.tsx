@@ -171,24 +171,16 @@ function SessionRow({
   const age = elapsed(session.updatedAt);
 
   return (
-    <li
-      className="session-row"
-      role="button"
-      tabIndex={0}
-      onClick={() => onOpen(session)}
-      onKeyDown={(event) => {
-        if (event.key !== 'Enter' && event.key !== ' ') return;
-        // Without this, Space also scrolls the page.
-        event.preventDefault();
-        onOpen(session);
-      }}
-    >
-      <div className="session-main">
+    <li className="session-row">
+      {/* Un botón de verdad, no un `li` con `role="button"`: dentro vive otro botón
+          (Archivar) y las interacciones anidadas confundían a los lectores de pantalla.
+          Además, la tecla Enter sobre Archivar burbujeaba al `li` y abría la sesión. */}
+      <button type="button" className="session-open" onClick={() => onOpen(session)}>
         <span className="session-title">{session.title}</span>
         <span className="muted small">
           {age ? t(unitKey(age), { count: 'count' in age ? age.count : 0 }) : ''}
         </span>
-      </div>
+      </button>
       <div className="session-meta">
         <span className={`badge ${session.state}`}>{t(STATE_KEY[session.state])}</span>
         {canArchive && onArchive && (
@@ -196,11 +188,7 @@ function SessionRow({
             type="button"
             className="ghost tiny"
             aria-label={`${t('action.archive')}: ${session.title}`}
-            onClick={(event) => {
-              // Sin esto, archivar abriría la sesión en el mismo toque.
-              event.stopPropagation();
-              onArchive(session);
-            }}
+            onClick={() => onArchive(session)}
           >
             {t('action.archive')}
           </button>
