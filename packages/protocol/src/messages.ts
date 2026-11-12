@@ -10,6 +10,7 @@ import {
   SessionId,
   SessionState,
   SessionSummary,
+  Workspace,
   TranscriptEvent,
 } from './domain.js';
 
@@ -49,6 +50,15 @@ export const PairRedeemMessage = message('pair.redeem', {
 });
 
 export const SessionsListMessage = message('sessions.list', {});
+
+/**
+ * Pide las carpetas del escritorio.
+ *
+ * Un host sin workspaces responde `workspace.ok` con una lista vacía: la app no
+ * distingue "no hay carpetas" de "este host no las soporta" mirando el error, así
+ * que la lista vacía es la respuesta honesta.
+ */
+export const WorkspaceListMessage = message('workspace.list', {});
 
 export const SessionSubscribeMessage = message('session.subscribe', {
   sessionId: SessionId,
@@ -92,6 +102,7 @@ export const ClientMessage = z.discriminatedUnion('type', [
   HelloMessage,
   PairRedeemMessage,
   SessionsListMessage,
+  WorkspaceListMessage,
   SessionSubscribeMessage,
   SessionHistoryMessage,
   ReplySendMessage,
@@ -124,6 +135,11 @@ export const PairOkMessage = message('pair.ok', {
 
 export const SessionsOkMessage = message('sessions.ok', {
   sessions: z.array(SessionSummary),
+});
+
+/** Folders of the desktop. A host without workspaces answers with an empty list. */
+export const WorkspaceOkMessage = message('workspace.ok', {
+  workspaces: z.array(Workspace),
 });
 
 export const SessionOkMessage = message('session.ok', {
@@ -204,6 +220,7 @@ export const ServerMessage = z.discriminatedUnion('type', [
   HelloOkMessage,
   PairOkMessage,
   SessionsOkMessage,
+  WorkspaceOkMessage,
   SessionOkMessage,
   HistoryOkMessage,
   ReplyOkMessage,

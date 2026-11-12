@@ -34,8 +34,30 @@ export const SessionSummary = z.object({
   seq: z.number().int().nonnegative(),
   /** Preguntas sin responder en esta sesión. */
   pendingQuestions: z.number().int().nonnegative(),
+  /**
+   * Carpeta (Workspace) a la que pertenece.
+   *
+   * Opcional a propósito: un host que no exponga workspaces sigue siendo válido y
+   * la app cae a una lista plana en vez de romperse.
+   */
+  workspaceId: z.string().min(1).optional(),
 });
 export type SessionSummary = z.infer<typeof SessionSummary>;
+
+/**
+ * Carpeta de DSH: un directorio registrado en el escritorio, con título y orden.
+ *
+ * El título puede estar vacío; entonces se muestra el nombre del directorio, que
+ * es lo que hace el escritorio.
+ */
+export const Workspace = z.object({
+  id: z.string().min(1),
+  title: z.string(),
+  directory: z.string(),
+  /** Posición en la barra lateral del escritorio, de menor a mayor. */
+  order: z.number().int().nonnegative(),
+});
+export type Workspace = z.infer<typeof Workspace>;
 
 /** Fragmento de transcripción. */
 export const TranscriptEvent = z.discriminatedUnion('kind', [
