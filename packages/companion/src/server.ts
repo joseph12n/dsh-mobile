@@ -18,6 +18,7 @@ import {
   type QuestionAnswerItem,
   type QuestionBatch,
   type ServerMessage,
+  type Workspace,
 } from '@dsh-mobile/protocol';
 import type { Device, DeviceRegistry } from './core/devices.js';
 import type { PairingService } from './core/pairing.js';
@@ -56,7 +57,13 @@ export interface ServerDeps {
   report?: () => ProbeReport;
   /** Raíz de la PWA compilada. Sin ella el host sirve solo la API. */
   webRoot?: string;
-  /** Fuente de sesiones. Sin ella `sessions.list` devuelve una lista vacía. */
+  /**
+   * Folders of the desktop. Without it `workspace.list` answers with an empty list,
+   * which is the honest answer for a host that has no workspaces.
+   */
+  listWorkspaces?: () => Promise<Workspace[]>;
+
+  /** Source of sessions. Without it `sessions.list` returns an empty list. */
   listSessions?: () => Promise<SessionRecord[]>;
   /** Lotes de preguntas pendientes. Se empujan tras listar sesiones. */
   listQuestions?: () => QuestionBatch[];
@@ -441,6 +448,22 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
             `Sin dispositivo emparejado, ${message.type} no está disponible.`,
           ),
         );
+        return;
+      }
+
+      if (message.type === 'workspace.list') {
+        // Una lista vacía es una respuesta válida: significa que este host no tiene
+        // carpetas, y el cliente pinta la lista plana sin tratarlo como error.
+        const workspaces = deps.listWorkspaces ? await deps.listWorkspaces() : [];
+        if (socket.readyState !== socket.OPEN) return;
+
+        send(socket, {
+          v: PROTOCOL_VERSION,
+          id: message.id,
+          at: Date.now(),
+          type: 'workspace.ok',
+          workspaces,
+        });
         return;
       }
 

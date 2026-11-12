@@ -856,3 +856,66 @@ describe('emparejamiento de punta a punta', () => {
     client.close();
   });
 });
+
+describe('folders over the WebSocket', () => {
+  /** A server whose only difference is how many folders it has. */
+  async function withFolders(
+    folders: unknown[],
+    run: (client: TestClient) => Promise<void>,
+  ): Promise<void> {
+    const registry = new DeviceRegistry({ persistence: new MemoryPersistence() });
+    const { token } = registry.enroll('Pixel', 'android');
+
+    const server = await startCompanionServer({
+      pairing: new PairingService(),
+      devices: registry,
+      port: 0,
+      listSessions: () => Promise.resolve([]),
+      listWorkspaces: () => Promise.resolve(folders as never),
+    });
+
+    try {
+      const client = await openClient(server.port);
+      client.send(hello({ deviceToken: token }));
+      const ready = await client.next();
+      expect(ready['type']).toBe('hello.ok');
+      await run(client);
+      client.close();
+    } finally {
+      await server.close();
+    }
+  }
+
+  it('answers with the folders the host provides', async () => {
+    await withFolders(
+      [{ id: 'ws-1', title: 'dsh-mobile', directory: 'C:/work', sessionIds: ['s1'] }],
+      async (client) => {
+        client.send({
+          v: PROTOCOL_VERSION,
+          id: 'wl',
+          at: Date.now(),
+          type: 'workspace.list',
+        } as never);
+        const response = await client.next();
+        expect(response['type']).toBe('workspace.ok');
+        const workspaces = response['workspaces'] as Array<{ id: string }>;
+        expect(workspaces.map((workspace) => workspace.id)).toEqual(['ws-1']);
+      },
+    );
+  });
+
+  it('answers with an empty list when the host has no folders', async () => {
+    // This is the host this project had until yesterday: an empty answer, not an error.
+    await withFolders([], async (client) => {
+      client.send({
+        v: PROTOCOL_VERSION,
+        id: 'wl',
+        at: Date.now(),
+        type: 'workspace.list',
+      } as never);
+      const response = await client.next();
+      expect(response['type']).toBe('workspace.ok');
+      expect(response['workspaces']).toEqual([]);
+    });
+  });
+});
