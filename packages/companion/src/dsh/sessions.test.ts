@@ -49,7 +49,7 @@ describe('resolución de identificadores de sesión', () => {
   it('dice que no existe sin lanzar', () => {
     const result = resolveSessionId(ctxWith([A]), 'zzzz');
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toContain('No hay ninguna sesión');
+    if (!result.ok) expect(result.error).toContain('No session matches');
   });
 
   it('se queja si falta el identificador', () => {

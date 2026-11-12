@@ -32,19 +32,19 @@ describe('mensaje de emparejamiento', () => {
     expect(compromised).toBe(false);
     expect(text).toContain('https://maquina.tailnet.ts.net/#/pair?v=1&c=ABCD1234EFGH5678');
     expect(text).toContain('ABCD1234EFGH5678');
-    expect(text).toContain('un solo uso');
+    expect(text).toContain('single use');
   });
 
   it('no avisa cuando el origen es bueno', () => {
     const { text } = buildPairingMessage({ ...base, origin: TAILNET, port: 6768 });
-    expect(text).not.toContain('Aviso');
+    expect(text).not.toContain('Heads up');
   });
 
   it('avisa cuando el origen es loopback', () => {
     const { text, compromised } = buildPairingMessage({ ...base, origin: LOOPBACK, port: 6768 });
 
     expect(compromised).toBe(true);
-    expect(text).toContain('Aviso');
+    expect(text).toContain('Heads up');
     expect(text).toContain('loopback');
   });
 
@@ -53,7 +53,7 @@ describe('mensaje de emparejamiento', () => {
     const { text, compromised } = buildPairingMessage({ ...base, port: 6768 });
     expect(compromised).toBe(true);
     expect(text).toContain('http://127.0.0.1:6768');
-    expect(text).toContain('averiguándolo');
+    expect(text).toContain('working it out');
   });
 
   it('usa el puerto real, no el de reserva, cuando el listener ya escucha', () => {
@@ -74,8 +74,37 @@ describe('mensaje de emparejamiento', () => {
     });
 
     expect(compromised).toBe(true);
-    expect(text).toContain('no pudo abrir el listener');
+    expect(text).toContain('could not open its listener');
     expect(text).toContain('EADDRINUSE');
     expect(text).not.toContain('#/pair');
+  });
+});
+
+describe('el QR sustituye al código copiado a mano', () => {
+  it('con QR, el mensaje lo pinta y no obliga a copiar nada', () => {
+    const { text } = buildPairingMessage({
+      ...base,
+      origin: TAILNET,
+      port: 6768,
+      qr: '  █▀▀▀█\n  █   █\n  █▄▄▄█',
+    });
+
+    expect(text).toContain('Scan this');
+    expect(text).toContain('█▀▀▀█');
+  });
+
+  it('sin QR sigue dando el enlace, para no dejarte sin salida', () => {
+    // El QR puede fallar (por ejemplo si la librería no puede con el texto). El
+    // comando tiene que seguir sirviendo.
+    const { text } = buildPairingMessage({ ...base, origin: TAILNET, port: 6768 });
+    expect(text).toContain('https://maquina.tailnet.ts.net/#/pair?v=1&c=ABCD1234EFGH5678');
+    expect(text).not.toContain('Scan this');
+  });
+
+  it('el enlace aparece siempre, con QR o sin él', () => {
+    const conQr = buildPairingMessage({ ...base, origin: TAILNET, qr: '███' });
+    const sinQr = buildPairingMessage({ ...base, origin: TAILNET });
+    expect(conQr.text).toContain('Link: https://maquina.tailnet.ts.net');
+    expect(sinQr.text).toContain('Link: https://maquina.tailnet.ts.net');
   });
 });

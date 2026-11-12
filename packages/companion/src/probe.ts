@@ -58,19 +58,19 @@ export interface ProbeReport {
 
 /** Describe un valor sin volcarlo entero. */
 function describe(value: unknown): string {
-  if (value === undefined) return 'ausente';
+  if (value === undefined) return 'absent';
   if (value === null) return 'null';
   const type = typeof value;
-  if (type === 'function') return 'función';
+  if (type === 'function') return 'function';
   if (type !== 'object') return type;
   const keys = Object.keys(value as object);
-  return `objeto{${keys.slice(0, 12).join(', ')}}`;
+  return `object{${keys.slice(0, 12).join(', ')}}`;
 }
 
 /** Resumen legible de una forma desconocida: tipo, longitud y primeras claves. */
 function summarize(value: unknown): string {
   if (Array.isArray(value)) {
-    return `array(${value.length}) primer elemento: ${describe(value[0])}`;
+    return `array(${value.length}) first element: ${describe(value[0])}`;
   }
   return describe(value);
 }
@@ -90,7 +90,7 @@ function sessionFacts(
   try {
     facts.messageCount = session.deriveMessages?.().length;
   } catch (error) {
-    log(`deriveMessages() falló en ${session.id}: ${String(error)}`);
+    log(`deriveMessages() failed on ${session.id}: ${String(error)}`);
   }
 
   if (projections) {
@@ -100,7 +100,7 @@ function sessionFacts(
       facts.projectionKeys = Object.keys(snapshot.values);
       facts.pendingQuestions = snapshot.values['userQuestions'];
     } catch (error) {
-      log(`snapshot() falló en ${session.id}: ${String(error)}`);
+      log(`snapshot() failed on ${session.id}: ${String(error)}`);
     }
   }
 
@@ -145,7 +145,7 @@ export function runProbe(ctx: HostContext): ProbeReport {
         facts.push(sessionFacts(session, projections));
       }
     } catch (error) {
-      log(`sessions.list() falló: ${String(error)}`);
+      log(`sessions.list() failed: ${String(error)}`);
     }
   }
 
@@ -173,56 +173,56 @@ export function runProbe(ctx: HostContext): ProbeReport {
 
 /** Vuelca el informe al log de evidencia, línea por línea. */
 export function reportToLog(report: ProbeReport): void {
-  log('===== FASE 0: sondeo =====');
-  log(`servicios montados (${report.serviceNames.length}): ${report.serviceNames.join(', ')}`);
+  log('===== PHASE 0: probe =====');
+  log(`mounted services (${report.serviceNames.length}): ${report.serviceNames.join(', ')}`);
 
   for (const detail of report.serviceDetails) {
-    log(`  · ${detail.name}: ${detail.methods.join(', ') || '(sin métodos enumerables)'}`);
+    log(`  · ${detail.name}: ${detail.methods.join(', ') || '(no enumerable methods)'}`);
   }
 
-  log(`sesiones vivas: ${report.sessionCount ?? 'no disponible'}`);
+  log(`live sessions: ${report.sessionCount ?? 'not available'}`);
 
   for (const session of report.sessions) {
     log(
-      `- sesión ${session.id}: mensajes=${session.messageCount ?? '?'} ` +
-        `asOfSeq=${session.asOfSeq ?? '?'} proyecciones=${session.projectionKeys?.length ?? 0}`,
+      `- session ${session.id}: messages=${session.messageCount ?? '?'} ` +
+        `asOfSeq=${session.asOfSeq ?? '?'} projections=${session.projectionKeys?.length ?? 0}`,
     );
     log(`  userQuestions -> ${summarize(session.pendingQuestions)}`);
   }
 
-  log(`candidatos de inyección: ${JSON.stringify(report.injectionCandidates)}`);
-  log('===== fin del sondeo =====');
+  log(`injection candidates: ${JSON.stringify(report.injectionCandidates)}`);
+  log('===== end of probe =====');
 }
 
 /** Informe en texto, para devolverlo desde el comando. */
 export function reportToText(report: ProbeReport): string {
   const lines: string[] = [];
-  lines.push(`Sondeo Fase 0 — ${report.timestamp}`);
-  lines.push(`Sesiones vivas: ${report.sessionCount ?? 'no disponible'}`);
-  lines.push(`Servicios montados: ${report.serviceNames.length}`);
+  lines.push(`Phase 0 probe — ${report.timestamp}`);
+  lines.push(`Live sessions: ${report.sessionCount ?? 'not available'}`);
+  lines.push(`Mounted services: ${report.serviceNames.length}`);
   lines.push('');
 
   for (const [index, session] of report.sessions.entries()) {
     lines.push(`${index + 1}) ${session.id}`);
-    lines.push(`   mensajes=${session.messageCount ?? '?'} · asOfSeq=${session.asOfSeq ?? '?'}`);
+    lines.push(`   messages=${session.messageCount ?? '?'} · asOfSeq=${session.asOfSeq ?? '?'}`);
     lines.push(`   userQuestions: ${summarize(session.pendingQuestions)}`);
   }
 
   lines.push('');
-  lines.push('Servicios relacionados con la conversación:');
+  lines.push('Services related to the conversation:');
   for (const detail of report.serviceDetails) {
-    lines.push(`  ${detail.name}: ${detail.methods.join(', ') || '(sin métodos enumerables)'}`);
+    lines.push(`  ${detail.name}: ${detail.methods.join(', ') || '(no enumerable methods)'}`);
   }
 
   lines.push('');
-  lines.push('Candidatos de inyección de texto:');
+  lines.push('Text injection candidates:');
   for (const [key, value] of Object.entries(report.injectionCandidates)) {
     lines.push(`  ${key}: ${value}`);
   }
 
   if (report.sessions.length > 0) {
     lines.push('');
-    lines.push('Para inyectar en una: /mobile-say <número> <texto>');
+    lines.push('To inject into one: /mobile-say <number> <text>');
   }
 
   return lines.join('\n');

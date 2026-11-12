@@ -134,7 +134,7 @@ describe('respuesta a un lote', () => {
     const outcome = answerQuestion(ctxWith([], []), input);
     expect(outcome.ok).toBe(false);
     expect(outcome.code).toBe('not-found');
-    expect(outcome.message).toContain('no está cargada');
+    expect(outcome.message).toContain('is not loaded on the host');
   });
 
   it('informa cuando la pregunta ya no admite respuesta', () => {
@@ -142,7 +142,7 @@ describe('respuesta a un lote', () => {
     (ctx['userQuestions'] as { answer: () => boolean }).answer = () => false;
     const outcome = answerQuestion(ctx, input);
     expect(outcome.code).toBe('bad-request');
-    expect(outcome.message).toContain('ya no admite respuesta');
+    expect(outcome.message).toContain('no longer accepts an answer');
   });
 
   it('convierte una excepción del servicio en error de contrato', () => {

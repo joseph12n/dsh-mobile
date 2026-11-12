@@ -10,6 +10,9 @@ import { answerQuestion, listPendingQuestions } from './dsh/questions.js';
 import { cancelRun, readHistory, subscribeSession } from './dsh/transcript.js';
 import { injectText } from './dsh/prompt.js';
 import { buildPairingMessage } from './pairing-message.js';
+import { qrText } from './qr-text.js';
+import { buildPairingUrl } from '@dsh-mobile/protocol';
+import { openInBrowser } from './open-browser.js';
 import { resolveSessionId } from './dsh/sessions.js';
 import { hasWorkspaces, listWorkspaces } from './dsh/workspaces.js';
 import type { HostContext } from './host-api.js';
@@ -35,10 +38,10 @@ export const name = 'dsh-mobile-companion';
  */
 export const inject = ['sessions', 'sessionProjections', 'commands'];
 
-const COMMAND_DESCRIPTION = 'Empareja el teléfono o consulta el estado del compañero móvil';
+const COMMAND_DESCRIPTION = 'Pair your phone, or check the companion status';
 
 export function apply(ctx: HostContext): void {
-  log(`plugin cargado · evidencia en ${PROBE_LOG_PATH}`);
+  log(`plugin loaded · evidence in ${PROBE_LOG_PATH}`);
 
   const disposers: Array<() => void> = [];
 
@@ -55,42 +58,78 @@ export function apply(ctx: HostContext): void {
   let listeningPort: number | undefined;
   let listenerError: string | undefined;
 
+  /** Enlace de emparejamiento del código actual. */
+  const linkFor = (code: string): string => {
+    const port = listeningPort ?? DEFAULT_PORT;
+    return buildPairingUrl(origin?.origin ?? `http://127.0.0.1:${port}`, code);
+  };
+
+  /**
+   * QR del enlace, ya pintado. Devuelve `undefined` si algo falla: el comando
+   * tiene que salir igual, con el enlace, aunque no se pueda pintar el código.
+   */
+  const qrFor = (code: string): string | undefined => {
+    try {
+      return qrText(linkFor(code));
+    } catch {
+      return undefined;
+    }
+  };
+
+  /** Abre `/pair` en el navegador y cuenta lo que pasó, sin lanzar. */
+  const openPairingPage = (): string => {
+    const page = `${origin?.origin ?? `http://127.0.0.1:${listeningPort ?? DEFAULT_PORT}`}/pair`;
+
+    void openInBrowser(page).then((abierto) => {
+      if (!abierto) log(`could not open the browser at ${page}`);
+    });
+
+    return `Opening ${page} in the desktop browser.`;
+  };
+
   /** Resuelve el origen público. No lanza: un fallo deja el nivel anterior. */
   const detectOrigin = async (port: number): Promise<void> => {
     try {
       origin = await resolvePublicOrigin(publicUrl, port);
-      log(`origen público para el emparejamiento: ${origin.origin} (${origin.source})`);
+      log(`public pairing origin: ${origin.origin} (${origin.source})`);
     } catch {
       // Sin detección, el comando ya cae a loopback y lo avisa.
     }
   };
 
-  // --- Comando /mobile: emparejamiento; /mobile estado: sondeo ------------------
+  // --- /mobile: pairing. `open` is the default; `qr` and `link` are opt-ins ------
   if (ctx.commands) {
     const register = (): (() => void) =>
       ctx.commands!.register({
         name: 'mobile',
         description: COMMAND_DESCRIPTION,
-        input: { hint: '[estado]' },
+        input: { hint: '[open|qr|link|status]' },
         handler: (invocation) => {
           const argument = (invocation.rawInput ?? '').trim().toLowerCase();
 
-          // `estado` mantiene el sondeo de desarrollo, que ya no estorba en la
-          // ruta principal.
-          if (argument === 'estado' || argument === 'probe') {
+          // `status` keeps the diagnostic probe out of the main path.
+
+          if (argument === 'status' || argument === 'probe') {
             try {
               const report = probe();
               return {
                 kind: 'success',
-                text: `${reportToText(report)}\n\nEvidencia completa: ${PROBE_LOG_PATH}`,
+                text: `${reportToText(report)}\n\nFull evidence: ${PROBE_LOG_PATH}`,
               };
             } catch (error) {
-              return { kind: 'error', text: `El sondeo falló: ${String(error)}` };
+              return { kind: 'error', text: `The probe failed: ${String(error)}` };
             }
           }
 
           try {
             const current = pairing.pending()[0] ?? pairing.issue();
+
+            // `qr` is opt-in on purpose: a text QR only scans when line height
+            // equals font size, which the DSH chat does not do. Printing it by
+            // default would look right and not scan.
+            const wantsQr = argument === 'qr';
+            const wantsLinkOnly = argument === 'link';
+
             const message = buildPairingMessage({
               code: current.code,
               expiresAt: current.expiresAt,
@@ -98,15 +137,19 @@ export function apply(ctx: HostContext): void {
               port: listeningPort,
               listenerError,
               fallbackPort: DEFAULT_PORT,
+              qr: wantsQr ? qrFor(current.code) : undefined,
             });
 
-            // Sin listener no hay éxito posible: que se vea como fallo.
+            // Opening the pairing page is the default: the QR there is an image,
+            // so it scans whatever the chat font is.
+            const opensBrowser = !wantsQr && !wantsLinkOnly && !listenerError;
+
             return {
               kind: message.compromised && listenerError ? 'error' : 'success',
-              text: message.text,
+              text: opensBrowser ? `${message.text}\n\n${openPairingPage()}` : message.text,
             };
           } catch (error) {
-            return { kind: 'error', text: `No pude preparar el emparejamiento: ${String(error)}` };
+            return { kind: 'error', text: `Could not prepare the pairing: ${String(error)}` };
           }
         },
       });
@@ -115,20 +158,20 @@ export function apply(ctx: HostContext): void {
     const registerSay = (): (() => void) =>
       ctx.commands!.register({
         name: 'mobile-say',
-        description: 'Inyecta un mensaje en una sesión vía sessionController.prompt (Fase 0, E0.3)',
-        input: { hint: '<sessionId> <texto>' },
+        description: 'Inject a message into a session through sessionController.prompt',
+        input: { hint: '<sessionId> <text>' },
         handler: (invocation) => {
           const raw = (invocation.rawInput ?? '').trim();
           const split = raw.indexOf(' ');
           if (split <= 0) {
-            return { kind: 'error', text: 'Uso: /mobile-say <sessionId> <texto>' };
+            return { kind: 'error', text: 'Usage: /mobile-say <sessionId> <text>' };
           }
 
           const resolution = resolveSessionId(ctx, raw.slice(0, split));
           if (!resolution.ok) return { kind: 'error', text: resolution.error };
 
           const text = raw.slice(split + 1).trim();
-          log(`E0.3: inyectando ${text.length} caracteres en ${resolution.id}`);
+          log(`E0.3: injecting ${text.length} characters into ${resolution.id}`);
 
           void injectText(ctx, resolution.id, text).then((result) =>
             log(`E0.3 resultado: ok=${result.ok} · ${result.detail}`),
@@ -136,7 +179,7 @@ export function apply(ctx: HostContext): void {
 
           return {
             kind: 'success',
-            text: `Envío despachado a ${resolution.id}. El resultado queda en ${PROBE_LOG_PATH}.`,
+            text: `Send dispatched to ${resolution.id}. The result is in ${PROBE_LOG_PATH}.`,
           };
         },
       });
@@ -151,10 +194,10 @@ export function apply(ctx: HostContext): void {
         disposers.push(register(), registerSay());
       }
     } catch (error) {
-      log(`no pude registrar los comandos: ${String(error)}`);
+      log(`could not register the commands: ${String(error)}`);
     }
   } else {
-    log('el servicio de comandos no está disponible; /mobile queda fuera');
+    log('the commands service is not available; /mobile is disabled');
   }
 
   // --- Estado del producto: emparejamiento y dispositivos ---------------------
@@ -168,7 +211,7 @@ export function apply(ctx: HostContext): void {
   const options = Number.isInteger(portFromEnv) && portFromEnv > 0 ? { port: portFromEnv } : {};
   const publicUrl = process.env.DSH_MOBILE_PUBLIC_URL?.trim();
   const webRoot = findWebRoot();
-  log(webRoot ? `PWA servida desde ${webRoot}` : 'PWA no encontrada; el host sirve solo la API');
+  log(webRoot ? `PWA served from ${webRoot}` : 'PWA not found; the host serves the API only');
 
   // Se anuncia solo lo que este host sabe hacer, y se **evalúa en cada hello**: el
   // controlador de workspaces puede montarse después del arranque, y una bandera
@@ -209,7 +252,7 @@ export function apply(ctx: HostContext): void {
       });
 
       listeningPort = running.port;
-      log(`listener listo en el puerto ${running.port} (prueba: GET /health)`);
+      log(`listener ready on port ${running.port} (try: GET /health)`);
 
       // Se resuelve después de escuchar: así hay puerto para el último nivel.
       void detectOrigin(running.port);
@@ -218,7 +261,7 @@ export function apply(ctx: HostContext): void {
       // Sin listener no hay a dónde emparejar, y el comando tiene que decirlo en
       // vez de enseñar un enlace muerto.
       listenerError = String(error);
-      log(`no pude abrir el listener: ${listenerError}`);
+      log(`could not open the listener: ${listenerError}`);
     });
 
   // --- Sondeo de arranque ------------------------------------------------------
@@ -227,7 +270,7 @@ export function apply(ctx: HostContext): void {
     try {
       probe();
     } catch (error) {
-      log(`el sondeo de arranque falló: ${String(error)}`);
+      log(`the startup probe failed: ${String(error)}`);
     }
   }, 2000);
   if (typeof timer.unref === 'function') timer.unref();
@@ -243,7 +286,7 @@ export function apply(ctx: HostContext): void {
           // Un disposer defectuoso no debe impedir los demás.
         }
       }
-      log('plugin descargado');
+      log('plugin unloaded');
     };
   }, 'dsh-mobile lifecycle');
 }

@@ -161,10 +161,10 @@ function pairingPage(
     : '';
 
   return `<!doctype html>
-<html lang="es">
+<html lang="en">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Emparejar DSH Mobile</title>
+<title>Pair DSH Mobile</title>
 <style>
   /* Mismos tokens que la app, sacados del tema oscuro de DSH. */
   @font-face {
@@ -192,11 +192,11 @@ function pairingPage(
 </style>
 <main>
   ${banner}
-  <h1>Emparejar DSH Mobile</h1>
-  <p>Escanea este código con la cámara del teléfono.</p>
-  <img src="${qrDataUrl}" alt="Código QR de emparejamiento">
+  <h1>Pair DSH Mobile</h1>
+  <p>Scan this code with your phone camera.</p>
+  <img src="${qrDataUrl}" alt="Pairing QR code">
   <code>${escapeHtml(code)}</code>
-  <small>Caduca a las ${escapeHtml(new Date(expiresAt).toLocaleTimeString())} · un solo uso</small>
+  <small>Expires at ${escapeHtml(new Date(expiresAt).toLocaleTimeString())} · single use</small>
   <small class="link">${escapeHtml(link)}</small>
 </main>
 </html>`;
@@ -281,12 +281,12 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
             res.end(pairingPage(link, existing.code, existing.expiresAt, dataUrl, notice));
           })
           .catch((error: unknown) => {
-            log(`no pude generar el QR: ${String(error)}`);
+            log(`could not generate the QR: ${String(error)}`);
             res.writeHead(500, json);
             res.end(JSON.stringify({ error: 'qr-failed' }));
           });
       } catch (error) {
-        log(`/pair falló: ${String(error)}`);
+        log(`/pair failed: ${String(error)}`);
         res.writeHead(400, json);
         res.end(JSON.stringify({ error: 'bad-request' }));
       }
@@ -314,7 +314,7 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
   // Sin manejador, un `error` del servidor de WebSocket (por ejemplo EADDRINUSE
   // al compartir el socket HTTP) es una excepción no capturada y se lleva por
   // delante el proceso del host.
-  wss.on('error', (error: Error) => log(`error del servidor WebSocket: ${error.message}`));
+  wss.on('error', (error: Error) => log(`WebSocket server error: ${error.message}`));
 
   wss.on('connection', (socket: WebSocket) => {
     const connection: Connection = {
@@ -324,7 +324,7 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
       windowStart: Date.now(),
     };
 
-    log('conexión abierta');
+    log('connection open');
 
     // Suscripciones vivas de esta conexión, para cortarlas al cerrar el socket.
     const subscriptions = new Map<string, { stop(): void }>();
@@ -333,9 +333,9 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
       // El manejador es asíncrono porque hay consultas que lo son. Cualquier
       // fallo se responde como `internal` en vez de cerrar el socket.
       void handleFrame(data).catch((error: unknown) => {
-        log(`marco fallido: ${String(error)}`);
+        log(`failed frame: ${String(error)}`);
         if (socket.readyState === socket.OPEN) {
-          send(socket, errorMessage(newMessageId(), 'internal', 'Fallo interno del host.'));
+          send(socket, errorMessage(newMessageId(), 'internal', 'Internal host failure.'));
         }
       });
     });
@@ -349,7 +349,7 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
       }
       connection.frameCount += 1;
       if (connection.frameCount > MAX_FRAMES_PER_MINUTE) {
-        send(socket, errorMessage(newMessageId(), 'rate-limited', 'Demasiados marcos por minuto.'));
+        send(socket, errorMessage(newMessageId(), 'rate-limited', 'Too many frames per minute.'));
         socket.close();
         return;
       }
@@ -358,7 +358,11 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
       if (!message) {
         send(
           socket,
-          errorMessage(newMessageId(), 'bad-request', 'El marco no valida contra el esquema.'),
+          errorMessage(
+            newMessageId(),
+            'bad-request',
+            'The frame does not validate against the schema.',
+          ),
         );
         return;
       }
@@ -390,7 +394,7 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
           if (!device) {
             send(
               socket,
-              errorMessage(message.id, 'auth-invalid', 'El token de dispositivo no es válido.'),
+              errorMessage(message.id, 'auth-invalid', 'The device token is not valid.'),
             );
             return;
           }
@@ -410,10 +414,7 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
 
       if (message.type === 'pair.redeem') {
         if (!connection.sawHello) {
-          send(
-            socket,
-            errorMessage(message.id, 'auth-required', 'Manda `hello` antes de emparejar.'),
-          );
+          send(socket, errorMessage(message.id, 'auth-required', 'Send `hello` before pairing.'));
           return;
         }
 
@@ -421,17 +422,17 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
         if (outcome !== 'ok') {
           const reason =
             outcome === 'expired'
-              ? 'El código caducó. Genera uno nuevo en el escritorio.'
+              ? 'That code expired. Generate a new one on the desktop.'
               : outcome === 'consumed'
-                ? 'Ese código ya se usó. Genera uno nuevo.'
-                : 'Código desconocido.';
+                ? 'That code was already used. Generate a new one.'
+                : 'Unknown code.';
           send(socket, errorMessage(message.id, 'auth-invalid', reason));
           return;
         }
 
         const enrolled = devices.enroll(message.deviceName, message.platform);
         connection.device = enrolled.device;
-        log(`dispositivo emparejado: ${enrolled.device.name} (${enrolled.device.platform})`);
+        log(`device paired: ${enrolled.device.name} (${enrolled.device.platform})`);
 
         send(socket, {
           v: PROTOCOL_VERSION,
@@ -452,7 +453,7 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
           errorMessage(
             message.id,
             'auth-required',
-            `Sin dispositivo emparejado, ${message.type} no está disponible.`,
+            `Without a paired device, ${message.type} is not available.`,
           ),
         );
         return;
@@ -506,7 +507,7 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
         if (!deps.answerQuestion) {
           send(
             socket,
-            errorMessage(message.id, 'bad-request', 'Este host no puede responder preguntas.'),
+            errorMessage(message.id, 'bad-request', 'This host cannot answer questions.'),
           );
           return;
         }
@@ -523,7 +524,7 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
             errorMessage(
               message.id,
               outcome.code ?? 'internal',
-              outcome.message ?? 'No pude responder.',
+              outcome.message ?? 'Could not answer.',
             ),
           );
           return;
@@ -541,7 +542,7 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
 
       if (message.type === 'reply.send') {
         if (!deps.sendReply) {
-          send(socket, errorMessage(message.id, 'bad-request', 'Este host no puede escribir.'));
+          send(socket, errorMessage(message.id, 'bad-request', 'This host cannot write.'));
           return;
         }
 
@@ -554,7 +555,7 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
             errorMessage(
               message.id,
               outcome.code ?? 'internal',
-              outcome.message ?? 'No pude enviar el mensaje.',
+              outcome.message ?? 'Could not send the message.',
             ),
           );
           return;
@@ -596,7 +597,7 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
         if (!deps.subscribeSession) {
           send(
             socket,
-            errorMessage(message.id, 'bad-request', 'Este host no puede suscribir sesiones.'),
+            errorMessage(message.id, 'bad-request', 'This host cannot subscribe to sessions.'),
           );
           return;
         }
@@ -639,7 +640,7 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
         if (!accepted) {
           send(
             socket,
-            errorMessage(message.id, 'not-found', 'No hay ningún turno en curso en esa sesión.'),
+            errorMessage(message.id, 'not-found', 'No turn is running in that session.'),
           );
           return;
         }
@@ -659,16 +660,16 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
         errorMessage(
           message.id,
           'bad-request',
-          `${message.type} todavía no está implementado en este build.`,
+          `${message.type} is not implemented in this build yet.`,
         ),
       );
     }
 
-    socket.on('error', (error: Error) => log(`error de WebSocket: ${error.message}`));
+    socket.on('error', (error: Error) => log(`WebSocket error: ${error.message}`));
     socket.on('close', () => {
       for (const [, subscription] of subscriptions) subscription.stop();
       subscriptions.clear();
-      log('conexión cerrada');
+      log('connection closed');
     });
   });
 
@@ -678,7 +679,7 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
       const address = http.address();
       listeningPort =
         typeof address === 'object' && address !== null ? address.port : requestedPort;
-      log(`listener escuchando en ${localOrigin()} (ws ${WEBSOCKET_PATH})`);
+      log(`listener on ${localOrigin()} (ws ${WEBSOCKET_PATH})`);
 
       resolve({
         port: listeningPort,
