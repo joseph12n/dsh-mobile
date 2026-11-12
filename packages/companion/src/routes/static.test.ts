@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
@@ -71,6 +71,32 @@ describe('resolución de rutas', () => {
       const resolved = resolveAsset(root, attempt);
       expect(resolved === undefined || resolved.startsWith(root)).toBe(true);
     }
+  });
+});
+
+describe('enlaces simbólicos', () => {
+  // Una junction dentro de la raíz que apunta fuera. Es el vector real: la ruta pedida
+  // está dentro, y el archivo que se leería no.
+  let linked = false;
+  try {
+    symlinkSync(outside, join(root, 'escape'), process.platform === 'win32' ? 'junction' : 'dir');
+    linked = true;
+  } catch {
+    // Crear enlaces requiere permisos en algunos sistemas; entonces no se prueba.
+  }
+
+  it('no sigue un enlace que sale de la raíz', (context) => {
+    if (!linked) context.skip();
+
+    // Se comprueba lo que de verdad importa: que no se sirve el secreto.
+    const result = serveStatic(root, '/escape/secreto.txt');
+    expect(result.status).toBe(404);
+    expect(result.body?.toString() ?? '').not.toContain('no deberías poder leer esto');
+  });
+
+  it('no devuelve una ruta de fuera a través del enlace', (context) => {
+    if (!linked) context.skip();
+    expect(resolveAsset(root, '/escape/secreto.txt')).toBeUndefined();
   });
 });
 
