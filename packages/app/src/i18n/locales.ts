@@ -23,6 +23,10 @@ export const LOCALE_LABELS: Record<Locale, string> = {
 };
 
 const en = {
+  'action.newSession': 'New session',
+  'action.archive': 'Archive',
+  'action.stopFirst': 'Stop the turn before archiving',
+  'action.archived': 'Archived',
   'app.subtitle': 'Remote control for DeepSeek Harness',
 
   'state.checking': 'Checking…',
@@ -101,6 +105,10 @@ export type MessageKey = keyof typeof en;
 export type Catalogue = Record<MessageKey, string>;
 
 const es: Catalogue = {
+  'action.newSession': 'Nueva sesión',
+  'action.archive': 'Archivar',
+  'action.stopFirst': 'Detén el turno antes de archivar',
+  'action.archived': 'Archivada',
   'app.subtitle': 'Control remoto de DeepSeek Harness',
 
   'state.checking': 'Comprobando…',
@@ -174,6 +182,10 @@ const es: Catalogue = {
 };
 
 const ptBR: Catalogue = {
+  'action.newSession': 'Nova sessão',
+  'action.archive': 'Arquivar',
+  'action.stopFirst': 'Pare o turno antes de arquivar',
+  'action.archived': 'Arquivada',
   'app.subtitle': 'Controle remoto do DeepSeek Harness',
 
   'state.checking': 'Verificando…',
@@ -247,6 +259,10 @@ const ptBR: Catalogue = {
 };
 
 const zhHans: Catalogue = {
+  'action.newSession': '新建会话',
+  'action.archive': '归档',
+  'action.stopFirst': '请先停止当前轮次',
+  'action.archived': '已归档',
   'app.subtitle': 'DeepSeek Harness 远程控制',
 
   'state.checking': '检查中…',

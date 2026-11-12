@@ -957,17 +957,20 @@ describe('folders over the WebSocket', () => {
 });
 
 describe('session actions over the WebSocket', () => {
+  /** What the host can do in one scenario. */
+  interface ActionDeps {
+    createSession?: () => Promise<{
+      ok: boolean;
+      code?: string;
+      message?: string;
+      sessionId?: string;
+    }>;
+    archiveSession?: () => Promise<{ ok: boolean; code?: string; message?: string }>;
+  }
+
   /** A server whose session actions are whatever the test needs. */
   async function acting(
-    deps: {
-      createSession?: () => Promise<{
-        ok: boolean;
-        code?: string;
-        message?: string;
-        sessionId?: string;
-      }>;
-      archiveSession?: () => Promise<{ ok: boolean; code?: string; message?: string }>;
-    },
+    deps: ActionDeps,
     run: (client: TestClient) => Promise<void>,
   ): Promise<void> {
     const registry = new DeviceRegistry({ persistence: new MemoryPersistence() });
@@ -1059,4 +1062,69 @@ describe('session actions over the WebSocket', () => {
       expect(response['code']).toBe('bad-request');
     });
   });
+
+  it('refuses to create when the host has no handler wired', async () => {
+    const response = await exchange({}, { type: 'session.create', workspaceId: 'ws-1' });
+    expect(response['type']).toBe('error');
+    expect(response['code']).toBe('bad-request');
+  });
+
+  it('treats a host without the create controller as a missing capability', async () => {
+    // "No hay servicio" y "no hay handler" son la misma respuesta: este host no lo hace.
+    const response = await exchange(
+      { createSession: async () => ({ ok: false, code: 'no-service', message: 'no service' }) },
+      { type: 'session.create', workspaceId: 'ws-1' },
+    );
+    expect(response['type']).toBe('error');
+    expect(response['code']).toBe('bad-request');
+  });
+
+  // Cada negativa del adaptador tiene su código en el contrato. La tabla evita cuatro
+  // pruebas idénticas, que además el análisis estático contaba como duplicación.
+  it.each([
+    ['active', 'denied'],
+    ['failed', 'internal'],
+    ['not-found', 'not-found'],
+    ['no-service', 'bad-request'],
+  ])('maps the archive refusal %s to %s', async (refusal, expected) => {
+    const response = await exchange(
+      { archiveSession: async () => archiveResult(refusal) },
+      { type: 'workspace.archive', sessionId: 's1' },
+    );
+    expect(response['type']).toBe('error');
+    expect(response['code']).toBe(expected);
+  });
+
+  it('keeps `denied` for the running turn, so the app can say "stop it first"', async () => {
+    // El código existe para que la app distinga una negativa resoluble de una avería:
+    // `denied` se traduce a "para el turno", y nada más lo hace.
+    const response = await exchange(
+      { archiveSession: async () => archiveResult('active') },
+      { type: 'workspace.archive', sessionId: 's1' },
+    );
+    expect(response['code']).toBe('denied');
+  });
+
+  /** Una negativa del adaptador con el código dado. */
+  function archiveResult(code: string): { ok: boolean; code: string; message: string } {
+    return { ok: false, code, message: code };
+  }
+
+  /**
+   * Empareja, manda un marco y devuelve la respuesta.
+   *
+   * Existe para que cada caso sea una sola idea: antes cada prueba repetía el sobre y
+   * el `send`, y el análisis estático lo contaba como código duplicado.
+   */
+  async function exchange(
+    deps: ActionDeps,
+    payload: Record<string, unknown>,
+  ): Promise<Record<string, unknown>> {
+    let received: Record<string, unknown> = {};
+    await acting(deps, async (client) => {
+      client.send({ v: PROTOCOL_VERSION, id: 'x', at: Date.now(), ...payload } as never);
+      received = await client.next();
+    });
+    return received;
+  }
 });

@@ -214,6 +214,37 @@ export class CompanionClient {
     return response.type === 'workspace.ok' ? response.workspaces : [];
   }
 
+  /**
+   * Creates a session inside an existing folder.
+   *
+   * The host decides whether the folder exists: `not-found` is its answer, not a guess
+   * made here from a list that may be stale.
+   */
+  async createSession(workspaceId: string): Promise<string> {
+    const response = await this.#request({ type: 'session.create', workspaceId });
+    if (response.type === 'error') throw new ConnectionError(response.message, response.code);
+    if (response.type !== 'session.created') {
+      throw new ConnectionError('The host did not confirm the session.', 'internal');
+    }
+    return response.sessionId;
+  }
+
+  /**
+   * Archives a session.
+   *
+   * The "session has work running" refusal arrives as `denied`, so the caller can offer
+   * "stop it first" instead of killing a running turn from a phone without asking. The
+   * response is checked like every other one: a frame that is not `workspace.archived`
+   * is a failure, not a success.
+   */
+  async archiveSession(sessionId: string): Promise<void> {
+    const response = await this.#request({ type: 'workspace.archive', sessionId });
+    if (response.type === 'error') throw new ConnectionError(response.message, response.code);
+    if (response.type !== 'workspace.archived') {
+      throw new ConnectionError('The host did not confirm the archive.', 'internal');
+    }
+  }
+
   async listSessions(): Promise<SessionSummary[]> {
     const response = await this.#request({ type: 'sessions.list' });
     if (response.type === 'error') throw new ConnectionError(response.message, response.code);

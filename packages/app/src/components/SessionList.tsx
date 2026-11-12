@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import type { SessionSummary, Workspace } from '@dsh-mobile/protocol';
 import { groupSessions, elapsed } from '../lib/sessions.js';
 import { displayTitle, groupByFolder, usesFolders } from '../lib/folders.js';
@@ -36,10 +36,25 @@ export function SessionList({
   sessions,
   workspaces,
   onOpen,
+  onCreate,
+  onArchive,
+  canCreate = false,
+  canArchive = false,
+  createPending,
+  archivePending,
 }: {
   sessions: SessionSummary[];
   workspaces: Workspace[];
   onOpen: (session: SessionSummary) => void;
+  /** Creates a session in that folder. Absent when the host cannot. */
+  onCreate?: (workspaceId: string) => void;
+  onArchive?: (session: SessionSummary) => void;
+  canCreate?: boolean;
+  canArchive?: boolean;
+  /** Folder whose create is in flight. Its button is disabled until it settles. */
+  createPending?: string;
+  /** Session whose archive is in flight, for the same reason. */
+  archivePending?: string;
 }) {
   const { t } = useI18n();
   const [showStale, setShowStale] = useState(false);
@@ -68,6 +83,19 @@ export function SessionList({
                   {section.workspace ? displayTitle(section.workspace) : t('group.noFolder')}
                 </h3>
                 <span className="count">{section.sessions.length}</span>
+                {section.workspace && canCreate && onCreate && (
+                  <button
+                    type="button"
+                    className="ghost tiny"
+                    // Todos los botones se llaman igual: sin la carpeta, un lector de
+                    // pantalla anuncia seis "Nueva sesión" idénticos.
+                    aria-label={`${t('action.newSession')}: ${displayTitle(section.workspace)}`}
+                    disabled={createPending !== undefined}
+                    onClick={() => onCreate(section.workspace!.id)}
+                  >
+                    {t('action.newSession')}
+                  </button>
+                )}
               </header>
 
               {empty ? (
@@ -75,7 +103,14 @@ export function SessionList({
               ) : (
                 <ul className="sessions" id={`folder-${index}`}>
                   {section.sessions.map((session) => (
-                    <SessionRow key={session.id} session={session} onOpen={onOpen} />
+                    <SessionRow
+                      key={session.id}
+                      session={session}
+                      onOpen={onOpen}
+                      {...(onArchive ? { onArchive } : {})}
+                      canArchive={canArchive}
+                      {...(archivePending ? { archivePending } : {})}
+                    />
                   ))}
                 </ul>
               )}
@@ -114,7 +149,14 @@ export function SessionList({
             {collapsed ? null : (
               <ul className="sessions" id={`group-${section.kind}`}>
                 {section.sessions.map((session) => (
-                  <SessionRow key={session.id} session={session} onOpen={onOpen} />
+                  <SessionRow
+                    key={session.id}
+                    session={session}
+                    onOpen={onOpen}
+                    {...(onArchive ? { onArchive } : {})}
+                    canArchive={canArchive}
+                    {...(archivePending ? { archivePending } : {})}
+                  />
                 ))}
               </ul>
             )}
@@ -129,34 +171,54 @@ export function SessionList({
 function SessionRow({
   session,
   onOpen,
+  onArchive,
+  canArchive,
+  archivePending,
 }: {
   session: SessionSummary;
   onOpen: (session: SessionSummary) => void;
+  onArchive?: (session: SessionSummary) => void;
+  canArchive: boolean;
+  /** Sesión cuyo archivo está en vuelo: su botón se deshabilita. */
+  archivePending?: string;
 }) {
   const { t } = useI18n();
   const age = elapsed(session.updatedAt);
+  const stateId = useId();
 
   return (
-    <li
-      className="session-row"
-      role="button"
-      tabIndex={0}
-      onClick={() => onOpen(session)}
-      onKeyDown={(event) => {
-        if (event.key !== 'Enter' && event.key !== ' ') return;
-        // Without this, Space also scrolls the page.
-        event.preventDefault();
-        onOpen(session);
-      }}
-    >
-      <div className="session-main">
+    <li className="session-row">
+      {/* Un botón de verdad, no un `li` con `role="button"`: dentro vive otro botón
+          (Archivar) y las interacciones anidadas confundían a los lectores de pantalla.
+          Además, la tecla Enter sobre Archivar burbujeaba al `li` y abría la sesión. */}
+      <button
+        type="button"
+        className="session-open"
+        aria-describedby={stateId}
+        onClick={() => onOpen(session)}
+      >
         <span className="session-title">{session.title}</span>
         <span className="muted small">
           {age ? t(unitKey(age), { count: 'count' in age ? age.count : 0 }) : ''}
         </span>
-      </div>
+      </button>
       <div className="session-meta">
-        <span className={`badge ${session.state}`}>{t(STATE_KEY[session.state])}</span>
+        {/* El estado queda fuera del nombre del botón: `aria-describedby` lo asocia
+            sin que el nombre arrastre "working" en cada fila. */}
+        <span id={stateId} className={`badge ${session.state}`}>
+          {t(STATE_KEY[session.state])}
+        </span>
+        {canArchive && onArchive && (
+          <button
+            type="button"
+            className="ghost tiny"
+            aria-label={`${t('action.archive')}: ${session.title}`}
+            disabled={archivePending !== undefined}
+            onClick={() => onArchive(session)}
+          >
+            {t('action.archive')}
+          </button>
+        )}
         {session.pendingQuestions > 0 && (
           <span className="badge waiting">
             {plural(t, 'session.questionCount', session.pendingQuestions)}

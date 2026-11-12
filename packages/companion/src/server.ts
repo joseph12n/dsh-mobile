@@ -507,7 +507,13 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
             socket,
             errorMessage(
               message.id,
-              created.code === 'no-folder' ? 'not-found' : 'internal',
+              // "No hay controlador" es lo mismo que "no hay handler": una capacidad
+              // que este host no tiene, no una avería.
+              created.code === 'no-service'
+                ? 'bad-request'
+                : created.code === 'no-folder'
+                  ? 'not-found'
+                  : 'internal',
               created.message ?? 'The session could not be created.',
             ),
           );
@@ -544,7 +550,17 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
             socket,
             errorMessage(
               message.id,
-              archived.code === 'not-found' ? 'not-found' : 'internal',
+              // `active` no es un fallo interno: es una negativa que el usuario puede
+              // resolver parando el turno. Con `internal` la app no podía distinguirla
+              // de un error de verdad y acababa diciendo "para el turno" ante cualquier
+              // avería. `no-service` es una capacidad ausente, como el handler ausente.
+              archived.code === 'active'
+                ? 'denied'
+                : archived.code === 'not-found'
+                  ? 'not-found'
+                  : archived.code === 'no-service'
+                    ? 'bad-request'
+                    : 'internal',
               archived.message ?? 'The session could not be archived.',
             ),
           );
