@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { FolderSection } from './folders.js';
+import { fakeStorage, restoreStorage } from './test-storage.js';
 import {
   applyFolderPreferences,
   DEFAULT_FOLDER_PREFERENCES,
@@ -18,29 +19,9 @@ import {
  */
 
 const KEY = 'dsh-mobile.folders';
-const original = globalThis.localStorage;
-
-/** A `localStorage` good enough for the module, in a Node environment. */
-function fakeStorage(options: { throwOnGet?: boolean; throwOnSet?: boolean } = {}): void {
-  const data = new Map<string, string>();
-
-  (globalThis as unknown as { localStorage: unknown }).localStorage = {
-    getItem(key: string): string | null {
-      if (options.throwOnGet) throw new Error('denied');
-      return data.get(key) ?? null;
-    },
-    setItem(key: string, value: string): void {
-      if (options.throwOnSet) throw new Error('full');
-      data.set(key, value);
-    },
-    removeItem(key: string): void {
-      data.delete(key);
-    },
-  };
-}
 
 afterEach(() => {
-  (globalThis as unknown as { localStorage: unknown }).localStorage = original;
+  restoreStorage();
 });
 
 /** A folder section with the given sessions' activity times. */
