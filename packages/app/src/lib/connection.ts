@@ -10,6 +10,7 @@ import {
   type QuestionAnswerItem,
   type ServerMessage,
   type SessionSummary,
+  type Workspace,
 } from '@dsh-mobile/protocol';
 
 /**
@@ -170,6 +171,7 @@ export class CompanionClient {
     }
 
     this.#handshakeDone = true;
+    this.#capabilities = [...response.host.capabilities];
     this.#onState({ kind: 'connected', host: response.host, device: response.device });
     return { host: response.host, ...(response.device ? { device: response.device } : {}) };
   }
@@ -187,6 +189,29 @@ export class CompanionClient {
 
     this.#onState({ kind: 'connected', host: response.host, device: response.device });
     return { deviceToken: response.deviceToken, device: response.device, host: response.host };
+  }
+
+  /**
+   * Folders of the desktop.
+   *
+   * A host that does not implement `workspace.list` answers `bad-request`; that is not a
+   * failure, it means "no folders", and the caller renders a flat list. Only other error
+   * codes propagate.
+   */
+  /** What this host said it can do. */
+  capabilities(): readonly string[] {
+    return this.#capabilities;
+  }
+
+  async listWorkspaces(): Promise<Workspace[]> {
+    const response = await this.#request({ type: 'workspace.list' });
+
+    if (response.type === 'error') {
+      if (response.code === 'bad-request') return [];
+      throw new ConnectionError(response.message, response.code);
+    }
+
+    return response.type === 'workspace.ok' ? response.workspaces : [];
   }
 
   async listSessions(): Promise<SessionSummary[]> {
@@ -263,6 +288,9 @@ export class CompanionClient {
    * congelada y sin síntoma.
    */
   #handshakeDone = false;
+
+  /** Capabilities announced by the host at `hello.ok`. Empty until connected. */
+  #capabilities: string[] = [];
 
   close(): void {
     this.#failAll(new Error('Conexión cerrada.'));

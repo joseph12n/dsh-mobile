@@ -8,6 +8,7 @@ import {
   type QuestionAnswerItem,
   type QuestionBatch,
   type SessionSummary,
+  type Workspace,
 } from '@dsh-mobile/protocol';
 import { CompanionClient, endpointFromLocation, normalizeEndpoint } from './lib/connection.js';
 import { classifyFailure, retryDelay } from './lib/reconnect.js';
@@ -35,7 +36,14 @@ type View =
     }
   | { kind: 'reconnecting'; endpoint: string; attempt: number; retryInMs: number }
   | { kind: 'connecting'; endpoint: string }
-  | { kind: 'sessions'; endpoint: string; host: HostInfo; sessions: SessionSummary[] }
+  | {
+      kind: 'sessions';
+      endpoint: string;
+      host: HostInfo;
+      sessions: SessionSummary[];
+      /** Folders of the desktop. Empty when the host does not expose them. */
+      workspaces: Workspace[];
+    }
   | { kind: 'error'; endpoint: string; message: string };
 
 export function App() {
@@ -210,8 +218,16 @@ export function App() {
         }
 
         const sessions = await connection.listSessions();
+
+        // Las carpetas son un extra: si fallan, la lista plana sigue siendo correcta.
+        // Antes iban en un `Promise.all` con las sesiones, así que un fallo de carpetas
+        // tiraba datos que ya estaban cargados.
+        const workspaces = hello.host.capabilities.includes('workspace.list')
+          ? await connection.listWorkspaces().catch(() => [])
+          : [];
+
         retry.current = 0;
-        setView({ kind: 'sessions', endpoint, host: hello.host, sessions });
+        setView({ kind: 'sessions', endpoint, host: hello.host, sessions, workspaces });
 
         // After a reconnect the open session must be resubscribed, or the
         // transcript stays frozen and stops receiving live events.
@@ -412,7 +428,10 @@ export function App() {
     if (!connection) return;
     try {
       const sessions = await connection.listSessions();
-      setView((previous) => (previous.kind === 'sessions' ? { ...previous, sessions } : previous));
+      const admiteCarpetas = connection.capabilities().includes('workspace.list');
+      const workspaces = admiteCarpetas ? await connection.listWorkspaces().catch(() => []) : [];
+
+      setView((state) => (state.kind === 'sessions' ? { ...state, sessions, workspaces } : state));
     } catch (error) {
       setView((previous) =>
         previous.kind === 'sessions'
@@ -563,7 +582,11 @@ export function App() {
                 </button>
               </div>
 
-              <SessionList sessions={view.sessions} onOpen={(session) => void open(session)} />
+              <SessionList
+                sessions={view.sessions}
+                workspaces={view.workspaces}
+                onOpen={(session) => void open(session)}
+              />
 
               <button type="button" className="ghost" onClick={forget}>
                 {t('error.forget')}

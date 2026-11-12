@@ -1,14 +1,20 @@
 import { useState } from 'react';
-import type { SessionSummary } from '@dsh-mobile/protocol';
+import type { SessionSummary, Workspace } from '@dsh-mobile/protocol';
 import { groupSessions, elapsed } from '../lib/sessions.js';
+import { displayTitle, groupByFolder, usesFolders } from '../lib/folders.js';
 import { plural, useI18n } from '../i18n/index.js';
 
 /**
- * Session list, grouped by state.
+ * Session list.
  *
- * The order of the sections comes from `groupSessions`; this file only draws. The
- * "older" group starts collapsed because it is not what you look at when you pick up
- * the phone, and the others cannot be collapsed: if they are there, they matter.
+ * Two shapes, and which one you get is decided by the host:
+ *
+ *  - **With folders** (the desktop's Workspaces): one section per folder, sessions inside
+ *    ordered by urgency. This is how the desktop reads.
+ *  - **Without folders**: the sections by state, as before. A host that does not expose
+ *    workspaces is still a valid host and must not look broken.
+ *
+ * The state stays visible either way: a badge on every row, and the waiting count.
  */
 
 const STATE_KEY = {
@@ -28,16 +34,56 @@ const SECTION_KEY = {
 
 export function SessionList({
   sessions,
+  workspaces,
   onOpen,
 }: {
   sessions: SessionSummary[];
+  workspaces: Workspace[];
   onOpen: (session: SessionSummary) => void;
 }) {
   const { t } = useI18n();
   const [showStale, setShowStale] = useState(false);
 
-  if (sessions.length === 0) {
+  const folders = groupByFolder(sessions, workspaces);
+
+  // Sin carpetas y sin sesiones, el aviso. Con carpetas, se pintan igual: es donde
+  // irían las sesiones nuevas y esconderlas borraba la agrupación entera.
+  if (sessions.length === 0 && !usesFolders(workspaces)) {
     return <p className="muted">{t('sessions.empty')}</p>;
+  }
+
+  if (usesFolders(workspaces)) {
+    return (
+      <>
+        {folders.map((section, index) => {
+          const id = section.workspace?.id ?? 'no-folder';
+          // A folder with nothing in it is still shown: it is where new sessions would go,
+          // and hiding it makes the app look like it lost a folder.
+          const empty = section.sessions.length === 0;
+
+          return (
+            <section key={id} className="group folder">
+              <header className="group-head">
+                <h3 title={section.workspace?.directory}>
+                  {section.workspace ? displayTitle(section.workspace) : t('group.noFolder')}
+                </h3>
+                <span className="count">{section.sessions.length}</span>
+              </header>
+
+              {empty ? (
+                <p className="muted small">{t('group.emptyFolder')}</p>
+              ) : (
+                <ul className="sessions" id={`folder-${index}`}>
+                  {section.sessions.map((session) => (
+                    <SessionRow key={session.id} session={session} onOpen={onOpen} />
+                  ))}
+                </ul>
+              )}
+            </section>
+          );
+        })}
+      </>
+    );
   }
 
   const sections = groupSessions(sessions);
@@ -58,8 +104,6 @@ export function SessionList({
                   className="ghost tiny"
                   onClick={() => setShowStale((previous) => !previous)}
                   aria-expanded={showStale}
-                  // Only points at the group when it exists: an `aria-controls`
-                  // referencing an unrendered element is a broken reference.
                   aria-controls={showStale ? `group-${section.kind}` : undefined}
                 >
                   {showStale ? t('group.hide') : t('group.show')}
@@ -69,48 +113,57 @@ export function SessionList({
 
             {collapsed ? null : (
               <ul className="sessions" id={`group-${section.kind}`}>
-                {section.sessions.map((session) => {
-                  const age = elapsed(session.updatedAt);
-
-                  return (
-                    <li
-                      key={session.id}
-                      className="session-row"
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => onOpen(session)}
-                      onKeyDown={(event) => {
-                        if (event.key !== 'Enter' && event.key !== ' ') return;
-                        // Without this, Space also scrolls the page.
-                        event.preventDefault();
-                        onOpen(session);
-                      }}
-                    >
-                      <div className="session-main">
-                        <span className="session-title">{session.title}</span>
-                        <span className="muted small">
-                          {age ? t(unitKey(age), { count: 'count' in age ? age.count : 0 }) : ''}
-                        </span>
-                      </div>
-                      <div className="session-meta">
-                        <span className={`badge ${session.state}`}>
-                          {t(STATE_KEY[session.state])}
-                        </span>
-                        {session.pendingQuestions > 0 && (
-                          <span className="badge waiting">
-                            {plural(t, 'session.questionCount', session.pendingQuestions)}
-                          </span>
-                        )}
-                      </div>
-                    </li>
-                  );
-                })}
+                {section.sessions.map((session) => (
+                  <SessionRow key={session.id} session={session} onOpen={onOpen} />
+                ))}
               </ul>
             )}
           </section>
         );
       })}
     </>
+  );
+}
+
+/** One session. The same row in both shapes: the state is always visible. */
+function SessionRow({
+  session,
+  onOpen,
+}: {
+  session: SessionSummary;
+  onOpen: (session: SessionSummary) => void;
+}) {
+  const { t } = useI18n();
+  const age = elapsed(session.updatedAt);
+
+  return (
+    <li
+      className="session-row"
+      role="button"
+      tabIndex={0}
+      onClick={() => onOpen(session)}
+      onKeyDown={(event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        // Without this, Space also scrolls the page.
+        event.preventDefault();
+        onOpen(session);
+      }}
+    >
+      <div className="session-main">
+        <span className="session-title">{session.title}</span>
+        <span className="muted small">
+          {age ? t(unitKey(age), { count: 'count' in age ? age.count : 0 }) : ''}
+        </span>
+      </div>
+      <div className="session-meta">
+        <span className={`badge ${session.state}`}>{t(STATE_KEY[session.state])}</span>
+        {session.pendingQuestions > 0 && (
+          <span className="badge waiting">
+            {plural(t, 'session.questionCount', session.pendingQuestions)}
+          </span>
+        )}
+      </div>
+    </li>
   );
 }
 

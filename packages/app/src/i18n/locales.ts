@@ -55,6 +55,8 @@ const en = {
   'group.working': 'Working',
   'group.idle': 'Idle',
   'group.stale': 'Older',
+  'group.noFolder': 'No folder',
+  'group.emptyFolder': 'No sessions here yet.',
   'group.show': 'Show',
   'group.hide': 'Hide',
 
@@ -127,6 +129,8 @@ const es: Catalogue = {
   'group.working': 'Trabajando',
   'group.idle': 'En reposo',
   'group.stale': 'Más antiguas',
+  'group.noFolder': 'Sin carpeta',
+  'group.emptyFolder': 'Todavía no hay sesiones aquí.',
   'group.show': 'Mostrar',
   'group.hide': 'Ocultar',
 
@@ -194,6 +198,8 @@ const ptBR: Catalogue = {
   'group.working': 'Trabalhando',
   'group.idle': 'Paradas',
   'group.stale': 'Mais antigas',
+  'group.noFolder': 'Sem pasta',
+  'group.emptyFolder': 'Ainda não há sessões aqui.',
   'group.show': 'Mostrar',
   'group.hide': 'Ocultar',
 
@@ -260,6 +266,8 @@ const zhHans: Catalogue = {
   'group.working': '进行中',
   'group.idle': '空闲',
   'group.stale': '更早的',
+  'group.noFolder': '未分组',
+  'group.emptyFolder': '这里还没有会话。',
   'group.show': '显示',
   'group.hide': '隐藏',
 
