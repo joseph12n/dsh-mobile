@@ -15,6 +15,8 @@ import {
   type DeviceInfo,
   type HistoryEntry,
   type HostInfo,
+  type ModelCatalog,
+  type ModelSelection,
   type QuestionAnswerItem,
   type QuestionBatch,
   type ServerMessage,
@@ -81,6 +83,22 @@ export interface ServerDeps {
     ok: boolean;
     code?: 'no-service' | 'active' | 'not-found' | 'failed';
     message?: string;
+  }>;
+
+  /** Catálogo de modelos del host. Sin ella, `models.list` se rechaza. */
+  listModels?: () => Promise<ModelCatalog>;
+
+  /** Cambia el modelo de una sesión. Sin ella, `model.select` se rechaza. */
+  selectModel?: (request: {
+    sessionId: string;
+    provider: string;
+    model: string;
+    reasoningEffort?: string;
+  }) => Promise<{
+    ok: boolean;
+    code?: 'no-service' | 'unavailable' | 'not-found' | 'failed';
+    message?: string;
+    selection?: ModelSelection;
   }>;
 
   /** Source of sessions. Without it `sessions.list` returns an empty list. */
@@ -486,6 +504,69 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
           at: Date.now(),
           type: 'workspace.ok',
           workspaces,
+        });
+        return;
+      }
+
+      if (message.type === 'models.list') {
+        if (!deps.listModels) {
+          send(socket, errorMessage(message.id, 'bad-request', 'This host cannot list models.'));
+          return;
+        }
+
+        const catalog = await deps.listModels();
+        if (socket.readyState !== socket.OPEN) return;
+
+        send(socket, {
+          v: PROTOCOL_VERSION,
+          id: message.id,
+          at: Date.now(),
+          type: 'models.ok',
+          catalog,
+        });
+        return;
+      }
+
+      if (message.type === 'model.select') {
+        if (!deps.selectModel) {
+          send(socket, errorMessage(message.id, 'bad-request', 'This host cannot select models.'));
+          return;
+        }
+
+        const selected = await deps.selectModel({
+          sessionId: message.sessionId,
+          provider: message.provider,
+          model: message.model,
+          ...(message.reasoningEffort ? { reasoningEffort: message.reasoningEffort } : {}),
+        });
+        if (socket.readyState !== socket.OPEN) return;
+
+        if (!selected.ok || !selected.selection) {
+          send(
+            socket,
+            errorMessage(
+              message.id,
+              // Una eleccion que ya no existe es culpa de la peticion, no del host:
+              // `bad-request` deja que la app diga "ese modelo ya no esta" y recargue
+              // el catalogo, en vez de ofrecer reintentar lo mismo.
+              selected.code === 'unavailable'
+                ? 'bad-request'
+                : selected.code === 'not-found'
+                  ? 'not-found'
+                  : 'internal',
+              selected.message ?? 'The model could not be changed.',
+            ),
+          );
+          return;
+        }
+
+        send(socket, {
+          v: PROTOCOL_VERSION,
+          id: message.id,
+          at: Date.now(),
+          type: 'model.selected',
+          sessionId: message.sessionId,
+          selection: selected.selection,
         });
         return;
       }
