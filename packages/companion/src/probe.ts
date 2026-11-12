@@ -55,7 +55,7 @@ export interface ProbeReport {
 
 /** Describe un valor sin volcarlo entero. */
 function describe(value: unknown): string {
-  if (value === undefined) return 'ausente';
+  if (value === undefined) return 'absent';
   if (value === null) return 'null';
   const type = typeof value;
   if (type === 'function') return 'function';
@@ -166,14 +166,14 @@ export function runProbe(ctx: HostContext): ProbeReport {
 
 /** Vuelca el informe al log de evidencia, línea por línea. */
 export function reportToLog(report: ProbeReport): void {
-  log('===== FASE 0: sondeo =====');
-  log(`servicios montados (${report.serviceNames.length}): ${report.serviceNames.join(', ')}`);
+  log('===== PHASE 0: probe =====');
+  log(`mounted services (${report.serviceNames.length}): ${report.serviceNames.join(', ')}`);
 
   for (const detail of report.serviceDetails) {
     log(`  · ${detail.name}: ${detail.methods.join(', ') || '(no enumerable methods)'}`);
   }
 
-  log(`sesiones vivas: ${report.sessionCount ?? 'no disponible'}`);
+  log(`live sessions: ${report.sessionCount ?? 'not available'}`);
 
   for (const session of report.sessions) {
     log(
@@ -184,20 +184,20 @@ export function reportToLog(report: ProbeReport): void {
   }
 
   log(`injection candidates: ${JSON.stringify(report.injectionCandidates)}`);
-  log('===== fin del sondeo =====');
+  log('===== end of probe =====');
 }
 
 /** Informe en texto, para devolverlo desde el comando. */
 export function reportToText(report: ProbeReport): string {
   const lines: string[] = [];
-  lines.push(`Sondeo Fase 0 — ${report.timestamp}`);
-  lines.push(`Sesiones vivas: ${report.sessionCount ?? 'no disponible'}`);
-  lines.push(`Servicios montados: ${report.serviceNames.length}`);
+  lines.push(`Phase 0 probe — ${report.timestamp}`);
+  lines.push(`Live sessions: ${report.sessionCount ?? 'not available'}`);
+  lines.push(`Mounted services: ${report.serviceNames.length}`);
   lines.push('');
 
   for (const [index, session] of report.sessions.entries()) {
     lines.push(`${index + 1}) ${session.id}`);
-    lines.push(`   mensajes=${session.messageCount ?? '?'} · asOfSeq=${session.asOfSeq ?? '?'}`);
+    lines.push(`   messages=${session.messageCount ?? '?'} · asOfSeq=${session.asOfSeq ?? '?'}`);
     lines.push(`   userQuestions: ${summarize(session.pendingQuestions)}`);
   }
 

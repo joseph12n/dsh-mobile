@@ -176,7 +176,11 @@ export function answerQuestion(
 ): AnswerOutcome {
   const userQuestions = service<UserQuestionsService>(ctx, 'userQuestions');
   if (!userQuestions) {
-    return { ok: false, code: 'internal', message: 'El host no expone el servicio de preguntas.' };
+    return {
+      ok: false,
+      code: 'internal',
+      message: 'The host does not expose the questions service.',
+    };
   }
 
   const agents = service<AgentRegistry>(ctx, 'agents');

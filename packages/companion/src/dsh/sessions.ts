@@ -29,7 +29,7 @@ export function resolveSessionId(ctx: HostContext, raw: string): SessionResoluti
   try {
     ids = sessions.list().map((session) => session.id);
   } catch (error) {
-    return { ok: false, error: `No pude listar las sesiones: ${String(error)}` };
+    return { ok: false, error: `Could not list the sessions: ${String(error)}` };
   }
 
   // 0. Un número elige por posición, con la misma numeración que muestra /mobile.
@@ -56,7 +56,7 @@ export function resolveSessionId(ctx: HostContext, raw: string): SessionResoluti
   if (matches.length > 1) {
     return {
       ok: false,
-      error: `"${wanted}" es ambiguo y coincide con ${matches.length} sesiones:\n${matches.join('\n')}`,
+      error: `"${wanted}" is ambiguous and matches ${matches.length} sessions:\n${matches.join('\n')}`,
     };
   }
 

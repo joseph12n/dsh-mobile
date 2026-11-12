@@ -267,7 +267,7 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
             res.end(pairingPage(link, existing.code, existing.expiresAt, dataUrl, notice));
           })
           .catch((error: unknown) => {
-            log(`no pude generar el QR: ${String(error)}`);
+            log(`could not generate the QR: ${String(error)}`);
             res.writeHead(500, json);
             res.end(JSON.stringify({ error: 'qr-failed' }));
           });
@@ -300,7 +300,7 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
   // Sin manejador, un `error` del servidor de WebSocket (por ejemplo EADDRINUSE
   // al compartir el socket HTTP) es una excepción no capturada y se lleva por
   // delante el proceso del host.
-  wss.on('error', (error: Error) => log(`error del servidor WebSocket: ${error.message}`));
+  wss.on('error', (error: Error) => log(`WebSocket server error: ${error.message}`));
 
   wss.on('connection', (socket: WebSocket) => {
     const connection: Connection = {
@@ -321,7 +321,7 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
       void handleFrame(data).catch((error: unknown) => {
         log(`marco fallido: ${String(error)}`);
         if (socket.readyState === socket.OPEN) {
-          send(socket, errorMessage(newMessageId(), 'internal', 'Fallo interno del host.'));
+          send(socket, errorMessage(newMessageId(), 'internal', 'Internal host failure.'));
         }
       });
     });
@@ -335,7 +335,7 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
       }
       connection.frameCount += 1;
       if (connection.frameCount > MAX_FRAMES_PER_MINUTE) {
-        send(socket, errorMessage(newMessageId(), 'rate-limited', 'Demasiados marcos por minuto.'));
+        send(socket, errorMessage(newMessageId(), 'rate-limited', 'Too many frames per minute.'));
         socket.close();
         return;
       }
@@ -344,7 +344,11 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
       if (!message) {
         send(
           socket,
-          errorMessage(newMessageId(), 'bad-request', 'El marco no valida contra el esquema.'),
+          errorMessage(
+            newMessageId(),
+            'bad-request',
+            'The frame does not validate against the schema.',
+          ),
         );
         return;
       }
@@ -361,7 +365,7 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
             errorMessage(
               message.id,
               'proto-unsupported',
-              `Este host habla dsh-mobile/${PROTOCOL_VERSION}; pediste ${message.proto}.`,
+              `This host speaks dsh-mobile/${PROTOCOL_VERSION}; you asked for ${message.proto}.`,
               capabilities,
             ),
           );
@@ -473,7 +477,7 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
         if (!deps.answerQuestion) {
           send(
             socket,
-            errorMessage(message.id, 'bad-request', 'Este host no puede responder preguntas.'),
+            errorMessage(message.id, 'bad-request', 'This host cannot answer questions.'),
           );
           return;
         }
@@ -490,7 +494,7 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
             errorMessage(
               message.id,
               outcome.code ?? 'internal',
-              outcome.message ?? 'No pude responder.',
+              outcome.message ?? 'Could not answer.',
             ),
           );
           return;
@@ -508,7 +512,7 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
 
       if (message.type === 'reply.send') {
         if (!deps.sendReply) {
-          send(socket, errorMessage(message.id, 'bad-request', 'Este host no puede escribir.'));
+          send(socket, errorMessage(message.id, 'bad-request', 'This host cannot write.'));
           return;
         }
 
@@ -521,7 +525,7 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
             errorMessage(
               message.id,
               outcome.code ?? 'internal',
-              outcome.message ?? 'No pude enviar el mensaje.',
+              outcome.message ?? 'Could not send the message.',
             ),
           );
           return;
@@ -563,7 +567,7 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
         if (!deps.subscribeSession) {
           send(
             socket,
-            errorMessage(message.id, 'bad-request', 'Este host no puede suscribir sesiones.'),
+            errorMessage(message.id, 'bad-request', 'This host cannot subscribe to sessions.'),
           );
           return;
         }

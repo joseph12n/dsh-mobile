@@ -162,7 +162,7 @@ export function apply(ctx: HostContext): void {
           const raw = (invocation.rawInput ?? '').trim();
           const split = raw.indexOf(' ');
           if (split <= 0) {
-            return { kind: 'error', text: 'Uso: /mobile-say <sessionId> <texto>' };
+            return { kind: 'error', text: 'Usage: /mobile-say <sessionId> <text>' };
           }
 
           const resolution = resolveSessionId(ctx, raw.slice(0, split));
@@ -192,7 +192,7 @@ export function apply(ctx: HostContext): void {
         disposers.push(register(), registerSay());
       }
     } catch (error) {
-      log(`no pude registrar los comandos: ${String(error)}`);
+      log(`could not register the commands: ${String(error)}`);
     }
   } else {
     log('the commands service is not available; /mobile is disabled');
@@ -242,7 +242,7 @@ export function apply(ctx: HostContext): void {
       });
 
       listeningPort = running.port;
-      log(`listener listo en el puerto ${running.port} (prueba: GET /health)`);
+      log(`listener ready on port ${running.port} (try: GET /health)`);
 
       // Se resuelve después de escuchar: así hay puerto para el último nivel.
       void detectOrigin(running.port);
@@ -251,7 +251,7 @@ export function apply(ctx: HostContext): void {
       // Sin listener no hay a dónde emparejar, y el comando tiene que decirlo en
       // vez de enseñar un enlace muerto.
       listenerError = String(error);
-      log(`no pude abrir el listener: ${listenerError}`);
+      log(`could not open the listener: ${listenerError}`);
     });
 
   // --- Sondeo de arranque ------------------------------------------------------

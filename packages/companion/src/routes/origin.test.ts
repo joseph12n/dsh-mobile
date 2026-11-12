@@ -162,7 +162,7 @@ describe('avisos para la página de emparejamiento', () => {
     const notice = originNotice('http://192.168.1.50:6768');
     expect(notice?.severity).toBe('warning');
     expect(notice?.message).toContain('will load');
-    expect(notice?.message).toContain('instalarse');
+    expect(notice?.message).toContain('install it');
     expect(noticeHeadline(notice!)).toContain('will not be able to install it');
   });
 

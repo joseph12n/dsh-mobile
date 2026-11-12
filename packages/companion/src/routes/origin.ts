@@ -134,7 +134,7 @@ export function originNotice(origin: string): OriginNotice | undefined {
       message:
         `${parsed.host} only exists inside this PC: on a phone it points at the phone ` +
         'itself. Open this page through the tailnet address (tailscale serve) or ' +
-        'configura DSH_MOBILE_PUBLIC_URL.',
+        'set DSH_MOBILE_PUBLIC_URL.',
     };
   }
 
@@ -143,8 +143,8 @@ export function originNotice(origin: string): OriginNotice | undefined {
       severity: 'warning',
       message:
         'This address is plain HTTP. The app will load, but the browser will not ' +
-        'instalarse ni usar notificaciones: eso exige HTTPS, que es lo que da el nombre ' +
-        'del tailnet.',
+        'let you install it or use notifications: both need HTTPS, which the tailnet ' +
+        'name provides.',
     };
   }
 
