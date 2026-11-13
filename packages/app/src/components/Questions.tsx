@@ -6,10 +6,12 @@ export function QuestionsCard({
   questions,
   titleFor,
   onSubmit,
+  inline = false,
 }: {
   questions: QuestionBatch[];
   titleFor?: (sessionId: string) => string;
   onSubmit: (callId: string, sessionId: string, answers: QuestionAnswerItem[]) => void;
+  inline?: boolean;
 }) {
   const { t } = useI18n();
   const [selected, setSelected] = useState<Record<string, string[]>>({});
@@ -44,12 +46,14 @@ export function QuestionsCard({
   };
 
   return (
-    <section className="card questions">
+    <section className={`card questions${inline ? ' inline' : ''}`}>
       <h2>{t('questions.title')}</h2>
 
       {questions.map((batch) => (
         <div key={batch.callId} className="question-batch">
-          <p className="muted small">{titleFor?.(batch.sessionId) ?? batch.sessionId}</p>
+          {!inline && (
+            <p className="muted small">{titleFor?.(batch.sessionId) ?? batch.sessionId}</p>
+          )}
 
           {batch.items.map((item) => {
             const key = `${batch.callId}:${item.id}`;
