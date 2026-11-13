@@ -29,8 +29,35 @@ export interface CommandDefinition {
   handler: (invocation: CommandInvocation) => { kind: string; text: string };
 }
 
+export interface CommandDescriptor {
+  name: string;
+  description: string;
+  input?: { hint?: string };
+}
+
+export interface CommandResult {
+  kind: 'success' | 'error';
+  text?: string;
+}
+
+export interface CommandExecution {
+  commandId: string;
+  result: CommandResult;
+}
+
 export interface CommandsService {
   register(definition: CommandDefinition): () => void;
+  list(agent: unknown): readonly CommandDescriptor[];
+  execute(
+    agent: unknown,
+    line: string,
+    attachments: unknown,
+    signal: AbortSignal,
+  ): Promise<CommandExecution | undefined>;
+}
+
+export interface AgentRegistry {
+  get(sessionId: string): unknown;
 }
 
 export interface SessionPromptRequest {

@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type {
+  CommandInfo,
+  CommandResult,
   HistoryEntry,
   ModelCatalog,
   ModelSelection,
@@ -336,6 +338,8 @@ export function SessionView({
   sendError,
   questions,
   onAnswerQuestion,
+  commands,
+  onRunCommand,
   onBack,
   onLoadMore,
   onCancel,
@@ -354,6 +358,8 @@ export function SessionView({
   sendError?: string;
   questions: QuestionBatch[];
   onAnswerQuestion: (callId: string, sessionId: string, answers: QuestionAnswerItem[]) => void;
+  commands?: CommandInfo[];
+  onRunCommand?: (line: string) => Promise<CommandResult | undefined>;
   onBack: () => void;
   onLoadMore: () => void;
   onCancel: () => void;
@@ -364,10 +370,21 @@ export function SessionView({
   const { t } = useI18n();
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
+  const [commandResult, setCommandResult] = useState<CommandResult | undefined>(undefined);
   const scrollRef = useRef<HTMLDivElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const atBottom = useRef(true);
+
+  const availableCommands = commands ?? [];
+  const commandMode = draft.startsWith('/') && !draft.includes('\n');
+  const commandToken = commandMode ? (draft.slice(1).split(/\s+/)[0] ?? '') : '';
+  const matches =
+    commandMode && !draft.slice(1).includes(' ') && availableCommands.length > 0
+      ? availableCommands
+          .filter((command) => command.name.startsWith(commandToken.toLowerCase()))
+          .slice(0, 8)
+      : [];
 
   useEffect(() => {
     headingRef.current?.focus({ preventScroll: true });
@@ -415,10 +432,50 @@ export function SessionView({
     const text = draft.trim();
     if (!text || sending) return;
     atBottom.current = true;
+
+    if (text.startsWith('/') && onRunCommand) {
+      setSending(true);
+      setCommandResult(undefined);
+      const result = await onRunCommand(text);
+      setSending(false);
+      if (!result) return;
+      setCommandResult(result);
+      if (result.kind === 'success') setDraft('');
+      return;
+    }
+
     setSending(true);
+    setCommandResult(undefined);
     const accepted = await onSend(text);
     setSending(false);
     if (accepted) setDraft('');
+  };
+
+  const startCommand = (): void => {
+    const area = textareaRef.current;
+    const start = area?.selectionStart ?? draft.length;
+    const end = area?.selectionEnd ?? draft.length;
+
+    setDraft((previous) => `${previous.slice(0, start)}/${previous.slice(end)}`);
+    setCommandResult(undefined);
+    requestAnimationFrame(() => {
+      const node = textareaRef.current;
+      if (!node) return;
+      const position = start + 1;
+      node.focus();
+      node.setSelectionRange(position, position);
+    });
+  };
+
+  const chooseCommand = (command: CommandInfo): void => {
+    setDraft(`/${command.name} `);
+    setCommandResult(undefined);
+    requestAnimationFrame(() => {
+      const node = textareaRef.current;
+      if (!node) return;
+      node.focus();
+      node.setSelectionRange(node.value.length, node.value.length);
+    });
   };
 
   return (
@@ -505,12 +562,49 @@ export function SessionView({
         <p className="muted">{t('session.archivedNote')}</p>
       ) : (
         <>
+          {matches.length > 0 && (
+            <div className="command-menu" role="group" aria-label={t('command.open')}>
+              {matches.map((command) => (
+                <button
+                  key={command.name}
+                  type="button"
+                  className="command-option"
+                  onClick={() => chooseCommand(command)}
+                >
+                  <span className="command-name">/{command.name}</span>
+                  <span className="command-description">{command.description}</span>
+                  {command.hint && <span className="command-hint">{command.hint}</span>}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {commandResult && (
+            <p className={`command-result ${commandResult.kind}`} role="status">
+              <span className="command-result-label">
+                {t(commandResult.kind === 'success' ? 'command.done' : 'command.error')}
+              </span>
+              {commandResult.text ?? t('command.noOutput')}
+            </p>
+          )}
+
           {sendError && (
             <p className="error composer-error" role="alert">
               {sendError}
             </p>
           )}
           <div className="composer">
+            {onRunCommand && availableCommands.length > 0 && (
+              <button
+                type="button"
+                className="ghost icon-button command-button"
+                onClick={startCommand}
+                disabled={sending}
+                aria-label={t('command.open')}
+              >
+                /
+              </button>
+            )}
             <textarea
               ref={textareaRef}
               value={draft}

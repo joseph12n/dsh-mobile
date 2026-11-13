@@ -4,6 +4,8 @@ import {
   newMessageId,
   parseServerMessage,
   type ClientMessage,
+  type CommandInfo,
+  type CommandResult,
   type DeviceInfo,
   type HistoryEntry,
   type HostInfo,
@@ -71,6 +73,7 @@ export function normalizeEndpoint(raw: string): string {
 }
 
 const REQUEST_TIMEOUT_MS = 10_000;
+const COMMAND_TIMEOUT_MS = 120_000;
 
 export class CompanionClient {
   readonly #url: string;
@@ -238,6 +241,30 @@ export class CompanionClient {
     if (response.type === 'error') throw new Error(response.message);
   }
 
+  async listCommands(sessionId: string): Promise<CommandInfo[]> {
+    const response = await this.#request({ type: 'commands.list', sessionId });
+    if (response.type === 'error') {
+      if (response.code === 'bad-request') return [];
+      throw new ConnectionError(response.message, response.code);
+    }
+    return response.type === 'commands.ok' ? response.commands : [];
+  }
+
+  async runCommand(sessionId: string, line: string): Promise<CommandResult> {
+    const response = await this.#request(
+      { type: 'command.run', sessionId, line },
+      COMMAND_TIMEOUT_MS,
+    );
+    if (response.type === 'error') throw new ConnectionError(response.message, response.code);
+    if (response.type !== 'command.ok') {
+      throw new ConnectionError('The host did not confirm the command.', 'internal');
+    }
+    return {
+      kind: response.kind,
+      ...(response.text !== undefined ? { text: response.text } : {}),
+    };
+  }
+
   async history(
     sessionId: string,
     options: { before?: number; limit?: number } = {},
@@ -290,7 +317,7 @@ export class CompanionClient {
     this.#onState({ kind: 'idle' });
   }
 
-  #request(payload: OutgoingMessage): Promise<ServerMessage> {
+  #request(payload: OutgoingMessage, timeoutMs = REQUEST_TIMEOUT_MS): Promise<ServerMessage> {
     const socket = this.#socket;
     if (!socket || socket.readyState !== WebSocket.OPEN) {
       return Promise.reject(new Error('Sin conexión con el host.'));
@@ -303,7 +330,7 @@ export class CompanionClient {
       const timer = setTimeout(() => {
         this.#pending.delete(id);
         reject(new Error('El host no respondió a tiempo.'));
-      }, REQUEST_TIMEOUT_MS);
+      }, timeoutMs);
 
       this.#pending.set(id, { resolve, reject, timer });
       socket.send(JSON.stringify(message));

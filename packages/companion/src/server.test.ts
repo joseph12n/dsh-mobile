@@ -360,6 +360,109 @@ describe('difusión a los dispositivos emparejados', () => {
   });
 });
 
+describe('comandos sobre el WebSocket', () => {
+  it('lista y ejecuta a través del host', async () => {
+    const localPairing = new PairingService();
+    const server = await startCompanionServer({
+      pairing: localPairing,
+      devices: new DeviceRegistry({ persistence: new MemoryPersistence() }),
+      port: 0,
+      listCommands: (sessionId) => [{ name: 'plan', description: `plan para ${sessionId}` }],
+      runCommand: async ({ line }) => ({
+        ok: true,
+        result: { kind: 'success', text: `eco ${line}` },
+      }),
+    });
+    const localCode = localPairing.issue().code;
+
+    const client = await openClient(server.port);
+    client.send(hello());
+    await client.next();
+    client.send({
+      v: PROTOCOL_VERSION,
+      id: 'pair-commands',
+      at: Date.now(),
+      type: 'pair.redeem',
+      code: localCode,
+      deviceName: 'Comandos',
+      platform: 'node',
+    });
+    expect((await client.next())['type']).toBe('pair.ok');
+
+    client.send({
+      v: PROTOCOL_VERSION,
+      id: 'commands-list',
+      at: Date.now(),
+      type: 'commands.list',
+      sessionId: 'session-1',
+    });
+    const listed = await client.next();
+    expect(listed['type']).toBe('commands.ok');
+    expect(listed['commands']).toEqual([{ name: 'plan', description: 'plan para session-1' }]);
+
+    client.send({
+      v: PROTOCOL_VERSION,
+      id: 'command-run',
+      at: Date.now(),
+      type: 'command.run',
+      sessionId: 'session-1',
+      line: '/plan revisa',
+    });
+    const ran = await client.next();
+    expect(ran['type']).toBe('command.ok');
+    expect(ran['kind']).toBe('success');
+    expect(ran['text']).toBe('eco /plan revisa');
+
+    client.close();
+    await server.close();
+  });
+
+  it('devuelve el error del host al ejecutar', async () => {
+    const localPairing = new PairingService();
+    const server = await startCompanionServer({
+      pairing: localPairing,
+      devices: new DeviceRegistry({ persistence: new MemoryPersistence() }),
+      port: 0,
+      runCommand: async () => ({
+        ok: false,
+        code: 'bad-request',
+        message: 'Ese comando no está permitido.',
+      }),
+    });
+    const localCode = localPairing.issue().code;
+
+    const client = await openClient(server.port);
+    client.send(hello());
+    await client.next();
+    client.send({
+      v: PROTOCOL_VERSION,
+      id: 'pair-commands-error',
+      at: Date.now(),
+      type: 'pair.redeem',
+      code: localCode,
+      deviceName: 'Comandos',
+      platform: 'node',
+    });
+    expect((await client.next())['type']).toBe('pair.ok');
+
+    client.send({
+      v: PROTOCOL_VERSION,
+      id: 'command-error',
+      at: Date.now(),
+      type: 'command.run',
+      sessionId: 'session-1',
+      line: '/plan',
+    });
+    const response = await client.next();
+    expect(response['type']).toBe('error');
+    expect(response['code']).toBe('bad-request');
+    expect(response['message']).toBe('Ese comando no está permitido.');
+
+    client.close();
+    await server.close();
+  });
+});
+
 describe('listado de sesiones sobre el WebSocket', () => {
   it('entrega las sesiones a un dispositivo emparejado', async () => {
     const persistence = new MemoryPersistence();

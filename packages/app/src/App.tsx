@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   parsePairingUrl,
+  type CommandInfo,
+  type CommandResult,
   type HistoryEntry,
   type HostInfo,
   type ModelCatalog,
@@ -68,6 +70,7 @@ export function App() {
   const [catalogStatus, setCatalogStatus] = useState<CatalogStatus>('idle');
   const [questions, setQuestions] = useState<QuestionBatch[]>([]);
   const [openSession, setOpenSession] = useState<SessionSummary | undefined>(undefined);
+  const [commands, setCommands] = useState<CommandInfo[]>([]);
   const listHeadingRef = useRef<HTMLHeadingElement>(null);
   const wasOpen = useRef(false);
   const questionsRef = useRef<QuestionBatch[]>([]);
@@ -467,6 +470,46 @@ export function App() {
     if (backFrom(globalThis.history, { view: 'settings' })) return;
     setSettingsOpen(false);
   }, []);
+
+  const commandCapable = view.kind === 'sessions' && view.host.capabilities.includes('command.run');
+
+  useEffect(() => {
+    const connection = client.current;
+    const sessionId = openSession?.id;
+    if (!connection || !sessionId || !commandCapable) {
+      setCommands([]);
+      return;
+    }
+
+    let cancelled = false;
+    void connection
+      .listCommands(sessionId)
+      .then((list) => {
+        if (!cancelled) setCommands(list);
+      })
+      .catch(() => {
+        if (!cancelled) setCommands([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [client, commandCapable, openSession?.id]);
+
+  const runOpenCommand = useCallback(
+    async (line: string): Promise<CommandResult | undefined> => {
+      const connection = client.current;
+      const sessionId = openSession?.id;
+      if (!connection || !sessionId) return { kind: 'error', text: 'The session is not open.' };
+
+      try {
+        return await connection.runCommand(sessionId, line);
+      } catch (error) {
+        return { kind: 'error', text: messageOf(error) };
+      }
+    },
+    [client, openSession?.id],
+  );
 
   const loadMore = useCallback(async () => {
     const connection = client.current;
@@ -893,6 +936,7 @@ export function App() {
                 entries={entries}
                 hasMore={hasMore}
                 loading={loadingHistory}
+                {...(commandCapable ? { commands, onRunCommand: runOpenCommand } : {})}
                 questions={questions.filter((batch) => batch.sessionId === openSession.id)}
                 onAnswerQuestion={(callId, sessionId, answers) =>
                   void answer(callId, sessionId, answers)

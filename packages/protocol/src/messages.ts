@@ -3,6 +3,8 @@ import { envelopeFields } from './envelope.js';
 import { ErrorCode } from './errors.js';
 import {
   Capabilities,
+  CommandInfo,
+  CommandResult,
   DeviceInfo,
   HostInfo,
   ModelCatalog,
@@ -67,6 +69,15 @@ export const QuestionAnswerMessage = message('question.answer', {
   answers: z.array(QuestionAnswerItem).min(1),
 });
 
+export const CommandsListMessage = message('commands.list', {
+  sessionId: SessionId,
+});
+
+export const CommandRunMessage = message('command.run', {
+  sessionId: SessionId,
+  line: z.string().min(2).max(4_000),
+});
+
 export const RunStartMessage = message('run.start', {
   sessionId: SessionId,
   prompt: z.string().min(1).max(32_000),
@@ -114,6 +125,8 @@ export const ClientMessage = z.discriminatedUnion('type', [
   SessionHistoryMessage,
   ReplySendMessage,
   QuestionAnswerMessage,
+  CommandsListMessage,
+  CommandRunMessage,
   RunStartMessage,
   RunCancelMessage,
   PingMessage,
@@ -184,6 +197,12 @@ export const AnswerOkMessage = message('answer.ok', {
   callId: z.string().min(1),
 });
 
+export const CommandsOkMessage = message('commands.ok', {
+  commands: z.array(CommandInfo),
+});
+
+export const CommandOkMessage = message('command.ok', CommandResult.shape);
+
 export const RunOkMessage = message('run.ok', {
   sessionId: SessionId,
   state: SessionState,
@@ -236,6 +255,8 @@ export const ServerMessage = z.discriminatedUnion('type', [
   HistoryOkMessage,
   ReplyOkMessage,
   AnswerOkMessage,
+  CommandsOkMessage,
+  CommandOkMessage,
   RunOkMessage,
   SessionEventMessage,
   SessionStateMessage,

@@ -15,6 +15,7 @@ const host = {
     'workspace.archive',
     'workspace.unarchive',
     'model.select',
+    'command.run',
     'session.history',
     'reply.send',
     'run.cancel',
@@ -284,6 +285,32 @@ wss.on('connection', (socket) => {
 
     if (message.type === 'workspace.list') {
       reply({ type: 'workspace.ok', workspaces });
+      return;
+    }
+
+    if (message.type === 'commands.list') {
+      reply({
+        type: 'commands.ok',
+        commands: [
+          { name: 'plan', description: 'Entrar en modo plan', hint: '<mensaje>' },
+          { name: 'goal', description: 'Ver el objetivo actual' },
+          { name: 'mobile', description: 'Emparejar el teléfono' },
+        ],
+      });
+      return;
+    }
+
+    if (message.type === 'command.run') {
+      const name = message.line.trim().split(/\s+/)[0];
+      if (name === '/plan') {
+        reply({ type: 'command.ok', kind: 'success', text: 'Modo plan activado.' });
+      } else if (name === '/goal') {
+        reply({ type: 'command.ok', kind: 'error', text: 'No hay un objetivo activo.' });
+      } else if (name === '/mobile') {
+        reply({ type: 'command.ok', kind: 'success', text: 'https://ejemplo.test/pair' });
+      } else {
+        reply({ type: 'command.ok', kind: 'error', text: 'Comando desconocido.' });
+      }
       return;
     }
 
