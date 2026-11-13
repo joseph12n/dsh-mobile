@@ -818,7 +818,9 @@ export function App() {
                   preferences={preferences}
                 />
 
-                <ForgetDeviceButton onForget={forget} />
+                <div className="panel-foot">
+                  <ForgetDeviceButton onForget={forget} />
+                </div>
               </section>
             )}
           </>
