@@ -64,3 +64,43 @@ export function displayTitle(workspace: Workspace): string {
 export function usesFolders(workspaces: readonly Workspace[]): boolean {
   return workspaces.length > 0;
 }
+
+const FOLDER_ACCENTS = [
+  '#7dd3c0',
+  '#93b4f5',
+  '#c9a3f0',
+  '#e6be78',
+  '#86d69a',
+  '#e79ab0',
+  '#f0a58f',
+  '#a7c7d9',
+] as const;
+
+export function folderAccent(id: string): string {
+  let hash = 0;
+  for (const character of id) {
+    hash = (hash * 31 + (character.codePointAt(0) ?? 0)) >>> 0;
+  }
+  return FOLDER_ACCENTS[hash % FOLDER_ACCENTS.length] ?? FOLDER_ACCENTS[0];
+}
+
+export function parentPath(directory: string): string {
+  const trimmed = directory.replace(/[\\/]+$/, '');
+  const cut = Math.max(trimmed.lastIndexOf('\\'), trimmed.lastIndexOf('/'));
+
+  if (cut < 0) return '';
+  if (cut === 0) return trimmed.startsWith('/') ? '/' : '';
+
+  const parent = trimmed.slice(0, cut);
+  return /^[A-Za-z]:$/.test(parent) ? `${parent}\\` : parent;
+}
+
+export function compactPath(path: string, keep = 2): string {
+  if (!path) return '';
+
+  const separator = path.includes('\\') ? '\\' : '/';
+  const segments = path.split(/[\\/]+/).filter(Boolean);
+  if (segments.length <= keep) return path;
+
+  return `…${separator}${segments.slice(-keep).join(separator)}`;
+}

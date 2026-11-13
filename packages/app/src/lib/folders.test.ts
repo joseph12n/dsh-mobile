@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import type { SessionSummary, Workspace } from '@dsh-mobile/protocol';
-import { byUrgency, displayTitle, groupByFolder, usesFolders } from './folders.js';
+import {
+  byUrgency,
+  compactPath,
+  displayTitle,
+  folderAccent,
+  groupByFolder,
+  parentPath,
+  usesFolders,
+} from './folders.js';
 
 const NOW = 1_800_000_000_000;
 
@@ -126,5 +134,46 @@ describe('folder title', () => {
 
   it('copes with a directory that has no segments', () => {
     expect(displayTitle(workspace('w1', { title: '', directory: '/' }))).toBe('/');
+  });
+});
+
+describe('folder location', () => {
+  it.each([
+    ['C:\\Users\\me\\project', 'C:\\Users\\me'],
+    ['C:/work/api/', 'C:/work'],
+    ['/home/me/app', '/home/me'],
+    ['\\\\server\\share\\folder', '\\\\server\\share'],
+    ['C:\\', ''],
+    ['/', ''],
+    ['project', ''],
+  ])('takes the parent of %s', (directory, expected) => {
+    expect(parentPath(directory)).toBe(expected);
+  });
+
+  it('compacts what the header shows to the useful tail', () => {
+    expect(compactPath(parentPath('C:\\Users\\josep\\OneDrive\\Documentos\\dsh-mobile'))).toBe(
+      '…\\OneDrive\\Documentos',
+    );
+    expect(compactPath('/home/me/projects/api')).toBe('…/projects/api');
+  });
+
+  it('leaves a path with nothing to compact alone', () => {
+    expect(compactPath('C:\\work')).toBe('C:\\work');
+    expect(compactPath('')).toBe('');
+  });
+});
+
+describe('folder accent', () => {
+  it('stays the same for the same folder', () => {
+    expect(folderAccent('ws-app')).toBe(folderAccent('ws-app'));
+  });
+
+  it('returns a palette colour', () => {
+    expect(folderAccent('ws-app')).toMatch(/^#[0-9a-f]{6}$/);
+  });
+
+  it('does not paint every folder the same', () => {
+    const colours = new Set(['ws-app', 'ws-api', 'ws-web', 'ws-lab'].map(folderAccent));
+    expect(colours.size).toBeGreaterThan(1);
   });
 });

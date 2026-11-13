@@ -107,6 +107,14 @@ export function MessagesIcon() {
   );
 }
 
+export function FolderIcon() {
+  return (
+    <Icon>
+      <path d="M3.5 8.5a2 2 0 0 1 2-2h3.1l1.9 2h8a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z" />
+    </Icon>
+  );
+}
+
 export function CloseIcon() {
   return (
     <Icon>

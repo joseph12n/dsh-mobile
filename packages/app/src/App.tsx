@@ -27,7 +27,7 @@ import { ForgetDeviceButton } from './components/ForgetDeviceButton.js';
 import { GearIcon, RefreshIcon } from './components/icons.js';
 import { useI18n } from './i18n/index.js';
 import type { MessageKey } from './i18n/locales.js';
-import { useFolderPreferences } from './lib/preferences.js';
+import { useFolderPreferences, toggleCollapsed } from './lib/preferences.js';
 
 type View =
   | { kind: 'checking' }
@@ -899,6 +899,9 @@ export function App() {
                   onCreate={(workspaceId) => void createInFolder(workspaceId)}
                   onArchive={(session) => void archive(session)}
                   onUnarchive={(session) => void restore(session)}
+                  onToggleFolder={(workspaceId) =>
+                    setPreferences(toggleCollapsed(preferences, workspaceId))
+                  }
                   canCreate={view.host.capabilities.includes('session.create')}
                   canArchive={view.host.capabilities.includes('workspace.archive')}
                   canUnarchive={view.host.capabilities.includes('workspace.unarchive')}

@@ -363,12 +363,12 @@ button {
     transform 120ms var(--ease-out);
 }
 
-button:active:not(:disabled) {
+button:active:not(:disabled):not(.folder-toggle) {
   transform: scale(0.98);
 }
 
 @media (hover: hover) and (pointer: fine) {
-  button:hover:not(:disabled):not(.option):not(.session-open) {
+  button:hover:not(:disabled):not(.option):not(.session-open):not(.folder-toggle) {
     background: var(--accent-hover);
   }
 
@@ -462,6 +462,113 @@ button[aria-pressed='true'] {
 
 .group.folder {
   padding-top: 6px;
+}
+
+.folder-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  gap: 4px;
+  margin-bottom: 6px;
+  padding: 4px 0;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+
+.folder-heading {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  color: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.folder-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 2px 0;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.folder-toggle:active {
+  background: var(--hover);
+}
+
+.folder-toggle > svg:first-child {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  color: var(--muted);
+  transition: transform 140ms var(--ease-out);
+}
+
+.folder-toggle[aria-expanded='true'] > svg:first-child {
+  transform: rotate(90deg);
+}
+
+.folder-static {
+  cursor: default;
+}
+
+.folder-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  color: var(--folder-accent, var(--muted));
+}
+
+.folder-icon svg {
+  width: 17px;
+  height: 17px;
+}
+
+.folder-ident {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.folder-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+  font-size: 13.5px;
+  font-weight: 500;
+}
+
+.folder-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+}
+
+.group.folder > .sessions {
+  margin-left: 2px;
+  padding-left: 10px;
+  border-left: 2px solid
+    color-mix(in srgb, var(--folder-accent, var(--line-strong)) 45%, transparent);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .folder-toggle:hover {
+    background: var(--hover);
+  }
 }
 
 .group + .group {
@@ -1265,7 +1372,8 @@ button.ghost.tiny {
   }
 
   .tool-toggle svg,
-  .session-model > summary svg {
+  .session-model > summary svg,
+  .folder-toggle > svg:first-child {
     transition: none;
   }
 
