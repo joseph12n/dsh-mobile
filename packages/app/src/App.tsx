@@ -50,6 +50,8 @@ type View =
 
 type ActionNotice = { key: MessageKey } | { text: string };
 
+const QUESTIONS_POLL_MS = 6000;
+
 export function App() {
   const { t } = useI18n();
   const { preferences, setPreferences } = useFolderPreferences();
@@ -83,6 +85,7 @@ export function App() {
   const openSeq = useRef(0);
 
   const refreshSeq = useRef(0);
+  const polling = useRef(false);
 
   const showArchivedRef = useRef(false);
 
@@ -347,12 +350,25 @@ export function App() {
       if (!connection) return;
       try {
         await connection.answer(callId, sessionId, answers);
-        setQuestions((previous) => previous.filter((batch) => batch.callId !== callId));
+
+        const remaining = questionsRef.current.filter((batch) => batch.callId !== callId);
+        questionsRef.current = remaining;
+        setQuestions(remaining);
+
+        updateSession(sessionId, (session) => {
+          const pendingQuestions = Math.max(0, session.pendingQuestions - 1);
+          return {
+            pendingQuestions,
+            ...(pendingQuestions === 0 && session.state === 'waiting'
+              ? { state: 'idle' as const }
+              : {}),
+          };
+        });
       } catch (error) {
         setView({ kind: 'error', endpoint: connection.url, message: messageOf(error) });
       }
     },
-    [client],
+    [client, updateSession],
   );
 
   const reopen = useCallback(
@@ -656,6 +672,46 @@ export function App() {
     document.addEventListener('visibilitychange', onVisibility);
     return () => document.removeEventListener('visibilitychange', onVisibility);
   }, [view.kind]);
+
+  const pollQuestions = useCallback(async () => {
+    const connection = client.current;
+    if (!connection || document.visibilityState !== 'visible' || polling.current) return;
+
+    polling.current = true;
+    try {
+      const sessions = await connection.listSessions(showArchivedRef.current);
+      if (client.current !== connection) return;
+
+      setView((previous) => (previous.kind === 'sessions' ? { ...previous, sessions } : previous));
+      setOpenSession((previous) => {
+        if (!previous) return previous;
+        const fresh = sessions.find((session) => session.id === previous.id);
+        return fresh ? { ...previous, ...fresh } : previous;
+      });
+
+      const busy = new Set(
+        sessions.filter((session) => session.pendingQuestions > 0).map((session) => session.id),
+      );
+      const alive = questionsRef.current.filter((batch) => busy.has(batch.sessionId));
+      if (alive.length !== questionsRef.current.length) {
+        questionsRef.current = alive;
+        setQuestions(alive);
+      }
+    } catch {
+    } finally {
+      polling.current = false;
+    }
+  }, [client]);
+
+  useEffect(() => {
+    if (view.kind !== 'sessions') return;
+
+    const timer = setInterval(() => {
+      void pollQuestions();
+    }, QUESTIONS_POLL_MS);
+
+    return () => clearInterval(timer);
+  }, [pollQuestions, view.kind]);
 
   const toggleArchived = async () => {
     const next = !showArchived;
