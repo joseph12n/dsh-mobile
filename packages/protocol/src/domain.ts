@@ -20,6 +20,8 @@ export const Capability = z.enum([
   'command.run',
   'session.activity',
   'devices.manage',
+  'providers.list',
+  'provider.connect',
 ]);
 export type Capability = z.infer<typeof Capability>;
 
@@ -189,6 +191,43 @@ export const SessionActivity = z.object({
   planActive: z.boolean().optional(),
 });
 export type SessionActivity = z.infer<typeof SessionActivity>;
+
+export const ProviderCredential = z.enum(['set', 'missing', 'unknown']);
+export type ProviderCredential = z.infer<typeof ProviderCredential>;
+
+export const ProviderCredentialSource = z.enum(['file', 'env', 'project-env', 'user-env']);
+export type ProviderCredentialSource = z.infer<typeof ProviderCredentialSource>;
+
+export const ProviderAction = z.enum(['add-key', 'add-provider', 'none', 'desktop']);
+export type ProviderAction = z.infer<typeof ProviderAction>;
+
+export const ProviderView = z.object({
+  id: z.string().min(1),
+  name: z.string(),
+  configured: z.boolean(),
+  credential: ProviderCredential,
+  credentialSource: ProviderCredentialSource.optional(),
+  action: ProviderAction,
+});
+export type ProviderView = z.infer<typeof ProviderView>;
+
+export const ProviderTestCode = z.enum(['ok', 'rejected', 'unreachable', 'unsupported', 'invalid']);
+export type ProviderTestCode = z.infer<typeof ProviderTestCode>;
+
+export const ProviderTestResult = z.object({
+  provider: z.string().min(1),
+  ok: z.boolean(),
+  code: ProviderTestCode,
+  detail: z.string().optional(),
+});
+export type ProviderTestResult = z.infer<typeof ProviderTestResult>;
+
+export const ProviderConnection = z.object({
+  provider: z.string().min(1),
+  credential: ProviderCredential,
+  credentialSource: ProviderCredentialSource.optional(),
+});
+export type ProviderConnection = z.infer<typeof ProviderConnection>;
 
 export const QuestionAnswerItem = z.object({
   id: z.string().min(1),

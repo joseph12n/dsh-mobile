@@ -100,24 +100,28 @@ Transport: **WebSocket**, JSON messages, shared envelope `{ v, id, at, type }`.
 
 ### Messages
 
-| Client → Host       | Host → Client                           |
-| ------------------- | --------------------------------------- |
-| `hello`             | `hello.ok` / `error`                    |
-| `pair.redeem`       | `pair.ok`                               |
-| `sessions.list`     | `sessions.ok` (+ `question.pending`)    |
-| `workspace.list`    | `workspace.ok` (folders of the desktop) |
-| `session.history`   | `history.ok`                            |
-| `session.subscribe` | `session.ok` (+ `session.event`)        |
-| `reply.send`        | `reply.ok`                              |
-| `question.answer`   | `answer.ok`                             |
-| `commands.list`     | `commands.ok`                           |
-| `command.run`       | `command.ok`                            |
-| `session.activity`  | `activity.ok`                           |
-| `devices.list`      | `devices.ok`                            |
-| `devices.revoke`    | `devices.revoked` (+ `devices.changed`) |
-| `run.cancel`        | `run.ok`                                |
-| `run.start`         | `error` (not implemented in this build) |
-| `ping`              | `pong`                                  |
+| Client → Host         | Host → Client                           |
+| --------------------- | --------------------------------------- |
+| `hello`               | `hello.ok` / `error`                    |
+| `pair.redeem`         | `pair.ok`                               |
+| `sessions.list`       | `sessions.ok` (+ `question.pending`)    |
+| `workspace.list`      | `workspace.ok` (folders of the desktop) |
+| `session.history`     | `history.ok`                            |
+| `session.subscribe`   | `session.ok` (+ `session.event`)        |
+| `reply.send`          | `reply.ok`                              |
+| `question.answer`     | `answer.ok`                             |
+| `commands.list`       | `commands.ok`                           |
+| `command.run`         | `command.ok`                            |
+| `session.activity`    | `activity.ok`                           |
+| `devices.list`        | `devices.ok`                            |
+| `devices.revoke`      | `devices.revoked` (+ `devices.changed`) |
+| `providers.list`      | `providers.ok`                          |
+| `provider.test`       | `provider.tested`                       |
+| `provider.connect`    | `provider.connected`                    |
+| `provider.disconnect` | `provider.disconnected`                 |
+| `run.cancel`          | `run.ok`                                |
+| `run.start`           | `error` (not implemented in this build) |
+| `ping`                | `pong`                                  |
 
 ## 8. Pairing
 
@@ -231,6 +235,13 @@ it. `session.activity` is a read-only request for the open session:
   `devices.changed` to the rest. The frames carry public device metadata only, never the token
   or its hash. Revoking yourself is the "forget this phone" path; the next request with the old
   token is `auth-invalid`.
+- **Model providers are key-only from the phone.** The phone names a provider from the host's
+  catalog, sends a key and nothing else; the host derives the credential reference, stores the
+  key with the credentials service and never returns it. `baseURL`, `api`, `apiKeyEnv`,
+  `headers`, model lists/overrides, route deletion and OAuth stay on the desktop: letting the
+  phone move an endpoint while a stored key exists would send that key to another host. The
+  test is a one-shot discovery against the host's own endpoint; a failed save reports whether
+  the key was already stored.
 - **Bounded listener.** At most 50 concurrent sockets and 32 paired devices; a socket that does
   not send `hello` within 10 s closes; a 20 s heartbeat reaps half-open clients; `lastSeenAt`
   is flushed to disk every 30 s only when it changed; `probe.log` rotates at 1 MiB keeping one

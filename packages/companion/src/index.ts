@@ -26,6 +26,14 @@ import {
 import { canListModels, canSelectModel, listModels, selectModel } from './dsh/models.js';
 import { commandsAvailable, listCommands, runCommand } from './dsh/slash-commands.js';
 import { activityAvailable, readSessionActivity } from './dsh/session-activity.js';
+import {
+  connectProvider,
+  disconnectProvider,
+  listProviders,
+  providerConnectAvailable,
+  providersAvailable,
+  testProvider,
+} from './dsh/providers.js';
 import { createQuestionBridge } from './dsh/question-bridge.js';
 import type { HostContext } from './host-api.js';
 import { reportToLog, reportToText, runProbe, type ProbeReport } from './probe.js';
@@ -204,6 +212,8 @@ export function apply(ctx: HostContext): void {
     if (canListModels(ctx) && canSelectModel(ctx)) list.push('model.select');
     if (commandsAvailable(ctx)) list.push('command.run');
     if (activityAvailable(ctx)) list.push('session.activity');
+    if (providersAvailable(ctx)) list.push('providers.list');
+    if (providerConnectAvailable(ctx)) list.push('provider.connect');
     list.push('devices.manage');
     return list;
   };
@@ -234,6 +244,10 @@ export function apply(ctx: HostContext): void {
     listCommands: (sessionId) => listCommands(ctx, sessionId),
     runCommand: (input) => runCommand(ctx, input),
     readActivity: (sessionId) => readSessionActivity(ctx, sessionId),
+    listProviders: () => listProviders(ctx),
+    testProvider: (input) => testProvider(ctx, input),
+    connectProvider: (input) => connectProvider(ctx, input),
+    disconnectProvider: (input) => disconnectProvider(ctx, input),
     answerQuestion: (input) => questionBridge.answer(input) ?? answerQuestion(ctx, input),
     readHistory: (sessionId, options) => readHistory(ctx, sessionId, options),
     subscribeSession: (sessionId, options) => subscribeSession(ctx, sessionId, options),

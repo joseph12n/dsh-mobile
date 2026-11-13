@@ -20,6 +20,9 @@ import {
   type HostInfo,
   type ModelCatalog,
   type ModelSelection,
+  type ProviderConnection,
+  type ProviderTestResult,
+  type ProviderView,
   type QuestionAnswerItem,
   type QuestionBatch,
   type ServerMessage,
@@ -76,6 +79,50 @@ export function reapIdleClients(
   }
 }
 
+interface ProviderActionOutcome {
+  ok: boolean;
+  code?: CommandFailureCode;
+  message?: string;
+  connection?: ProviderConnection;
+}
+
+async function settleProvider(
+  socket: WebSocket,
+  id: string,
+  run: () => Promise<ProviderActionOutcome>,
+  fallback: ProviderConnection,
+  type: 'provider.connected' | 'provider.disconnected',
+): Promise<void> {
+  const outcome = await run();
+  if (socket.readyState !== socket.OPEN) return;
+
+  if (!outcome.ok) {
+    send(
+      socket,
+      errorMessage(
+        id,
+        outcome.code ?? 'internal',
+        outcome.message ?? 'The provider could not be configured.',
+      ),
+    );
+    return;
+  }
+
+  const frame = {
+    v: PROTOCOL_VERSION,
+    id,
+    at: Date.now(),
+    ...(outcome.connection ?? fallback),
+  };
+
+  send(
+    socket,
+    type === 'provider.connected'
+      ? { ...frame, type: 'provider.connected' }
+      : { ...frame, type: 'provider.disconnected' },
+  );
+}
+
 export interface ServerDeps {
   pairing: PairingService;
   devices: DeviceRegistry;
@@ -130,6 +177,20 @@ export interface ServerDeps {
     result?: CommandResult;
   }>;
   readActivity?: (sessionId: string) => SessionActivity | Promise<SessionActivity>;
+  listProviders?: () => ProviderView[] | Promise<ProviderView[]>;
+  testProvider?: (input: { provider: string; apiKey: string }) => Promise<ProviderTestResult>;
+  connectProvider?: (input: { provider: string; apiKey: string }) => Promise<{
+    ok: boolean;
+    code?: CommandFailureCode;
+    message?: string;
+    connection?: ProviderConnection;
+  }>;
+  disconnectProvider?: (input: { provider: string }) => Promise<{
+    ok: boolean;
+    code?: CommandFailureCode;
+    message?: string;
+    connection?: ProviderConnection;
+  }>;
   answerQuestion?: (input: {
     callId: string;
     sessionId: string;
@@ -596,6 +657,87 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
           type: 'devices.changed',
           devices: updated,
         });
+        return;
+      }
+
+      if (message.type === 'providers.list') {
+        if (!deps.listProviders) {
+          send(socket, errorMessage(message.id, 'bad-request', 'This host cannot list providers.'));
+          return;
+        }
+
+        const providers = await deps.listProviders();
+        if (socket.readyState !== socket.OPEN) return;
+
+        send(socket, {
+          v: PROTOCOL_VERSION,
+          id: message.id,
+          at: Date.now(),
+          type: 'providers.ok',
+          providers,
+        });
+        return;
+      }
+
+      if (message.type === 'provider.test') {
+        if (!deps.testProvider) {
+          send(socket, errorMessage(message.id, 'bad-request', 'This host cannot test providers.'));
+          return;
+        }
+
+        const result = await deps.testProvider({
+          provider: message.provider,
+          apiKey: message.apiKey,
+        });
+        if (socket.readyState !== socket.OPEN) return;
+
+        send(socket, {
+          v: PROTOCOL_VERSION,
+          id: message.id,
+          at: Date.now(),
+          type: 'provider.tested',
+          ...result,
+        });
+        return;
+      }
+
+      if (message.type === 'provider.connect') {
+        const connect = deps.connectProvider;
+        if (!connect) {
+          send(
+            socket,
+            errorMessage(message.id, 'bad-request', 'This host cannot connect providers.'),
+          );
+          return;
+        }
+
+        await settleProvider(
+          socket,
+          message.id,
+          () => connect({ provider: message.provider, apiKey: message.apiKey }),
+          { provider: message.provider, credential: 'set' },
+          'provider.connected',
+        );
+        return;
+      }
+
+      if (message.type === 'provider.disconnect') {
+        const disconnect = deps.disconnectProvider;
+        if (!disconnect) {
+          send(
+            socket,
+            errorMessage(message.id, 'bad-request', 'This host cannot disconnect providers.'),
+          );
+          return;
+        }
+
+        await settleProvider(
+          socket,
+          message.id,
+          () => disconnect({ provider: message.provider }),
+          { provider: message.provider, credential: 'unknown' },
+          'provider.disconnected',
+        );
         return;
       }
 

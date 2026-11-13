@@ -75,6 +75,58 @@ export interface SubagentsService {
   listDescendants(rootSessionId: string, signal?: AbortSignal): Promise<readonly SubagentEntry[]>;
 }
 
+export interface SettingsDescriptor {
+  ns: string;
+  revision: number;
+  value: unknown;
+}
+
+export interface SettingsService {
+  describe(options?: { redactSecrets?: boolean }): readonly SettingsDescriptor[];
+  update(ns: string, patch: unknown, expectedRevision?: number): Promise<void>;
+}
+
+export interface CredentialDescription {
+  configured: boolean;
+  source?: 'file' | 'env' | 'project-env' | 'user-env';
+  writable?: boolean;
+}
+
+export interface CredentialsService {
+  describe(ref: string): Promise<CredentialDescription>;
+  set(ref: string, value: string): Promise<void>;
+  unset(ref: string): Promise<void>;
+}
+
+export interface LlmProvider {
+  id: string;
+  name?: string;
+}
+
+export interface ConfigurableProvider {
+  provider: string;
+  displayName: string;
+  settingsNs: string;
+  settingsPath: readonly string[];
+  declared?: boolean;
+  defaultBaseURL?: string;
+  nativeAuth?: unknown;
+}
+
+export interface DiscoveredModel {
+  id: string;
+}
+
+export interface LlmService {
+  listProviders(): readonly LlmProvider[];
+  listConfigurableProviders(): readonly ConfigurableProvider[];
+  discoverModels(
+    settingsNs: string,
+    request: { provider?: string; baseURL?: string; api?: string; apiKey?: string },
+    signal?: AbortSignal,
+  ): Promise<readonly DiscoveredModel[]>;
+}
+
 export interface SessionPromptRequest {
   requestId: string;
   sessionId: string;
@@ -91,6 +143,9 @@ export interface HostContext {
   sessionProjections?: ProjectionsService;
   commands?: CommandsService;
   subagents?: SubagentsService;
+  llm?: LlmService;
+  settings?: SettingsService;
+  credentials?: CredentialsService;
   effect?(factory: () => Generator<unknown, void, unknown>, label?: string): void;
   get?(name: string): unknown;
   reflect?: { store?: Record<string, unknown> };
