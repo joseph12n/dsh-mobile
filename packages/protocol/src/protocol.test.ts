@@ -59,6 +59,56 @@ describe('comandos', () => {
   });
 });
 
+describe('actividad de la sesión', () => {
+  const base = { v: PROTOCOL_VERSION, id: 'activity-1', at: 1_760_000_000_000 };
+
+  it('acepta la petición y las actividades válidas', () => {
+    expect(
+      ClientMessage.safeParse({ ...base, type: 'session.activity', sessionId: 'session-1' })
+        .success,
+    ).toBe(true);
+    expect(
+      ServerMessage.safeParse({
+        ...base,
+        type: 'activity.ok',
+        sessionId: 'session-1',
+        activity: { subagents: [] },
+      }).success,
+    ).toBe(true);
+    expect(
+      ServerMessage.safeParse({
+        ...base,
+        type: 'activity.ok',
+        sessionId: 'session-1',
+        activity: {
+          goal: { objective: 'Mejorar', phase: 'active', roundsStarted: 6, maxRounds: 256 },
+          subagents: [{ id: 'child-1', activity: 'running', depth: 1 }],
+          todos: { open: 1, total: 2, items: [{ content: 'Pintar', status: 'pending' }] },
+        },
+      }).success,
+    ).toBe(true);
+  });
+
+  it('rechaza un estado de tarea desconocido', () => {
+    expect(
+      ServerMessage.safeParse({
+        ...base,
+        type: 'activity.ok',
+        sessionId: 'session-1',
+        activity: { subagents: [{ id: 'child-1', activity: 'running', depth: 1 }] },
+      }).success,
+    ).toBe(true);
+    expect(
+      ServerMessage.safeParse({
+        ...base,
+        type: 'activity.ok',
+        sessionId: 'session-1',
+        activity: { subagents: [{ id: 'child-1', activity: 'sleeping', depth: 1 }] },
+      }).success,
+    ).toBe(false);
+  });
+});
+
 describe('eventos de transcripción', () => {
   it('acepta el razonamiento opcional de una respuesta', () => {
     const event = { kind: 'message', role: 'assistant', text: 'hola', reasoning: 'pienso' };

@@ -22,6 +22,7 @@ import {
   type QuestionAnswerItem,
   type QuestionBatch,
   type ServerMessage,
+  type SessionActivity,
   type Workspace,
 } from '@dsh-mobile/protocol';
 import type { Device, DeviceRegistry } from './core/devices.js';
@@ -94,6 +95,7 @@ export interface ServerDeps {
     message?: string;
     result?: CommandResult;
   }>;
+  readActivity?: (sessionId: string) => SessionActivity | Promise<SessionActivity>;
   answerQuestion?: (input: {
     callId: string;
     sessionId: string;
@@ -772,6 +774,29 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
           type: 'command.ok',
           kind: result.kind,
           ...(result.text !== undefined ? { text: result.text } : {}),
+        });
+        return;
+      }
+
+      if (message.type === 'session.activity') {
+        if (!deps.readActivity) {
+          send(
+            socket,
+            errorMessage(message.id, 'bad-request', 'This host cannot read the activity.'),
+          );
+          return;
+        }
+
+        const activity = await deps.readActivity(message.sessionId);
+        if (socket.readyState !== socket.OPEN) return;
+
+        send(socket, {
+          v: PROTOCOL_VERSION,
+          id: message.id,
+          at: Date.now(),
+          type: 'activity.ok',
+          sessionId: message.sessionId,
+          activity,
         });
         return;
       }

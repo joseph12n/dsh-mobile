@@ -7,6 +7,7 @@ import type {
   ModelSelection,
   QuestionAnswerItem,
   QuestionBatch,
+  SessionActivity,
   SessionSummary,
   TranscriptEvent,
 } from '@dsh-mobile/protocol';
@@ -340,6 +341,7 @@ export function SessionView({
   onAnswerQuestion,
   commands,
   onRunCommand,
+  activity,
   onBack,
   onLoadMore,
   onCancel,
@@ -360,6 +362,7 @@ export function SessionView({
   onAnswerQuestion: (callId: string, sessionId: string, answers: QuestionAnswerItem[]) => void;
   commands?: CommandInfo[];
   onRunCommand?: (line: string) => Promise<CommandResult | undefined>;
+  activity?: SessionActivity;
   onBack: () => void;
   onLoadMore: () => void;
   onCancel: () => void;
@@ -385,6 +388,15 @@ export function SessionView({
           .filter((command) => command.name.startsWith(commandToken.toLowerCase()))
           .slice(0, 8)
       : [];
+
+  const runningSubagents =
+    activity?.subagents.filter((item) => item.activity === 'running').length ?? 0;
+  const activityVisible = Boolean(
+    activity?.goal ||
+    activity?.planActive ||
+    activity?.todos ||
+    (activity?.subagents.length ?? 0) > 0,
+  );
 
   useEffect(() => {
     headingRef.current?.focus({ preventScroll: true });
@@ -528,6 +540,82 @@ export function SessionView({
           onToggle={keepBottom}
           {...(onReloadModels ? { onReload: onReloadModels } : {})}
         />
+      )}
+
+      {activity && activityVisible && (
+        <details className="session-activity">
+          <summary>
+            {activity.goal && (
+              <span className="activity-chip goal">
+                {t('activity.goal')} · {activity.goal.roundsStarted}
+                {activity.goal.maxRounds ? `/${activity.goal.maxRounds}` : ''}
+              </span>
+            )}
+            {runningSubagents > 0 && (
+              <span className="activity-chip">
+                {plural(t, 'activity.subagents', runningSubagents)}
+              </span>
+            )}
+            {activity.todos && (
+              <span className="activity-chip">
+                {plural(t, 'activity.todos', activity.todos.open)}
+              </span>
+            )}
+            {activity.planActive && <span className="activity-chip">{t('activity.plan')}</span>}
+          </summary>
+
+          <div className="activity-body">
+            {activity.goal && (
+              <div className="activity-section">
+                <p className="activity-label">{t('activity.goal')}</p>
+                <p className="activity-objective">{activity.goal.objective}</p>
+                <p className="activity-meta">
+                  {t('activity.phase')}: {activity.goal.phase} · {t('activity.rounds')}{' '}
+                  {activity.goal.roundsStarted}
+                  {activity.goal.maxRounds ? `/${activity.goal.maxRounds}` : ''}
+                </p>
+              </div>
+            )}
+
+            {activity.subagents.length > 0 && (
+              <div className="activity-section">
+                <p className="activity-label">{t('activity.subagentsLabel')}</p>
+                <ul className="activity-list">
+                  {activity.subagents.map((item) => (
+                    <li key={item.id}>
+                      <span
+                        className={`dot ${item.activity === 'running' ? 'working' : 'idle'}`}
+                        aria-hidden="true"
+                      />
+                      <span>{item.label ?? item.id}</span>
+                      <span className="activity-state">
+                        {item.activity === 'running'
+                          ? t('activity.running')
+                          : t('activity.inactive')}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {activity.todos && activity.todos.items.length > 0 && (
+              <div className="activity-section">
+                <p className="activity-label">
+                  {t('activity.todosLabel')} · {activity.todos.open}/{activity.todos.total}
+                </p>
+                <ul className="activity-list">
+                  {activity.todos.items.map((item) => (
+                    <li key={item.content}>
+                      <span className={`todo-dot ${item.status}`} aria-hidden="true" />
+                      <span>{item.content}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </details>
       )}
 
       <div className="session-scroll" ref={scrollRef} onScroll={trackScroll}>

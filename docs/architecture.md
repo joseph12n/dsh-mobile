@@ -112,6 +112,7 @@ Transport: **WebSocket**, JSON messages, shared envelope `{ v, id, at, type }`.
 | `question.answer`   | `answer.ok`                             |
 | `commands.list`     | `commands.ok`                           |
 | `command.run`       | `command.ok`                            |
+| `session.activity`  | `activity.ok`                           |
 | `run.cancel`        | `run.ok`                                |
 | `run.start`         | `error` (not implemented in this build) |
 | `ping`              | `pong`                                  |
@@ -191,7 +192,24 @@ inventing one:
   are present. No attachments in this first version; the command timeout on the phone is two
   minutes.
 
-## 11. Transcript
+## 11. Activity: goal, subagents and tasks
+
+The session projections already carry what the agent is doing; the phone only had no view of
+it. `session.activity` is a read-only request for the open session:
+
+- **Goal** from the `goal` projection: objective, phase, rounds started and the round cap.
+- **Subagents** from the live `subagents.listDescendants(sessionId)`: each child's label,
+  `running`/`inactive` activity and depth. Diagnostics are skipped; the list is capped at 20
+  and running children sort first.
+- **Tasks** from the `todos` projection: open and total counts plus at most 8 items with their
+  status. `planActive` comes from the `plan` projection.
+- The host advertises `session.activity` only when the session store and the projections are
+  present. The phone asks when a session opens and every 6 s while it is open; a session with
+  nothing to show renders no strip.
+- The strip is a native `<details>` under the model row: chips for the goal round, running
+  subagents, open tasks and plan; the body lists them. Nothing here controls the agent.
+
+## 12. Transcript
 
 - **History**: `sessionController.page()` returns a page of the log.
 - **Live**: `observeEvent()` delivers a stream of events as they are committed.
@@ -199,7 +217,7 @@ inventing one:
   recognised and the rest is discarded. Inventing a line is worse than leaving a gap.
 - The client merges both sources by `seq`, so reconnecting does not duplicate.
 
-## 12. Security
+## 13. Security
 
 - **Loopback only.** The listen address is a constant (`HOST = '127.0.0.1'`), not a
   configuration option: there is no network mode. It is published through the tailnet name
@@ -211,9 +229,10 @@ inventing one:
 - **The host decides.** Capabilities are announced in `hello.ok` and the server does not send
   what the client cannot do.
 
-## 13. Status
+## 14. Status
 
 Phases 0 and 1 closed with evidence; phase 2 works end to end: pair, list sessions, read the
-transcript, answer questions, write, cancel and run the host's commands.
+transcript, answer questions, write, cancel, run the host's commands and follow the session's
+activity.
 
 The pending work is in GitHub issues.

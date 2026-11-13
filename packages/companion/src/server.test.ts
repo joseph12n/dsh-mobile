@@ -125,8 +125,8 @@ async function pairClient(
   return client;
 }
 
-async function commandHost(
-  deps: Pick<ServerDeps, 'listCommands' | 'runCommand'>,
+async function hostWith(
+  deps: Pick<ServerDeps, 'listCommands' | 'runCommand' | 'readActivity'>,
 ): Promise<{ server: TestServer; pairing: PairingService }> {
   const pairing = new PairingService();
   const server = await startCompanionServer({
@@ -398,7 +398,7 @@ describe('difusión a los dispositivos emparejados', () => {
 
 describe('comandos sobre el WebSocket', () => {
   it('lista y ejecuta a través del host', async () => {
-    const { server, pairing } = await commandHost({
+    const { server, pairing } = await hostWith({
       listCommands: (sessionId) => [{ name: 'plan', description: `plan para ${sessionId}` }],
       runCommand: async ({ line }) => ({
         ok: true,
@@ -436,7 +436,7 @@ describe('comandos sobre el WebSocket', () => {
   });
 
   it('devuelve el error del host al ejecutar', async () => {
-    const { server, pairing } = await commandHost({
+    const { server, pairing } = await hostWith({
       runCommand: async () => ({
         ok: false,
         code: 'bad-request',
@@ -457,6 +457,43 @@ describe('comandos sobre el WebSocket', () => {
     expect(response['type']).toBe('error');
     expect(response['code']).toBe('bad-request');
     expect(response['message']).toBe('Ese comando no está permitido.');
+
+    client.close();
+    await server.close();
+  });
+});
+
+describe('actividad sobre el WebSocket', () => {
+  it('devuelve la meta y las tareas de la sesión', async () => {
+    const { server, pairing } = await hostWith({
+      readActivity: async (sessionId) => ({
+        goal: {
+          objective: `Mejorar ${sessionId}`,
+          phase: 'active',
+          roundsStarted: 6,
+          maxRounds: 256,
+        },
+        subagents: [],
+        todos: { open: 1, total: 2, items: [{ content: 'Pintar', status: 'pending' }] },
+      }),
+    });
+    const client = await pairClient(server, pairing.issue().code, 'Actividad');
+
+    client.send({
+      v: PROTOCOL_VERSION,
+      id: 'activity-1',
+      at: Date.now(),
+      type: 'session.activity',
+      sessionId: 'session-1',
+    });
+    const response = await client.next();
+
+    expect(response['type']).toBe('activity.ok');
+    expect(response['sessionId']).toBe('session-1');
+    expect(response['activity']).toMatchObject({
+      goal: { objective: 'Mejorar session-1', phase: 'active', roundsStarted: 6 },
+      todos: { open: 1, total: 2 },
+    });
 
     client.close();
     await server.close();

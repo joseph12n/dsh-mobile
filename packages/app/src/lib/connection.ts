@@ -13,6 +13,7 @@ import {
   type ModelSelection,
   type QuestionAnswerItem,
   type ServerMessage,
+  type SessionActivity,
   type SessionSummary,
   type Workspace,
 } from '@dsh-mobile/protocol';
@@ -263,6 +264,12 @@ export class CompanionClient {
       kind: response.kind,
       ...(response.text !== undefined ? { text: response.text } : {}),
     };
+  }
+
+  async activity(sessionId: string): Promise<SessionActivity> {
+    const response = await this.#request({ type: 'session.activity', sessionId });
+    if (response.type === 'error') throw new ConnectionError(response.message, response.code);
+    return response.type === 'activity.ok' ? response.activity : { subagents: [] };
   }
 
   async history(
