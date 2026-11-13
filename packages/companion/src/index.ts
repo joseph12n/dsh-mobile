@@ -204,6 +204,7 @@ export function apply(ctx: HostContext): void {
     if (canListModels(ctx) && canSelectModel(ctx)) list.push('model.select');
     if (commandsAvailable(ctx)) list.push('command.run');
     if (activityAvailable(ctx)) list.push('session.activity');
+    list.push('devices.manage');
     return list;
   };
 

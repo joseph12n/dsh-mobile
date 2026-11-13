@@ -320,6 +320,29 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
   wss.on('error', (error: Error) => log(`WebSocket server error: ${error.message}`));
 
   const clients = new Set<WebSocket>();
+  const deviceSockets = new Map<string, Set<WebSocket>>();
+
+  function trackDevice(socket: WebSocket, device: Device): void {
+    clients.add(socket);
+    const peers = deviceSockets.get(device.id) ?? new Set<WebSocket>();
+    peers.add(socket);
+    deviceSockets.set(device.id, peers);
+  }
+
+  function untrackDevice(socket: WebSocket): void {
+    clients.delete(socket);
+    for (const [id, peers] of deviceSockets) {
+      if (!peers.delete(socket)) continue;
+      if (peers.size === 0) deviceSockets.delete(id);
+      break;
+    }
+  }
+
+  function broadcast(message: ServerMessage): void {
+    for (const client of clients) {
+      if (client.readyState === client.OPEN) send(client, message);
+    }
+  }
 
   wss.on('connection', (socket: WebSocket) => {
     const connection: Connection = {
@@ -400,7 +423,7 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
             return;
           }
           connection.device = device;
-          clients.add(socket);
+          trackDevice(socket, device);
         }
 
         send(socket, {
@@ -434,7 +457,7 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
 
         const enrolled = devices.enroll(message.deviceName, message.platform);
         connection.device = enrolled.device;
-        clients.add(socket);
+        trackDevice(socket, enrolled.device);
         log(`device paired: ${enrolled.device.name} (${enrolled.device.platform})`);
 
         send(socket, {
@@ -458,6 +481,60 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
             `Without a paired device, ${message.type} is not available.`,
           ),
         );
+        return;
+      }
+
+      if (message.type === 'devices.list') {
+        send(socket, {
+          v: PROTOCOL_VERSION,
+          id: message.id,
+          at: Date.now(),
+          type: 'devices.ok',
+          devices: devices.list().map(toDeviceInfo),
+        });
+        return;
+      }
+
+      if (message.type === 'devices.revoke') {
+        const target = devices.list().find((device) => device.id === message.deviceId);
+        if (!target) {
+          send(socket, errorMessage(message.id, 'not-found', 'Unknown device.'));
+          return;
+        }
+
+        devices.revoke(target.id);
+        const updated = devices.list().map(toDeviceInfo);
+        const peers = [...(deviceSockets.get(target.id) ?? [])];
+
+        send(socket, {
+          v: PROTOCOL_VERSION,
+          id: message.id,
+          at: Date.now(),
+          type: 'devices.revoked',
+          deviceId: target.id,
+        });
+
+        for (const peer of peers) {
+          if (peer !== socket) {
+            send(peer, {
+              v: PROTOCOL_VERSION,
+              id: newMessageId(),
+              at: Date.now(),
+              type: 'devices.revoked',
+              deviceId: target.id,
+            });
+          }
+          untrackDevice(peer);
+          peer.close(1008, 'revoked');
+        }
+
+        broadcast({
+          v: PROTOCOL_VERSION,
+          id: newMessageId(),
+          at: Date.now(),
+          type: 'devices.changed',
+          devices: updated,
+        });
         return;
       }
 
@@ -926,7 +1003,7 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
 
     socket.on('error', (error: Error) => log(`WebSocket error: ${error.message}`));
     socket.on('close', () => {
-      clients.delete(socket);
+      untrackDevice(socket);
       for (const [, subscription] of subscriptions) subscription.stop();
       subscriptions.clear();
       log('connection closed');
@@ -944,11 +1021,7 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
       resolve({
         port: listeningPort,
         publicUrl: localOrigin(),
-        broadcast(message: ServerMessage) {
-          for (const client of clients) {
-            if (client.readyState === client.OPEN) send(client, message);
-          }
-        },
+        broadcast,
         clientCount() {
           return clients.size;
         },
