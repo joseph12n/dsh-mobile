@@ -560,7 +560,9 @@ export function App() {
   const inConversation = view.kind === 'sessions' && openSession !== undefined;
 
   return (
-    <main className={`shell${inConversation ? ' is-conversation' : ''}`}>
+    <main
+      className={`shell${inConversation ? ' is-conversation' : ''}${view.kind === 'pairing' ? ' is-pairing' : ''}`}
+    >
       <header className="head">
         <h1>DSH Mobile</h1>
         <p className="muted">{t('app.subtitle')}</p>
@@ -577,30 +579,37 @@ export function App() {
         )}
 
         {view.kind === 'pairing' && (
-          <section className="card">
+          <section className="card pairing-card">
             <h2>{t('state.pairing')}</h2>
-            <p>{t('pairing.explain')}</p>
+            <p className="muted">{t('pairing.explain')}</p>
 
             <label className="field">
               <span>{t('pairing.code')}</span>
               <input
+                className="code-input"
                 value={code}
                 onChange={(event) => setCode(event.target.value.toUpperCase())}
-                placeholder="ABCD1234…"
+                placeholder="ABCD1234"
                 autoCapitalize="characters"
                 autoComplete="one-time-code"
+                autoCorrect="off"
+                spellCheck={false}
                 inputMode="text"
+                enterKeyHint="go"
               />
             </label>
 
             <label className="field">
               <span>{t('pairing.host')}</span>
               <input
+                className="host-input"
                 value={endpointInput || view.endpoint}
                 onChange={(event) => setEndpointInput(event.target.value)}
                 placeholder="wss://machine.tailnet.ts.net/ws"
                 autoCapitalize="none"
                 autoComplete="url"
+                autoCorrect="off"
+                spellCheck={false}
                 inputMode="url"
               />
             </label>
@@ -615,7 +624,9 @@ export function App() {
               {t('pairing.submit')}
             </button>
             {(view.noticeKey || view.notice) && (
-              <p className="error">{view.noticeKey ? t(view.noticeKey) : view.notice}</p>
+              <p className="error" role="alert">
+                {view.noticeKey ? t(view.noticeKey) : view.notice}
+              </p>
             )}
           </section>
         )}
