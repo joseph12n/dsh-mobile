@@ -33,6 +33,10 @@ desktop.ini
 # Capturas de vista previa (no son entregables)
 .preview/
 
+# Skills de agentes instaladas con `npx skills` (contenido de terceros, local).
+# El repo no las publica: se restauran con `npx skills experimental_install`.
+.agents/
+
 # OneDrive / temporales
 ~$*
 *.tmp
