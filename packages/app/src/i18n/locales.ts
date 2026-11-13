@@ -42,6 +42,9 @@ const en = {
 
   'error.retry': 'Retry',
   'error.forget': 'Forget this device',
+  'forget.confirm': 'Forget this device? You will need to pair it again from the desktop.',
+  'forget.cancel': 'Cancel',
+  'forget.action': 'Forget',
 
   'sessions.title': 'Sessions',
   'sessions.archived': 'Archived',
@@ -142,6 +145,10 @@ const es: Catalogue = {
 
   'error.retry': 'Reintentar',
   'error.forget': 'Olvidar este dispositivo',
+  'forget.confirm':
+    '¿Olvidar este dispositivo? Tendrás que emparejarlo otra vez desde el escritorio.',
+  'forget.cancel': 'Cancelar',
+  'forget.action': 'Olvidar',
 
   'sessions.title': 'Sesiones',
   'sessions.archived': 'Archivadas',
@@ -238,6 +245,9 @@ const ptBR: Catalogue = {
 
   'error.retry': 'Tentar de novo',
   'error.forget': 'Esquecer este dispositivo',
+  'forget.confirm': 'Esquecer este dispositivo? Você terá que emparelhá-lo novamente pelo desktop.',
+  'forget.cancel': 'Cancelar',
+  'forget.action': 'Esquecer',
 
   'sessions.title': 'Sessões',
   'sessions.archived': 'Arquivadas',
@@ -333,6 +343,9 @@ const zhHans: Catalogue = {
 
   'error.retry': '重试',
   'error.forget': '忘记此设备',
+  'forget.confirm': '忘记此设备？你需要从桌面重新配对。',
+  'forget.cancel': '取消',
+  'forget.action': '忘记',
 
   'sessions.title': '会话',
   'sessions.archived': '已归档',

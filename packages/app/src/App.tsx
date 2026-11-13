@@ -24,6 +24,7 @@ import { QuestionsCard } from './components/Questions.js';
 import { SessionView } from './components/SessionView.js';
 import { SessionList } from './components/SessionList.js';
 import { Settings } from './components/Settings.js';
+import { ForgetDeviceButton } from './components/ForgetDeviceButton.js';
 import { RefreshIcon } from './components/icons.js';
 import { useI18n } from './i18n/index.js';
 import { LOCALES, LOCALE_LABELS, type Locale, type MessageKey } from './i18n/locales.js';
@@ -685,9 +686,7 @@ export function App() {
               <button type="button" onClick={() => void start(view.endpoint)}>
                 {t('error.retry')}
               </button>
-              <button type="button" className="ghost" onClick={forget}>
-                {t('error.forget')}
-              </button>
+              <ForgetDeviceButton onForget={forget} />
             </div>
           </section>
         )}
@@ -783,9 +782,7 @@ export function App() {
                   preferences={preferences}
                 />
 
-                <button type="button" className="ghost" onClick={forget}>
-                  {t('error.forget')}
-                </button>
+                <ForgetDeviceButton onForget={forget} />
               </section>
             )}
           </>
