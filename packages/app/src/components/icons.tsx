@@ -98,3 +98,11 @@ export function RefreshIcon() {
     </Icon>
   );
 }
+
+export function MessagesIcon() {
+  return (
+    <Icon>
+      <path d="M21 15a2 2 0 0 1-2 2H8l-4 3V5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2z" />
+    </Icon>
+  );
+}

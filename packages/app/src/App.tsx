@@ -266,6 +266,23 @@ export function App() {
   }, [start]);
 
   useEffect(() => {
+    const viewport = globalThis.visualViewport;
+    if (!viewport) return;
+    const root = document.documentElement;
+    const apply = (): void => {
+      root.style.setProperty('--viewport-height', `${Math.round(viewport.height)}px`);
+    };
+    apply();
+    viewport.addEventListener('resize', apply);
+    viewport.addEventListener('scroll', apply);
+    return () => {
+      viewport.removeEventListener('resize', apply);
+      viewport.removeEventListener('scroll', apply);
+      root.style.removeProperty('--viewport-height');
+    };
+  }, []);
+
+  useEffect(() => {
     if (wasOpen.current && openSession === undefined) {
       listHeadingRef.current?.focus({ preventScroll: true });
     }
@@ -660,13 +677,18 @@ export function App() {
         {view.kind === 'error' && (
           <section className="card">
             <h2>{t('state.error')}</h2>
-            <p className="error">{view.message}</p>
-            <button type="button" onClick={() => void start(view.endpoint)}>
-              {t('error.retry')}
-            </button>
-            <button type="button" className="ghost" onClick={forget}>
-              {t('error.forget')}
-            </button>
+            <p className="error" role="alert">
+              {view.message}
+            </p>
+            {view.endpoint && <p className="muted small">{view.endpoint}</p>}
+            <div className="stack">
+              <button type="button" onClick={() => void start(view.endpoint)}>
+                {t('error.retry')}
+              </button>
+              <button type="button" className="ghost" onClick={forget}>
+                {t('error.forget')}
+              </button>
+            </div>
           </section>
         )}
 

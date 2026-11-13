@@ -4,7 +4,7 @@ import { groupSessions, elapsed } from '../lib/sessions.js';
 import { displayTitle, groupByFolder, usesFolders } from '../lib/folders.js';
 import { folderView, type FolderPreferences } from '../lib/preferences.js';
 import { plural, useI18n } from '../i18n/index.js';
-import { ArchiveIcon, PlusIcon, RestoreIcon } from './icons.js';
+import { ArchiveIcon, MessagesIcon, PlusIcon, RestoreIcon } from './icons.js';
 
 const STATE_KEY = {
   working: 'session.working',
@@ -59,7 +59,12 @@ export function SessionList({
     : { state: 'folders' as const, sections: grouped };
 
   if (sessions.length === 0 && !usesFolders(workspaces)) {
-    return <p className="muted">{t('sessions.empty')}</p>;
+    return (
+      <div className="empty-state">
+        <MessagesIcon />
+        <p>{t('sessions.empty')}</p>
+      </div>
+    );
   }
 
   if (view.state === 'all-hidden') {
