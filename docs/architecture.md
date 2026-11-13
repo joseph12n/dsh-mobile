@@ -113,6 +113,8 @@ Transport: **WebSocket**, JSON messages, shared envelope `{ v, id, at, type }`.
 | `commands.list`     | `commands.ok`                           |
 | `command.run`       | `command.ok`                            |
 | `session.activity`  | `activity.ok`                           |
+| `devices.list`      | `devices.ok`                            |
+| `devices.revoke`    | `devices.revoked` (+ `devices.changed`) |
 | `run.cancel`        | `run.ok`                                |
 | `run.start`         | `error` (not implemented in this build) |
 | `ping`              | `pong`                                  |
@@ -224,6 +226,11 @@ it. `session.activity` is a read-only request for the open session:
   with `tailscale serve`, which reaches loopback and brings HTTPS. Device authentication
   already exists; what we do not want is an open port.
 - **One token per device**, stored as a hash; revoking one does not affect the others.
+- **Device revocation is immediate.** A paired device can list the paired devices and revoke
+  one: the host deletes the token, closes every live socket of that device and broadcasts
+  `devices.changed` to the rest. The frames carry public device metadata only, never the token
+  or its hash. Revoking yourself is the "forget this phone" path; the next request with the old
+  token is `auth-invalid`.
 - **Narrow scope**: sessions, questions, runs and commands. No settings, credentials or plugin
   management.
 - **The host decides.** Capabilities are announced in `hello.ok` and the server does not send

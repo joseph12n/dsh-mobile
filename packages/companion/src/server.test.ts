@@ -108,7 +108,7 @@ async function pairClient(
   server: TestServer,
   code: string,
   deviceName: string,
-): Promise<TestClient> {
+): Promise<{ client: TestClient; paired: Record<string, unknown> }> {
   const client = await openClient(server.port);
   client.send(hello());
   await client.next();
@@ -121,8 +121,9 @@ async function pairClient(
     deviceName,
     platform: 'node',
   });
-  expect((await client.next())['type']).toBe('pair.ok');
-  return client;
+  const paired = await client.next();
+  expect(paired['type']).toBe('pair.ok');
+  return { client, paired };
 }
 
 async function hostWith(
@@ -405,7 +406,7 @@ describe('comandos sobre el WebSocket', () => {
         result: { kind: 'success', text: `eco ${line}` },
       }),
     });
-    const client = await pairClient(server, pairing.issue().code, 'Comandos');
+    const { client } = await pairClient(server, pairing.issue().code, 'Comandos');
 
     client.send({
       v: PROTOCOL_VERSION,
@@ -443,7 +444,7 @@ describe('comandos sobre el WebSocket', () => {
         message: 'Ese comando no está permitido.',
       }),
     });
-    const client = await pairClient(server, pairing.issue().code, 'Comandos');
+    const { client } = await pairClient(server, pairing.issue().code, 'Comandos');
 
     client.send({
       v: PROTOCOL_VERSION,
@@ -477,7 +478,7 @@ describe('actividad sobre el WebSocket', () => {
         todos: { open: 1, total: 2, items: [{ content: 'Pintar', status: 'pending' }] },
       }),
     });
-    const client = await pairClient(server, pairing.issue().code, 'Actividad');
+    const { client } = await pairClient(server, pairing.issue().code, 'Actividad');
 
     client.send({
       v: PROTOCOL_VERSION,
@@ -494,6 +495,96 @@ describe('actividad sobre el WebSocket', () => {
       goal: { objective: 'Mejorar session-1', phase: 'active', roundsStarted: 6 },
       todos: { open: 1, total: 2 },
     });
+
+    client.close();
+    await server.close();
+  });
+});
+
+describe('dispositivos sobre el WebSocket', () => {
+  it('lista, revoca y corta los sockets del revocado', async () => {
+    const { server, pairing } = await hostWith({});
+    const { client: alice } = await pairClient(server, pairing.issue().code, 'Alice');
+    const { client: bob, paired: bobPaired } = await pairClient(
+      server,
+      pairing.issue().code,
+      'Bob',
+    );
+    const bobToken = bobPaired['deviceToken'] as string;
+
+    alice.send({ v: PROTOCOL_VERSION, id: 'devices-list', at: Date.now(), type: 'devices.list' });
+    const listed = await alice.next();
+    expect(listed['type']).toBe('devices.ok');
+    const devices = listed['devices'] as Array<{ id: string; name: string }>;
+    const bobDevice = devices.find((device) => device.name === 'Bob');
+    expect(bobDevice).toBeDefined();
+
+    alice.send({
+      v: PROTOCOL_VERSION,
+      id: 'device-revoke',
+      at: Date.now(),
+      type: 'devices.revoke',
+      deviceId: bobDevice?.id,
+    });
+    const revoked = await alice.next();
+    expect(revoked['type']).toBe('devices.revoked');
+    expect(revoked['deviceId']).toBe(bobDevice?.id);
+
+    const changed = await alice.next();
+    expect(changed['type']).toBe('devices.changed');
+    expect(
+      (changed['devices'] as Array<{ name: string }>).some((device) => device.name === 'Bob'),
+    ).toBe(false);
+
+    const bobFrame = await bob.next();
+    expect(bobFrame['type']).toBe('devices.revoked');
+    await expect(bob.next(200)).rejects.toThrow('timeout');
+
+    const again = await openClient(server.port);
+    again.send(hello({ deviceToken: bobToken }));
+    const response = await again.next();
+    expect(response['type']).toBe('error');
+    expect(response['code']).toBe('auth-invalid');
+    again.close();
+
+    alice.close();
+    await server.close();
+  });
+
+  it('revoca el propio dispositivo y cierra la conexión', async () => {
+    const { server, pairing } = await hostWith({});
+    const { client, paired } = await pairClient(server, pairing.issue().code, 'Self');
+    const device = paired['device'] as { id: string };
+
+    client.send({
+      v: PROTOCOL_VERSION,
+      id: 'self-revoke',
+      at: Date.now(),
+      type: 'devices.revoke',
+      deviceId: device.id,
+    });
+    const revoked = await client.next();
+    expect(revoked['type']).toBe('devices.revoked');
+    await expect(client.next(200)).rejects.toThrow('timeout');
+
+    client.close();
+    await server.close();
+  });
+
+  it('rechaza un id desconocido', async () => {
+    const { server, pairing } = await hostWith({});
+    const { client } = await pairClient(server, pairing.issue().code, 'Unknown');
+
+    client.send({
+      v: PROTOCOL_VERSION,
+      id: 'unknown-revoke',
+      at: Date.now(),
+      type: 'devices.revoke',
+      deviceId: 'missing',
+    });
+    const response = await client.next();
+    expect(response['type']).toBe('error');
+    expect(response['code']).toBe('not-found');
 
     client.close();
     await server.close();

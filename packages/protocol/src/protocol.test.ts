@@ -109,6 +109,34 @@ describe('actividad de la sesión', () => {
   });
 });
 
+describe('dispositivos', () => {
+  const base = { v: PROTOCOL_VERSION, id: 'devices-1', at: 1_760_000_000_000 };
+
+  it('acepta listar y revocar', () => {
+    expect(ClientMessage.safeParse({ ...base, type: 'devices.list' }).success).toBe(true);
+    expect(
+      ClientMessage.safeParse({ ...base, type: 'devices.revoke', deviceId: 'device-1' }).success,
+    ).toBe(true);
+    expect(ClientMessage.safeParse({ ...base, type: 'devices.revoke' }).success).toBe(false);
+  });
+
+  it('acepta la lista, la revocación y el cambio', () => {
+    const device = { id: 'device-1', name: 'Pixel', createdAt: 1, lastSeenAt: 2 };
+    expect(
+      ServerMessage.safeParse({ ...base, type: 'devices.ok', devices: [device] }).success,
+    ).toBe(true);
+    expect(
+      ServerMessage.safeParse({ ...base, type: 'devices.revoked', deviceId: 'device-1' }).success,
+    ).toBe(true);
+    expect(ServerMessage.safeParse({ ...base, type: 'devices.changed', devices: [] }).success).toBe(
+      true,
+    );
+    expect(
+      ServerMessage.safeParse({ ...base, type: 'devices.revoked', deviceId: '' }).success,
+    ).toBe(false);
+  });
+});
+
 describe('eventos de transcripción', () => {
   it('acepta el razonamiento opcional de una respuesta', () => {
     const event = { kind: 'message', role: 'assistant', text: 'hola', reasoning: 'pienso' };

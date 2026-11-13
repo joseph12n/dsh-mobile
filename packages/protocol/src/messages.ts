@@ -83,6 +83,12 @@ export const SessionActivityMessage = message('session.activity', {
   sessionId: SessionId,
 });
 
+export const DevicesListMessage = message('devices.list', {});
+
+export const DeviceRevokeMessage = message('devices.revoke', {
+  deviceId: z.string().min(1),
+});
+
 export const RunStartMessage = message('run.start', {
   sessionId: SessionId,
   prompt: z.string().min(1).max(32_000),
@@ -133,6 +139,8 @@ export const ClientMessage = z.discriminatedUnion('type', [
   CommandsListMessage,
   CommandRunMessage,
   SessionActivityMessage,
+  DevicesListMessage,
+  DeviceRevokeMessage,
   RunStartMessage,
   RunCancelMessage,
   PingMessage,
@@ -245,6 +253,14 @@ export const DevicesChangedMessage = message('devices.changed', {
   devices: z.array(DeviceInfo),
 });
 
+export const DevicesOkMessage = message('devices.ok', {
+  devices: z.array(DeviceInfo),
+});
+
+export const DeviceRevokedMessage = message('devices.revoked', {
+  deviceId: z.string().min(1),
+});
+
 export const ErrorMessage = message('error', {
   code: ErrorCode,
   message: z.string(),
@@ -274,6 +290,8 @@ export const ServerMessage = z.discriminatedUnion('type', [
   SessionStateMessage,
   QuestionPendingMessage,
   QuestionSettledMessage,
+  DevicesOkMessage,
+  DeviceRevokedMessage,
   DevicesChangedMessage,
   ErrorMessage,
 ]);

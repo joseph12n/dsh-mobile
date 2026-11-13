@@ -19,6 +19,7 @@ export const Capability = z.enum([
   'model.select',
   'command.run',
   'session.activity',
+  'devices.manage',
 ]);
 export type Capability = z.infer<typeof Capability>;
 
