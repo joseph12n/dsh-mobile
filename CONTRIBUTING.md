@@ -25,19 +25,24 @@ pnpm test
 
 ## Commands
 
-| Command             | What it does                                   |
-| ------------------- | ---------------------------------------------- |
-| `pnpm build`        | Builds the three packages in dependency order  |
-| `pnpm test`         | Vitest, the whole suite                        |
-| `pnpm test:watch`   | Vitest in watch mode                           |
-| `pnpm typecheck`    | `tsc --noEmit` per package                     |
-| `pnpm lint`         | ESLint                                         |
-| `pnpm lint:fix`     | ESLint, fixing what it can                     |
-| `pnpm format`       | Prettier, writing                              |
-| `pnpm format:check` | Prettier, checking only                        |
-| `pnpm smoke`        | Starts the built server and walks the contract |
-| `pnpm clean`        | Removes build output                           |
-| `pnpm dev`          | PWA in development mode                        |
+| Command             | What it does                                           |
+| ------------------- | ------------------------------------------------------ |
+| `pnpm build`        | Builds the packages and embeds the PWA in the plugin   |
+| `pnpm test`         | Vitest, the whole suite                                |
+| `pnpm test:watch`   | Vitest in watch mode                                   |
+| `pnpm typecheck`    | `tsc --noEmit` per package                             |
+| `pnpm lint`         | ESLint                                                 |
+| `pnpm lint:fix`     | ESLint, fixing what it can                             |
+| `pnpm format`       | Prettier, writing                                      |
+| `pnpm format:check` | Prettier, checking only                                |
+| `pnpm smoke`        | Starts the built server and walks the contract         |
+| `pnpm clean`        | Removes build output                                   |
+| `pnpm dev`          | PWA in development mode                                |
+
+The build finishes by copying the compiled PWA into `packages/companion/dist/web`. That copy
+is what a published or linked plugin serves: the plugin no longer depends on finding the
+sibling `packages/app/dist` at runtime. `pnpm smoke` fails if the copy or its resolution is
+missing.
 
 Before proposing a change, `pnpm lint && pnpm typecheck && pnpm test && pnpm build` must pass
 clean.

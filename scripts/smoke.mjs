@@ -1,14 +1,15 @@
+import { existsSync } from 'node:fs';
+
 process.env.DSH_MOBILE_LOG_FILE = '0';
 
 const { default: WebSocket } = await import('ws');
 const { startCompanionServer } = await import('../packages/companion/dist/server.js');
+const { findWebRoot } = await import('../packages/companion/dist/routes/web-root.js');
 const { PairingService } = await import('../packages/companion/dist/core/pairing.js');
 const { DeviceRegistry } = await import('../packages/companion/dist/core/devices.js');
 
-const WEB_ROOT = new URL('../packages/app/dist', import.meta.url).pathname.replace(
-  /^\/([A-Za-z]:)/,
-  '$1',
-);
+const packagedWeb = new URL('../packages/companion/dist/web/index.html', import.meta.url);
+const webRoot = findWebRoot();
 
 const memory = {
   devices: [],
@@ -27,7 +28,7 @@ const server = await startCompanionServer({
   pairing,
   devices,
   port: 0,
-  webRoot: WEB_ROOT,
+  ...(webRoot ? { webRoot } : {}),
   listSessions: async () => [
     {
       id: 'demo-1',
@@ -87,6 +88,12 @@ function check(label, ok, detail = '') {
   if (!ok) failures += 1;
   console.log(`${ok ? 'ok  ' : 'FALLO'} ${label}${detail ? ` · ${detail}` : ''}`);
 }
+
+check('la PWA viaja dentro del paquete', existsSync(packagedWeb));
+check(
+  'el plugin resuelve la PWA empaquetada',
+  webRoot?.replaceAll('\\', '/').endsWith('packages/companion/dist/web') === true,
+);
 
 const index = await fetch(`${base}/`);
 const indexHtml = await index.text();
