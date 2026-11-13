@@ -904,6 +904,52 @@ button.ghost.tiny {
   max-width: 64%;
 }
 
+.sheet-devices {
+  margin-top: 12px;
+}
+
+.sheet-devices .sheet-label {
+  margin-bottom: 6px;
+}
+
+.devices {
+  display: grid;
+  gap: 8px;
+}
+
+.device-list {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.device-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+}
+
+.device-ident {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.device-name {
+  overflow: hidden;
+  color: var(--text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.device-row .ghost {
+  flex: 0 0 auto;
+}
+
 .settings-folders {
   margin: 4px 0 0;
   padding: 6px 0 8px;
