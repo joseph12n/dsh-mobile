@@ -67,6 +67,8 @@ export function App() {
   const [catalog, setCatalog] = useState<ModelCatalog | undefined>(undefined);
   const [questions, setQuestions] = useState<QuestionBatch[]>([]);
   const [openSession, setOpenSession] = useState<SessionSummary | undefined>(undefined);
+  const listHeadingRef = useRef<HTMLHeadingElement>(null);
+  const wasOpen = useRef(false);
   const [entries, setEntries] = useState<HistoryEntry[]>([]);
   const [hasMore, setHasMore] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
@@ -262,6 +264,13 @@ export function App() {
   useEffect(() => {
     startRef.current = start;
   }, [start]);
+
+  useEffect(() => {
+    if (wasOpen.current && openSession === undefined) {
+      listHeadingRef.current?.focus({ preventScroll: true });
+    }
+    wasOpen.current = openSession !== undefined;
+  }, [openSession]);
 
   const answer = useCallback(
     async (callId: string, sessionId: string, answers: QuestionAnswerItem[]) => {
@@ -693,7 +702,9 @@ export function App() {
             ) : (
               <section className="card sessions-panel">
                 <div className="row">
-                  <h2>{t('sessions.title')}</h2>
+                  <h2 ref={listHeadingRef} tabIndex={-1}>
+                    {t('sessions.title')}
+                  </h2>
                   <div className="row-actions">
                     {view.host.capabilities.includes('workspace.unarchive') && (
                       <button

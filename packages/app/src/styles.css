@@ -399,6 +399,13 @@ textarea:focus-visible {
   outline-offset: 2px;
 }
 
+.session-heading:focus-visible,
+.sessions-panel h2:focus-visible {
+  outline: 2px solid var(--link);
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+
 button.ghost.tiny {
   min-height: 44px;
   padding: 4px 12px;
