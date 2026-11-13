@@ -99,6 +99,10 @@ const en = {
   'session.tools_plural': '{count} tools',
   'session.hideTools': 'hide',
   'session.reasoning': 'Reasoning',
+  'command.open': 'Commands',
+  'command.done': 'Done',
+  'command.error': 'Command error',
+  'command.noOutput': 'No output.',
   'session.questionCount': '{count} question',
   'session.questionCount_plural': '{count} questions',
 
@@ -216,6 +220,10 @@ const es: Catalogue = {
   'session.tools_plural': '{count} herramientas',
   'session.hideTools': 'ocultar',
   'session.reasoning': 'Razonamiento',
+  'command.open': 'Comandos',
+  'command.done': 'Hecho',
+  'command.error': 'Error del comando',
+  'command.noOutput': 'Sin salida.',
   'session.questionCount': '{count} pregunta',
   'session.questionCount_plural': '{count} preguntas',
 
@@ -328,6 +336,10 @@ const ptBR: Catalogue = {
   'session.tools_plural': '{count} ferramentas',
   'session.hideTools': 'ocultar',
   'session.reasoning': 'Raciocínio',
+  'command.open': 'Comandos',
+  'command.done': 'Concluído',
+  'command.error': 'Erro do comando',
+  'command.noOutput': 'Sem saída.',
   'session.questionCount': '{count} pergunta',
   'session.questionCount_plural': '{count} perguntas',
 
@@ -439,6 +451,10 @@ const zhHans: Catalogue = {
   'session.tools_plural': '{count} 个工具',
   'session.hideTools': '隐藏',
   'session.reasoning': '推理',
+  'command.open': '命令',
+  'command.done': '完成',
+  'command.error': '命令出错',
+  'command.noOutput': '没有输出。',
   'session.questionCount': '{count} 个问题',
   'session.questionCount_plural': '{count} 个问题',
 

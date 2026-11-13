@@ -12,6 +12,53 @@ import {
 
 const at = 1_760_000_000_000;
 
+describe('comandos', () => {
+  const base = { v: PROTOCOL_VERSION, id: 'command-1', at: 1_760_000_000_000 };
+
+  it('acepta listar y ejecutar comandos', () => {
+    expect(
+      ClientMessage.safeParse({ ...base, type: 'commands.list', sessionId: 'session-1' }).success,
+    ).toBe(true);
+    expect(
+      ClientMessage.safeParse({
+        ...base,
+        type: 'command.run',
+        sessionId: 'session-1',
+        line: '/plan revisa el PR',
+      }).success,
+    ).toBe(true);
+  });
+
+  it('rechaza una línea sin nombre', () => {
+    expect(
+      ClientMessage.safeParse({ ...base, type: 'command.run', sessionId: 'session-1', line: '/' })
+        .success,
+    ).toBe(false);
+    expect(
+      ClientMessage.safeParse({ ...base, type: 'command.run', sessionId: 'session-1' }).success,
+    ).toBe(false);
+  });
+
+  it('acepta las respuestas de lista y de ejecución', () => {
+    expect(
+      ServerMessage.safeParse({
+        ...base,
+        type: 'commands.ok',
+        commands: [{ name: 'plan', description: 'Entrar en modo plan', hint: '<mensaje>' }],
+      }).success,
+    ).toBe(true);
+    expect(ServerMessage.safeParse({ ...base, type: 'command.ok', kind: 'success' }).success).toBe(
+      true,
+    );
+    expect(
+      ServerMessage.safeParse({ ...base, type: 'command.ok', kind: 'error', text: 'no' }).success,
+    ).toBe(true);
+    expect(ServerMessage.safeParse({ ...base, type: 'command.ok', kind: 'nope' }).success).toBe(
+      false,
+    );
+  });
+});
+
 describe('eventos de transcripción', () => {
   it('acepta el razonamiento opcional de una respuesta', () => {
     const event = { kind: 'message', role: 'assistant', text: 'hola', reasoning: 'pienso' };

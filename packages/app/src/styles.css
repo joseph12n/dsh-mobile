@@ -363,12 +363,14 @@ button {
     transform 120ms var(--ease-out);
 }
 
-button:active:not(:disabled):not(.folder-toggle) {
+button:active:not(:disabled):not(.folder-toggle):not(.command-option) {
   transform: scale(0.98);
 }
 
 @media (hover: hover) and (pointer: fine) {
-  button:hover:not(:disabled):not(.option):not(.session-open):not(.folder-toggle) {
+  button:hover:not(:disabled):not(.option):not(.session-open):not(.folder-toggle):not(
+      .command-option
+    ) {
     background: var(--accent-hover);
   }
 
@@ -1499,6 +1501,112 @@ button.ghost.tiny {
   height: 44px;
   padding: 0;
   border-radius: var(--radius);
+}
+
+.command-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: var(--radius);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 17px;
+}
+
+.command-menu {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  max-height: 220px;
+  overflow-y: auto;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.command-option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  width: 100%;
+  min-height: 44px;
+  padding: 9px 12px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: none;
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 14px;
+  text-align: left;
+}
+
+.command-option:last-child {
+  border-bottom: 0;
+}
+
+.command-option:active {
+  background: var(--hover);
+}
+
+.command-name {
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.command-description {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.command-hint {
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.command-result {
+  display: block;
+  flex: 0 0 auto;
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.command-result.error {
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--line));
+}
+
+.command-result-label {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--muted);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .command-option:hover {
+    background: var(--hover);
+  }
 }
 
 .locale {

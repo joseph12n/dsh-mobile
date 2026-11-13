@@ -17,6 +17,7 @@ export const Capability = z.enum([
   'workspace.list',
   'workspace.unarchive',
   'model.select',
+  'command.run',
 ]);
 export type Capability = z.infer<typeof Capability>;
 
@@ -136,6 +137,19 @@ export const QuestionBatch = z.object({
   createdAt: z.number().int().nonnegative(),
 });
 export type QuestionBatch = z.infer<typeof QuestionBatch>;
+
+export const CommandInfo = z.object({
+  name: z.string().min(1),
+  description: z.string(),
+  hint: z.string().optional(),
+});
+export type CommandInfo = z.infer<typeof CommandInfo>;
+
+export const CommandResult = z.object({
+  kind: z.enum(['success', 'error']),
+  text: z.string().optional(),
+});
+export type CommandResult = z.infer<typeof CommandResult>;
 
 export const QuestionAnswerItem = z.object({
   id: z.string().min(1),

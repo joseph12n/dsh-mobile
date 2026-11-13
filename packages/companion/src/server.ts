@@ -12,6 +12,8 @@ import {
   newMessageId,
   parseClientMessage,
   type Capability,
+  type CommandInfo,
+  type CommandResult,
   type DeviceInfo,
   type HistoryEntry,
   type HostInfo,
@@ -37,6 +39,8 @@ import { toWireSession, type SessionRecord } from './dsh/session-source.js';
 
 export const DEFAULT_PORT = 6768;
 const HOST = '127.0.0.1';
+
+type CommandFailureCode = 'not-found' | 'bad-request' | 'internal';
 
 export interface ServerDeps {
   pairing: PairingService;
@@ -83,11 +87,18 @@ export interface ServerDeps {
 
   listSessions?: (options: { includeArchived?: boolean }) => Promise<SessionRecord[]>;
   listQuestions?: () => QuestionBatch[];
+  listCommands?: (sessionId: string) => CommandInfo[] | Promise<CommandInfo[]>;
+  runCommand?: (input: { sessionId: string; line: string }) => Promise<{
+    ok: boolean;
+    code?: CommandFailureCode;
+    message?: string;
+    result?: CommandResult;
+  }>;
   answerQuestion?: (input: {
     callId: string;
     sessionId: string;
     answers: QuestionAnswerItem[];
-  }) => { ok: boolean; code?: 'not-found' | 'bad-request' | 'internal'; message?: string };
+  }) => { ok: boolean; code?: CommandFailureCode; message?: string };
   readHistory?: (
     sessionId: string,
     options: { before?: number; limit?: number },
@@ -703,6 +714,64 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
           at: Date.now(),
           type: 'answer.ok',
           callId: message.callId,
+        });
+        return;
+      }
+
+      if (message.type === 'commands.list') {
+        if (!deps.listCommands) {
+          send(
+            socket,
+            errorMessage(message.id, 'bad-request', 'This host cannot list the commands.'),
+          );
+          return;
+        }
+
+        const commands = await deps.listCommands(message.sessionId);
+        if (socket.readyState !== socket.OPEN) return;
+
+        send(socket, {
+          v: PROTOCOL_VERSION,
+          id: message.id,
+          at: Date.now(),
+          type: 'commands.ok',
+          commands,
+        });
+        return;
+      }
+
+      if (message.type === 'command.run') {
+        if (!deps.runCommand) {
+          send(socket, errorMessage(message.id, 'bad-request', 'This host cannot run commands.'));
+          return;
+        }
+
+        const outcome = await deps.runCommand({
+          sessionId: message.sessionId,
+          line: message.line,
+        });
+        if (socket.readyState !== socket.OPEN) return;
+
+        if (!outcome.ok) {
+          send(
+            socket,
+            errorMessage(
+              message.id,
+              outcome.code ?? 'internal',
+              outcome.message ?? 'The command could not run.',
+            ),
+          );
+          return;
+        }
+
+        const result = outcome.result ?? { kind: 'success' as const };
+        send(socket, {
+          v: PROTOCOL_VERSION,
+          id: message.id,
+          at: Date.now(),
+          type: 'command.ok',
+          kind: result.kind,
+          ...(result.text !== undefined ? { text: result.text } : {}),
         });
         return;
       }

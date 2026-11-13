@@ -110,6 +110,8 @@ Transport: **WebSocket**, JSON messages, shared envelope `{ v, id, at, type }`.
 | `session.subscribe` | `session.ok` (+ `session.event`)        |
 | `reply.send`        | `reply.ok`                              |
 | `question.answer`   | `answer.ok`                             |
+| `commands.list`     | `commands.ok`                           |
+| `command.run`       | `command.ok`                            |
 | `run.cancel`        | `run.ok`                                |
 | `run.start`         | `error` (not implemented in this build) |
 | `ping`              | `pong`                                  |
@@ -170,7 +172,26 @@ that reconnects still sees the question. Timed requests are left to the projecti
 Answering a question still needs the session's **root agent alive**; if it is not, the host
 answers `not-found` saying so.
 
-## 10. Transcript
+## 10. Commands: the host registry, run directly
+
+DSH's `commands` service is a host-side registry: a command runs against the live agent and
+**never becomes a model message**. The phone mirrors the desktop's command surface instead of
+inventing one:
+
+- `commands.list(sessionId)` returns the effective descriptors for that session's live agent
+  (global plus agent-scoped, name-sorted). No live agent ⇒ empty list; the palette stays hidden.
+- The composer shows a filtered palette when the draft starts with `/`; a `/` button opens it.
+  Selecting a command inserts `/name `; sending the line calls `command.run`.
+- `commands.execute(agent, line, …)` is the same entry point the desktop uses. The phone does
+  not parse the command grammar.
+- The result (`success`/`error` plus text) is returned in `command.ok` and rendered **above the
+  composer**, outside the transcript, matching the desktop's outside-history result. The
+  `command/run` and `command/done` events still land in the session log.
+- The host advertises `command.run` only when both the command registry and the agent registry
+  are present. No attachments in this first version; the command timeout on the phone is two
+  minutes.
+
+## 11. Transcript
 
 - **History**: `sessionController.page()` returns a page of the log.
 - **Live**: `observeEvent()` delivers a stream of events as they are committed.
@@ -178,21 +199,21 @@ answers `not-found` saying so.
   recognised and the rest is discarded. Inventing a line is worse than leaving a gap.
 - The client merges both sources by `seq`, so reconnecting does not duplicate.
 
-## 11. Security
+## 12. Security
 
 - **Loopback only.** The listen address is a constant (`HOST = '127.0.0.1'`), not a
   configuration option: there is no network mode. It is published through the tailnet name
   with `tailscale serve`, which reaches loopback and brings HTTPS. Device authentication
   already exists; what we do not want is an open port.
 - **One token per device**, stored as a hash; revoking one does not affect the others.
-- **Narrow scope**: sessions, questions and runs. No settings, credentials or plugin
+- **Narrow scope**: sessions, questions, runs and commands. No settings, credentials or plugin
   management.
 - **The host decides.** Capabilities are announced in `hello.ok` and the server does not send
   what the client cannot do.
 
-## 12. Status
+## 13. Status
 
 Phases 0 and 1 closed with evidence; phase 2 works end to end: pair, list sessions, read the
-transcript, answer questions, write and cancel.
+transcript, answer questions, write, cancel and run the host's commands.
 
 The pending work is in GitHub issues.

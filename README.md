@@ -140,6 +140,9 @@ tool use so they do not dirty your log.
   scrolling back through it.
 - **Answer questions and approvals**, with the full text and the options — including the
   agent's blocking `ask_user_question`, which does not need a timed preset.
+- **Run the host's slash commands** from the composer: `/plan`, `/goal`, `/mobile` and the
+  commands your plugins register. The result appears above the composer and does not enter the
+  model transcript.
 - **Write** to the agent and **cancel** the running turn.
 - Open the gear for language, contrast, folder preferences and the paired device. The phone's
   back gesture closes the sheet or the conversation before it leaves the app.
