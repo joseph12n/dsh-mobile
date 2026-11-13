@@ -272,7 +272,9 @@ function SessionRow({
         aria-describedby={archived ? `${stateId} ${archivedId}` : stateId}
         onClick={() => onOpen(session)}
       >
-        <span className="session-title">{session.title}</span>
+        <span className="session-title" title={session.title}>
+          {session.title}
+        </span>
         <span className="session-age muted small">
           {age ? t(unitKey(age), { count: 'count' in age ? age.count : 0 }) : ''}
         </span>

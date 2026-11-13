@@ -695,7 +695,7 @@ button.ghost.tiny {
 
 .model-field {
   display: flex;
-  flex: 1 1 160px;
+  flex: 1 1 220px;
   flex-direction: column;
   gap: 4px;
 }
@@ -1114,13 +1114,15 @@ button.ghost.tiny {
 }
 
 .session-heading {
+  display: -webkit-box;
   margin: 0;
+  overflow: hidden;
+  overflow-wrap: anywhere;
   font-size: 16px;
   font-weight: 500;
   line-height: 1.25;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .session-state {
