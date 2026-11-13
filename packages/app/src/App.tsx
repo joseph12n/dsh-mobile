@@ -91,6 +91,7 @@ export function App() {
   const startRef = useRef<((endpoint: string, pairingCode?: string) => Promise<void>) | undefined>(
     undefined,
   );
+  const reloadRef = useRef<(() => Promise<void>) | undefined>(undefined);
 
   const cancelRetry = useCallback(() => {
     clearTimeout(retryTimer.current);
@@ -599,6 +600,19 @@ export function App() {
       setActionError({ text: messageOf(error) });
     }
   };
+
+  useEffect(() => {
+    reloadRef.current = reload;
+  });
+
+  useEffect(() => {
+    if (view.kind !== 'sessions') return;
+    const onVisibility = (): void => {
+      if (document.visibilityState === 'visible') void reloadRef.current?.();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, [view.kind]);
 
   const toggleArchived = async () => {
     const next = !showArchived;
