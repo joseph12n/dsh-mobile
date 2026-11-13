@@ -32,6 +32,90 @@ describe('traducción de eventos', () => {
     expect(event).toEqual({ kind: 'message', role: 'assistant', text: 'uno dos' });
   });
 
+  it('separa el razonamiento de la respuesta', () => {
+    const event = toTranscriptEvent({
+      type: 'assistant/message',
+      data: {
+        message: {
+          content: [
+            { type: 'reasoning', text: 'pienso ' },
+            { type: 'reasoning', text: 'despacio' },
+            { type: 'text', text: 'respuesta' },
+          ],
+        },
+      },
+    });
+
+    expect(event).toEqual({
+      kind: 'message',
+      role: 'assistant',
+      text: 'respuesta',
+      reasoning: 'pienso\n\ndespacio',
+    });
+  });
+
+  it('no pinta un paso que solo razona o llama herramientas', () => {
+    expect(
+      toTranscriptEvent({
+        type: 'assistant/message',
+        data: { message: { content: [{ type: 'reasoning', text: 'pienso' }] } },
+      }),
+    ).toBeUndefined();
+
+    expect(
+      toTranscriptEvent({
+        type: 'assistant/message',
+        data: {
+          message: {
+            content: [{ type: 'reasoning', text: 'pienso' }, { type: 'tool-call' }],
+          },
+        },
+      }),
+    ).toBeUndefined();
+  });
+
+  it('se queda con el texto y no con la llamada a herramienta', () => {
+    const event = toTranscriptEvent({
+      type: 'assistant/message',
+      data: {
+        content: [{ type: 'tool-call' }, { type: 'text', text: 'hecho' }],
+      },
+    });
+
+    expect(event).toEqual({ kind: 'message', role: 'assistant', text: 'hecho' });
+  });
+
+  it('ignora los mensajes que inyecta el host como si fueran del usuario', () => {
+    for (const kind of [
+      'time-context',
+      'runtime-context',
+      'agent-instructions',
+      'skill-catalog',
+      'tool-jobs',
+      'user-approval',
+    ]) {
+      const event = toTranscriptEvent({
+        type: 'user/message',
+        data: { content: [{ type: 'text', text: 'ruido' }], source: { kind } },
+      });
+      expect(event, kind).toBeUndefined();
+    }
+  });
+
+  it('conserva un mensaje real del usuario, con o sin fuente', () => {
+    const withSource = toTranscriptEvent({
+      type: 'user/message',
+      data: { content: [{ type: 'text', text: 'hola' }], source: { kind: 'user' } },
+    });
+    const withoutSource = toTranscriptEvent({
+      type: 'user/message',
+      data: { content: [{ type: 'text', text: 'hola' }] },
+    });
+
+    expect(withSource).toEqual({ kind: 'message', role: 'user', text: 'hola' });
+    expect(withoutSource).toEqual({ kind: 'message', role: 'user', text: 'hola' });
+  });
+
   it('marca una llamada a herramienta como en curso', () => {
     const event = toTranscriptEvent({
       type: 'tool/call',
