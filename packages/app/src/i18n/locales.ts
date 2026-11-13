@@ -96,6 +96,8 @@ const en = {
   'model.effortDefault': 'Default',
   'model.none': 'No models available',
   'model.choose': 'Select model',
+  'model.unavailable': 'Model unavailable',
+  'model.retry': 'Retry the model catalog',
 
   'questions.title': 'Waiting for you',
   'questions.other': 'Or write another answer…',
@@ -200,6 +202,8 @@ const es: Catalogue = {
   'model.effortDefault': 'Por defecto',
   'model.none': 'No hay modelos disponibles',
   'model.choose': 'Elegir modelo',
+  'model.unavailable': 'Modelo no disponible',
+  'model.retry': 'Reintentar el catálogo de modelos',
 
   'questions.title': 'Te está esperando',
   'questions.other': 'O escribe otra respuesta…',
@@ -299,6 +303,8 @@ const ptBR: Catalogue = {
   'model.effortDefault': 'Padrão',
   'model.none': 'Nenhum modelo disponível',
   'model.choose': 'Escolher modelo',
+  'model.unavailable': 'Modelo indisponível',
+  'model.retry': 'Tentar novamente o catálogo de modelos',
 
   'questions.title': 'Esperando você',
   'questions.other': 'Ou escreva outra resposta…',
@@ -397,6 +403,8 @@ const zhHans: Catalogue = {
   'model.effortDefault': '默认',
   'model.none': '没有可用的模型',
   'model.choose': '选择模型',
+  'model.unavailable': '模型不可用',
+  'model.retry': '重试模型列表',
 
   'questions.title': '等待你回复',
   'questions.other': '或者写另一个回答…',
