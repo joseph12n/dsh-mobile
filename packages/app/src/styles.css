@@ -1108,7 +1108,7 @@ button.ghost.tiny {
 .composer textarea {
   flex: 1 1 auto;
   min-height: 44px;
-  max-height: 132px;
+  max-height: 134px;
   padding: 11px 14px;
   border-radius: var(--radius);
   border: 1px solid var(--line-strong);
@@ -1118,6 +1118,7 @@ button.ghost.tiny {
   font-size: 16px;
   line-height: 1.4;
   resize: none;
+  overflow-y: auto;
 }
 
 .send-button {

@@ -266,11 +266,19 @@ export function SessionView({
   const [draft, setDraft] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const atBottom = useRef(true);
 
   useEffect(() => {
     headingRef.current?.focus({ preventScroll: true });
   }, [session.id]);
+
+  useEffect(() => {
+    const area = textareaRef.current;
+    if (!area) return;
+    area.style.height = 'auto';
+    area.style.height = `${Math.min(area.scrollHeight, 134)}px`;
+  }, [draft]);
 
   useEffect(() => {
     atBottom.current = true;
@@ -378,6 +386,7 @@ export function SessionView({
       ) : (
         <div className="composer">
           <textarea
+            ref={textareaRef}
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={(event) => {
