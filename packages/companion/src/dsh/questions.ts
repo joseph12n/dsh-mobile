@@ -39,7 +39,7 @@ function asString(value: unknown, fallback = ''): string {
   return typeof value === 'string' ? value : fallback;
 }
 
-function toItem(raw: unknown): QuestionItem | undefined {
+export function toQuestionItem(raw: unknown): QuestionItem | undefined {
   if (typeof raw !== 'object' || raw === null) return undefined;
   const item = raw as RawQuestionItem;
 
@@ -81,7 +81,9 @@ function toBatch(raw: unknown, sessionId: string): QuestionBatch | undefined {
   if (!callId) return undefined;
 
   const items = Array.isArray(pending.questions)
-    ? pending.questions.map(toItem).filter((item): item is QuestionItem => item !== undefined)
+    ? pending.questions
+        .map(toQuestionItem)
+        .filter((item): item is QuestionItem => item !== undefined)
     : [];
   if (items.length === 0) return undefined;
 
