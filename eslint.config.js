@@ -8,7 +8,8 @@ export default tseslint.config(
       '**/dist/**',
       '**/coverage/**',
       '**/.agents/**',
-      '**/.preview/**',
+      'tools/preview/out/**',
+      'tools/preview/axe.min.js',
       '**/*.d.ts',
       'MEMORIA.md',
       'AGENTS.md',
@@ -36,7 +37,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ['scripts/**/*.mjs', '**/scripts/**/*.mjs'],
+    files: ['scripts/**/*.mjs', '**/scripts/**/*.mjs', 'tools/**/*.mjs'],
     languageOptions: {
       globals: {
         console: 'readonly',
@@ -46,6 +47,8 @@ export default tseslint.config(
         fetch: 'readonly',
         setTimeout: 'readonly',
         clearTimeout: 'readonly',
+        setInterval: 'readonly',
+        clearInterval: 'readonly',
       },
     },
   },
