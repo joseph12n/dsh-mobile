@@ -96,6 +96,7 @@ const en = {
 
   'questions.title': 'Waiting for you',
   'questions.other': 'Or write another answer…',
+  'questions.multi': 'You can choose more than one.',
   'questions.submit': 'Send answer',
 
   'time.now': 'just now',
@@ -195,6 +196,7 @@ const es: Catalogue = {
 
   'questions.title': 'Te está esperando',
   'questions.other': 'O escribe otra respuesta…',
+  'questions.multi': 'Puedes elegir más de una.',
   'questions.submit': 'Enviar respuesta',
 
   'time.now': 'ahora',
@@ -290,6 +292,7 @@ const ptBR: Catalogue = {
 
   'questions.title': 'Esperando você',
   'questions.other': 'Ou escreva outra resposta…',
+  'questions.multi': 'Você pode escolher mais de uma.',
   'questions.submit': 'Enviar resposta',
 
   'time.now': 'agora',
@@ -384,6 +387,7 @@ const zhHans: Catalogue = {
 
   'questions.title': '等待你回复',
   'questions.other': '或者写另一个回答…',
+  'questions.multi': '可以多选。',
   'questions.submit': '发送回答',
 
   'time.now': '刚刚',

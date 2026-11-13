@@ -598,6 +598,12 @@ button.ghost.tiny {
   font-family: var(--font-mono);
 }
 
+.question-hint {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .options {
   display: flex;
   flex-wrap: wrap;
@@ -606,6 +612,10 @@ button.ghost.tiny {
 }
 
 .option {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
   width: auto;
   min-height: 44px;
   padding: 10px 16px;
@@ -613,12 +623,26 @@ button.ghost.tiny {
   color: var(--text-secondary);
   border-color: var(--line-strong);
   font-weight: 400;
+  text-align: left;
 }
 
-.option:not(.chosen):hover:not(:disabled) {
-  background: var(--hover);
-  border-color: var(--line-emphasis);
-  color: var(--text);
+.option-description {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.option.chosen .option-description {
+  color: inherit;
+  opacity: 0.75;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .option:not(.chosen):hover:not(:disabled) {
+    background: var(--hover);
+    border-color: var(--line-emphasis);
+    color: var(--text);
+  }
 }
 
 .option.chosen {

@@ -53,13 +53,17 @@ export function QuestionsCard({
 
           {batch.items.map((item) => {
             const key = `${batch.callId}:${item.id}`;
+            const textId = `${key}-text`;
             const chosen = selected[key] ?? [];
 
             return (
-              <div key={item.id} className="question-item">
+              <div key={item.id} className="question-item" role="group" aria-labelledby={textId}>
                 {item.header && <span className="question-header">{item.header}</span>}
-                <p className="question-text">{item.text}</p>
+                <p className="question-text" id={textId}>
+                  {item.text}
+                </p>
                 {item.detail && <pre className="question-detail">{item.detail}</pre>}
+                {item.multiSelect && <p className="question-hint">{t('questions.multi')}</p>}
 
                 <div className="options">
                   {item.options.map((option) => (
@@ -68,9 +72,12 @@ export function QuestionsCard({
                       type="button"
                       className={`option ${chosen.includes(option.label) ? 'chosen' : ''}`}
                       onClick={() => toggle(key, option.label, item.multiSelect)}
-                      title={option.description ?? undefined}
+                      aria-pressed={chosen.includes(option.label)}
                     >
-                      {option.label}
+                      <span>{option.label}</span>
+                      {option.description && (
+                        <span className="option-description">{option.description}</span>
+                      )}
                     </button>
                   ))}
                 </div>
@@ -83,6 +90,7 @@ export function QuestionsCard({
                       setCustom((previous) => ({ ...previous, [key]: event.target.value }))
                     }
                     placeholder={t('questions.other')}
+                    aria-label={t('questions.other')}
                     autoCapitalize="sentences"
                   />
                 )}
