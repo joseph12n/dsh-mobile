@@ -272,6 +272,20 @@ export class CompanionClient {
     return response.type === 'activity.ok' ? response.activity : { subagents: [] };
   }
 
+  async listDevices(): Promise<DeviceInfo[]> {
+    const response = await this.#request({ type: 'devices.list' });
+    if (response.type === 'error') throw new ConnectionError(response.message, response.code);
+    return response.type === 'devices.ok' ? response.devices : [];
+  }
+
+  async revokeDevice(deviceId: string): Promise<void> {
+    const response = await this.#request({ type: 'devices.revoke', deviceId });
+    if (response.type === 'error') throw new ConnectionError(response.message, response.code);
+    if (response.type !== 'devices.revoked') {
+      throw new ConnectionError('The host did not confirm the revocation.', 'internal');
+    }
+  }
+
   async history(
     sessionId: string,
     options: { before?: number; limit?: number } = {},

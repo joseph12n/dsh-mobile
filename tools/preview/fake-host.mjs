@@ -17,6 +17,7 @@ const host = {
     'model.select',
     'command.run',
     'session.activity',
+    'devices.manage',
     'session.history',
     'reply.send',
     'run.cancel',
@@ -30,6 +31,22 @@ const device = {
   createdAt: now - 86_400_000,
   lastSeenAt: now,
 };
+
+let devices = [
+  device,
+  {
+    id: 'device-android',
+    name: 'Android de José',
+    createdAt: now - 10 * 86_400_000,
+    lastSeenAt: now - 3 * 3_600_000,
+  },
+  {
+    id: 'device-ipad',
+    name: 'iPad viejo',
+    createdAt: now - 30 * 86_400_000,
+    lastSeenAt: now - 20 * 86_400_000,
+  },
+];
 
 const workspaces = [
   {
@@ -343,6 +360,24 @@ wss.on('connection', (socket) => {
           planActive: true,
         },
       });
+      return;
+    }
+
+    if (message.type === 'devices.list') {
+      reply({ type: 'devices.ok', devices });
+      return;
+    }
+
+    if (message.type === 'devices.revoke') {
+      const target = devices.find((item) => item.id === message.deviceId);
+      if (!target) {
+        reply({ type: 'error', code: 'not-found', message: 'Unknown device.' });
+        return;
+      }
+
+      devices = devices.filter((item) => item.id !== target.id);
+      reply({ type: 'devices.revoked', deviceId: target.id });
+      send({ id: `devices-${Date.now()}`, type: 'devices.changed', devices });
       return;
     }
 

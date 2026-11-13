@@ -1,5 +1,10 @@
 import { useId } from 'react';
-import { PROTOCOL_NAME, PROTOCOL_VERSION, type Workspace } from '@dsh-mobile/protocol';
+import {
+  PROTOCOL_NAME,
+  PROTOCOL_VERSION,
+  type DeviceInfo,
+  type Workspace,
+} from '@dsh-mobile/protocol';
 import { displayTitle } from '../lib/folders.js';
 import {
   FOLDER_ORDERS,
@@ -11,6 +16,7 @@ import { useContrast, CONTRASTS, type Contrast } from '../lib/contrast.js';
 import { useI18n } from '../i18n/index.js';
 import { LOCALES, LOCALE_LABELS, type Locale, type MessageKey } from '../i18n/locales.js';
 import { ForgetDeviceButton } from './ForgetDeviceButton.js';
+import { PairedDevices } from './PairedDevices.js';
 import { Sheet } from './Sheet.js';
 
 const ORDER_KEY: Record<FolderOrder, MessageKey> = {
@@ -28,6 +34,11 @@ export function SettingsSheet({
   onPreferencesChange,
   hostName,
   endpoint,
+  devices,
+  currentDeviceId,
+  canManageDevices,
+  onRevokeDevice,
+  deviceError,
   onForget,
 }: {
   open: boolean;
@@ -38,6 +49,11 @@ export function SettingsSheet({
   onPreferencesChange: (next: FolderPreferences) => void;
   hostName: string;
   endpoint: string;
+  devices: DeviceInfo[];
+  currentDeviceId?: string;
+  canManageDevices: boolean;
+  onRevokeDevice: (deviceId: string) => void;
+  deviceError?: string;
   onForget: () => void;
 }) {
   const { t, locale, setLocale } = useI18n();
@@ -146,6 +162,23 @@ export function SettingsSheet({
             <span className="muted small">{t('settings.address')}</span>
             <span className="sheet-endpoint">{endpoint}</span>
           </div>
+
+          {canManageDevices && (
+            <div className="sheet-devices">
+              <p className="sheet-label">{t('settings.devices')}</p>
+              {deviceError ? (
+                <p className="error" role="alert">
+                  {deviceError}
+                </p>
+              ) : (
+                <PairedDevices
+                  devices={devices}
+                  {...(currentDeviceId ? { currentId: currentDeviceId } : {})}
+                  onRevoke={onRevokeDevice}
+                />
+              )}
+            </div>
+          )}
 
           <div className="sheet-action">
             <ForgetDeviceButton onForget={onForget} />

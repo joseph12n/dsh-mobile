@@ -145,6 +145,8 @@ tool use so they do not dirty your log.
   model transcript.
 - **See what the agent is doing**: a compact strip with the current goal and its round, the
   running subagents and the open tasks, with the details one tap away.
+- **Manage the paired devices**: see the list with the last time each was seen, revoke one, and
+  forget this phone (which revokes it on the host first).
 - **Write** to the agent and **cancel** the running turn.
 - Open the gear for language, contrast, folder preferences and the paired device. The phone's
   back gesture closes the sheet or the conversation before it leaves the app.

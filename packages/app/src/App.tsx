@@ -3,6 +3,7 @@ import {
   parsePairingUrl,
   type CommandInfo,
   type CommandResult,
+  type DeviceInfo,
   type HistoryEntry,
   type HostInfo,
   type ModelCatalog,
@@ -70,6 +71,9 @@ export function App() {
   const [catalog, setCatalog] = useState<ModelCatalog | undefined>(undefined);
   const [catalogStatus, setCatalogStatus] = useState<CatalogStatus>('idle');
   const [questions, setQuestions] = useState<QuestionBatch[]>([]);
+  const [device, setDevice] = useState<DeviceInfo | undefined>(undefined);
+  const [devices, setDevices] = useState<DeviceInfo[]>([]);
+  const [deviceError, setDeviceError] = useState<string | undefined>(undefined);
   const [openSession, setOpenSession] = useState<SessionSummary | undefined>(undefined);
   const [commands, setCommands] = useState<CommandInfo[]>([]);
   const [activity, setActivity] = useState<SessionActivity | undefined>(undefined);
@@ -237,6 +241,11 @@ export function App() {
           return;
         }
 
+        if (message.type === 'devices.changed') {
+          setDevices(message.devices);
+          return;
+        }
+
         if (message.type === 'session.state') {
           updateSession(message.sessionId, () => ({ state: message.state }));
           return;
@@ -260,6 +269,7 @@ export function App() {
         setQuestions([]);
         const token = storage.token();
         const hello = await connection.connect(pairingCode ? undefined : token);
+        let currentDevice = hello.device;
 
         if (pairingCode) {
           const paired = await connection.pair(
@@ -267,9 +277,13 @@ export function App() {
             deviceName(),
             navigator.platform ?? 'web',
           );
+          currentDevice = paired.device;
           storage.saveToken(paired.deviceToken);
           storage.saveEndpoint(endpoint);
         }
+
+        if (client.current !== connection) return;
+        setDevice(currentDevice);
 
         const sessions = await connection.listSessions(showArchivedRef.current);
 
@@ -277,6 +291,7 @@ export function App() {
           ? await connection.listWorkspaces().catch(() => [])
           : [];
 
+        if (client.current !== connection) return;
         retry.current = 0;
         setView({ kind: 'sessions', endpoint, host: hello.host, sessions, workspaces });
 
@@ -461,12 +476,47 @@ export function App() {
     return () => globalThis.removeEventListener('popstate', onPopState);
   }, [leaveSession]);
 
+  const devicesCapable =
+    view.kind === 'sessions' && view.host.capabilities.includes('devices.manage');
+
+  const loadDevices = useCallback(async () => {
+    const connection = client.current;
+    if (!connection || !devicesCapable) {
+      setDevices([]);
+      return;
+    }
+
+    try {
+      setDevices(await connection.listDevices());
+      setDeviceError(undefined);
+    } catch (error) {
+      setDevices([]);
+      setDeviceError(messageOf(error));
+    }
+  }, [client, devicesCapable]);
+
   const openSettings = useCallback(() => {
     if (topEntry(globalThis.history)?.view !== 'settings') {
       pushEntry(globalThis.history, { view: 'settings' });
     }
     setSettingsOpen(true);
-  }, []);
+    void loadDevices();
+  }, [loadDevices]);
+
+  const revokeDevice = useCallback(
+    async (deviceId: string) => {
+      const connection = client.current;
+      if (!connection) return;
+
+      try {
+        await connection.revokeDevice(deviceId);
+        await loadDevices();
+      } catch (error) {
+        setDeviceError(messageOf(error));
+      }
+    },
+    [client, loadDevices],
+  );
 
   const closeSettings = useCallback(() => {
     if (backFrom(globalThis.history, { view: 'settings' })) return;
@@ -817,7 +867,18 @@ export function App() {
     }
   };
 
-  const forget = () => {
+  const forget = async (): Promise<void> => {
+    const connection = client.current;
+    const currentId = device?.id;
+    if (connection && currentId && devicesCapable) {
+      try {
+        await Promise.race([
+          connection.revokeDevice(currentId),
+          new Promise((resolve) => setTimeout(resolve, 1500)),
+        ]);
+      } catch {}
+    }
+
     cancelRetry();
     retry.current = 0;
     client.current?.close();
@@ -825,6 +886,9 @@ export function App() {
     openSessionId.current = undefined;
     storage.saveToken(undefined);
     storage.saveEndpoint(undefined);
+    setDevice(undefined);
+    setDevices([]);
+    setDeviceError(undefined);
     setSettingsOpen(false);
     if (topEntry(globalThis.history)?.view === 'settings') globalThis.history.back();
     setView({ kind: 'pairing', endpoint: endpointFromLocation() });
@@ -1061,6 +1125,11 @@ export function App() {
         onPreferencesChange={setPreferences}
         hostName={view.kind === 'sessions' ? view.host.name : ''}
         endpoint={shownEndpoint}
+        devices={devices}
+        {...(device ? { currentDeviceId: device.id } : {})}
+        canManageDevices={devicesCapable}
+        onRevokeDevice={(deviceId) => void revokeDevice(deviceId)}
+        {...(deviceError ? { deviceError } : {})}
         onForget={forget}
       />
     </main>
