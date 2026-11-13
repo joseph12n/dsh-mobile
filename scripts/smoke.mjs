@@ -1,14 +1,3 @@
-// Verificación de humo de los artefactos compilados: el servidor de dist/ sirviendo
-// la PWA de dist/, con emparejamiento, sesiones y preguntas de punta a punta.
-//
-//   pnpm build && pnpm smoke
-//
-// No toca DSH: arranca el servidor con datos de ejemplo en un puerto efímero. Sirve
-// para comprobar que el paquete que se publicaría funciona tal cual.
-//
-// El módulo de log del plugin escribe en $DSH_HOME/companion/probe.log; aquí se
-// desactiva antes de importarlo, porque una verificación no debe ensuciar el log
-// del usuario. La variable se lee al cargar el módulo, de ahí el import dinámico.
 process.env.DSH_MOBILE_LOG_FILE = '0';
 
 const { default: WebSocket } = await import('ws');
@@ -112,17 +101,13 @@ check('el manifest se revalida', manifest.headers.get('cache-control') === 'no-c
 
 const manifestJson = await manifest.json();
 const sizes = new Set(manifestJson.icons.map((icon) => icon.sizes));
-// Chromium exige estos dos tamaños en PNG para ofrecer el aviso de instalación.
 check('el manifest declara iconos de 192 y 512', sizes.has('192x192') && sizes.has('512x512'));
 
-// No basta con el tamaño: sin `type: image/png` el navegador puede descartarlo.
 for (const size of ['192x192', '512x512']) {
   const entry = manifestJson.icons.find((icon) => icon.sizes === size);
   check(`el icono ${size} es PNG`, entry?.type === 'image/png' && entry.src.endsWith('.png'));
 }
 
-// Android recorta con formas arbitrarias: sin una variante maskable, el lanzador
-// mete el icono en un cuadrado blanco.
 check(
   'hay una variante maskable',
   manifestJson.icons.some((icon) => String(icon.purpose ?? '').includes('maskable')),
@@ -136,7 +121,6 @@ for (const icon of manifestJson.icons.filter((entry) => entry.src.endsWith('.png
   );
 }
 
-// iOS no lee el manifest: lo referencia el HTML, y si falta, el icono no aparece.
 check('el apple-touch-icon se sirve', (await fetch(`${base}/apple-touch-icon.png`)).status === 200);
 
 const assetPath = indexHtml.match(/src="([^"]+\.js)"/)?.[1];
@@ -153,7 +137,6 @@ check('el QR se genera', pairHtml.includes('data:image/png;base64,'));
 
 const code = pairHtml.match(/<code>([^<]+)<\/code>/)?.[1];
 
-/** Envía marcos y resuelve cuando llegaron todos los tipos pedidos. */
 function collect(frames, wanted) {
   return new Promise((resolve, reject) => {
     const socket = new WebSocket(wsUrl);

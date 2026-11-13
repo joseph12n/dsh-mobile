@@ -2,15 +2,6 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { CONTRASTS, isContrast, storeContrast, storedContrast } from './contrast.js';
 import { fakeStorage, restoreStorage } from './test-storage.js';
 
-/**
- * The contrast choice.
- *
- * Three levels and a memory. The cases worth pinning are the cheap ones: an unknown
- * stored value must not break the app, and a storage that throws must not either —
- * `localStorage` throws in private modes and inside some webviews, which is exactly
- * where a phone PWA runs.
- */
-
 const KEY = 'dsh-mobile.contrast';
 
 afterEach(() => {
@@ -30,7 +21,6 @@ describe('reading the stored level', () => {
   });
 
   it('ignores a value it does not know', () => {
-    // Una version futura, o alguien tocando la consola.
     fakeStorage();
     globalThis.localStorage.setItem(KEY, 'ultra');
     expect(storedContrast()).toBe('normal');
@@ -47,7 +37,6 @@ describe('reading the stored level', () => {
   });
 
   it('survives having no storage at all', () => {
-    // Un webview sin `localStorage` no puede impedir ver la app.
     (globalThis as unknown as { localStorage: unknown }).localStorage = undefined;
     expect(storedContrast()).toBe('normal');
     expect(() => storeContrast('low')).not.toThrow();

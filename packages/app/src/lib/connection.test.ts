@@ -1,11 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { endpointFromLocation, normalizeEndpoint } from './connection.js';
 
-/**
- * Normalización del endpoint. Importa porque es el único dato de red que el
- * usuario teclea a mano, y equivocarlo da un error críptico de WebSocket.
- */
-
 const original = globalThis.location;
 
 afterEach(() => {

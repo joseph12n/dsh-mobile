@@ -9,16 +9,6 @@ import {
   unarchiveSession,
 } from './lifecycle.js';
 
-/**
- * Session lifecycle, against the **real** host shapes.
- *
- * The first version of this file tested shapes that do not exist: `createSession` instead
- * of `create`, a nested `session.sessionId`, two arguments to `archive`, and a refusal
- * code looked up in the message. It was green and wrong. Every fixture here uses what the
- * packaged app actually exposes.
- */
-
-/** An error the way the host throws it: a stable code plus a message. */
 function coded(code: string, message = 'no'): Error {
   return Object.assign(new Error(message), { code });
 }
@@ -29,8 +19,6 @@ function ctxWith(services: Record<string, unknown>): HostContext {
 
 describe('creating a session', () => {
   it('asks the host with the workspace id, not with a cwd', async () => {
-    // Con `cwd` la sesión se crea pero NO entra en la carpeta: la característica entera
-    // se perdería en silencio.
     const seen: unknown[] = [];
     const ctx = ctxWith({
       sessionController: {
@@ -48,7 +36,6 @@ describe('creating a session', () => {
   });
 
   it('reads the flat response, not a nested one', async () => {
-    // `create` devuelve `{ sessionId }`; `created.session.sessionId` siempre es undefined.
     const ctx = ctxWith({ sessionController: { create: async () => ({ sessionId: 'x' }) } });
     expect(await createSession(ctx, { workspaceId: 'w' })).toEqual({ ok: true, sessionId: 'x' });
   });
@@ -68,7 +55,6 @@ describe('creating a session', () => {
   });
 
   it('refuses when the host has no create()', async () => {
-    // `createSession` existe en el host pero es privado: llamarlo no hacía nada.
     const ctx = ctxWith({ sessionController: { createSession: async () => ({}) } });
     expect(await createSession(ctx, { workspaceId: 'w' })).toMatchObject({
       ok: false,
@@ -188,8 +174,6 @@ describe('archiving a session', () => {
   });
 
   it('reads the refusal code from error.code, not from the message', async () => {
-    // El texto es `cannot archive session 'x': the session is active`: buscar
-    // `session-active` ahí no acierta nunca.
     const ctx = ctxWith({
       workspaceController: {
         archiveSession: async () => {

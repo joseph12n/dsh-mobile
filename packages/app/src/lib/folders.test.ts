@@ -2,14 +2,6 @@ import { describe, expect, it } from 'vitest';
 import type { SessionSummary, Workspace } from '@dsh-mobile/protocol';
 import { byUrgency, displayTitle, groupByFolder, usesFolders } from './folders.js';
 
-/**
- * Grouping by folder.
- *
- * The cases that matter are the awkward ones: a session pointing at a folder that no
- * longer exists, a folder with nothing in it, and a session with no folder at all. A
- * grouping that loses a session is worse than a flat list.
- */
-
 const NOW = 1_800_000_000_000;
 
 function workspace(id: string, overrides: Partial<Workspace> = {}): Workspace {
@@ -52,13 +44,11 @@ describe('grouping sessions into folders', () => {
   });
 
   it('keeps the host order of the folders', () => {
-    // The order is what the desktop shows; re-sorting it here would disagree with it.
     const sections = groupByFolder([], [workspace('z'), workspace('a')]);
     expect(sections.map((section) => section.workspace?.id)).toEqual(['z', 'a']);
   });
 
   it('keeps a folder with no sessions', () => {
-    // Hiding it makes the app look like it lost a folder.
     const sections = groupByFolder(
       [session('a', { workspaceId: 'w2' })],
       [workspace('w1'), workspace('w2')],
@@ -68,7 +58,6 @@ describe('grouping sessions into folders', () => {
   });
 
   it('does not lose a session whose folder is gone', () => {
-    // A folder can be removed on the desktop while a session still points at it.
     const sections = groupByFolder([session('a', { workspaceId: 'deleted' })], [workspace('w1')]);
     const all = sections.flatMap((section) => section.sessions.map((item) => item.id));
     expect(all).toEqual(['a']);
@@ -109,7 +98,6 @@ describe('grouping sessions into folders', () => {
   });
 
   it('a waiting session beats a working one', () => {
-    // What blocks the agent is what the human has to look at first.
     expect(
       byUrgency(session('w', { pendingQuestions: 1 }), session('t', { state: 'working' })),
     ).toBeLessThan(0);
@@ -128,7 +116,6 @@ describe('folder title', () => {
   });
 
   it('falls back to the directory name, last segment only', () => {
-    // A full path does not fit on a phone.
     expect(displayTitle(workspace('w1', { title: '', directory: 'C:/work/dsh-mobile' }))).toBe(
       'dsh-mobile',
     );

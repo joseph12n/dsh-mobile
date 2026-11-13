@@ -1,11 +1,5 @@
 import { CompanionClient } from './connection.js';
 
-/**
- * Un doble del WebSocket del navegador, compartido por las pruebas del cliente.
- *
- * Vive fuera de cualquier `.test.ts` para que dos archivos de pruebas no tengan que
- * copiarlo: una copia se queda atrás en cuanto el harness cambia.
- */
 export class FakeSocket {
   static readonly OPEN = 1;
   static instances: FakeSocket[] = [];
@@ -30,18 +24,15 @@ export class FakeSocket {
     this.onclose?.();
   }
 
-  /** Simula que el host acepta el socket. */
   open(): void {
     this.readyState = 1;
     this.onopen?.();
   }
 
-  /** Simula un marco del host. */
   deliver(message: Record<string, unknown>): void {
     this.onmessage?.({ data: JSON.stringify(message) });
   }
 
-  /** Simula que el host cierra el socket. */
   drop(): void {
     this.readyState = 3;
     this.onclose?.();
@@ -50,7 +41,6 @@ export class FakeSocket {
 
 const originalWebSocket = globalThis.WebSocket;
 
-/** Instala el doble y deja una lista limpia. */
 export function stubSocket(): void {
   FakeSocket.instances = [];
   (globalThis as unknown as { WebSocket: unknown }).WebSocket = Object.assign(FakeSocket, {
@@ -58,15 +48,12 @@ export function stubSocket(): void {
   });
 }
 
-/** Devuelve el WebSocket global a su sitio. */
 export function restoreSocket(): void {
   (globalThis as unknown as { WebSocket: unknown }).WebSocket = originalWebSocket;
 }
 
-/** Deja correr la cadena pendiente: el cliente envía `hello` tras `onopen`. */
 export const flush = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
 
-/** Responde a la última petición enviada con el marco dado. */
 export function answer(socket: FakeSocket, frame: Record<string, unknown>): void {
   const last = socket.sent.at(-1);
   if (!last) throw new Error('nothing was sent');
@@ -74,14 +61,12 @@ export function answer(socket: FakeSocket, frame: Record<string, unknown>): void
   socket.deliver({ v: 1, id: parsed.id, at: 1, ...frame });
 }
 
-/** El último marco que el cliente envió, ya parseado. */
 export function lastSent(socket: FakeSocket): Record<string, unknown> {
   const last = socket.sent.at(-1);
   if (!last) throw new Error('nothing was sent');
   return JSON.parse(last) as Record<string, unknown>;
 }
 
-/** Un cliente ya emparejado contra el doble. */
 export async function connected(
   capabilities: string[] = [],
 ): Promise<{ socket: FakeSocket; client: CompanionClient }> {

@@ -5,19 +5,6 @@ import { displayTitle, groupByFolder, usesFolders } from '../lib/folders.js';
 import { folderView, type FolderPreferences } from '../lib/preferences.js';
 import { plural, useI18n } from '../i18n/index.js';
 
-/**
- * Session list.
- *
- * Two shapes, and which one you get is decided by the host:
- *
- *  - **With folders** (the desktop's Workspaces): one section per folder, sessions inside
- *    ordered by urgency. This is how the desktop reads.
- *  - **Without folders**: the sections by state, as before. A host that does not expose
- *    workspaces is still a valid host and must not look broken.
- *
- * The state stays visible either way: a badge on every row, and the waiting count.
- */
-
 const STATE_KEY = {
   working: 'session.working',
   waiting: 'session.waiting',
@@ -51,21 +38,15 @@ export function SessionList({
   sessions: SessionSummary[];
   workspaces: Workspace[];
   onOpen: (session: SessionSummary) => void;
-  /** Creates a session in that folder. Absent when the host cannot. */
   onCreate?: (workspaceId: string) => void;
   onArchive?: (session: SessionSummary) => void;
-  /** Brings an archived session back. Absent when the host cannot. */
   onUnarchive?: (session: SessionSummary) => void;
   canCreate?: boolean;
   canArchive?: boolean;
   canUnarchive?: boolean;
-  /** Folder whose create is in flight. Its button is disabled until it settles. */
   createPending?: string;
-  /** Session whose archive is in flight, for the same reason. */
   archivePending?: string;
-  /** Session whose restore is in flight. */
   restorePending?: string;
-  /** How the user wants the folders shown. Without them, the host order. */
   preferences?: FolderPreferences;
 }) {
   const { t, locale } = useI18n();
@@ -76,14 +57,10 @@ export function SessionList({
     ? folderView(grouped, preferences, locale)
     : { state: 'folders' as const, sections: grouped };
 
-  // Sin carpetas y sin sesiones, el aviso. Con carpetas, se pintan igual: es donde
-  // irían las sesiones nuevas y esconderlas borraba la agrupación entera.
   if (sessions.length === 0 && !usesFolders(workspaces)) {
     return <p className="muted">{t('sessions.empty')}</p>;
   }
 
-  // Solo se avisa cuando no hay nada que pintar y el motivo es que el usuario ocultó
-  // las carpetas. Si no queda ninguna por «ocultar vacías», se muestran igual.
   if (view.state === 'all-hidden') {
     return <p className="muted">{t('settings.allHidden')}</p>;
   }
@@ -95,8 +72,6 @@ export function SessionList({
       <>
         {folders.map((section, index) => {
           const id = section.workspace?.id ?? 'no-folder';
-          // A folder with nothing in it is still shown: it is where new sessions would go,
-          // and hiding it makes the app look like it lost a folder.
           const empty = section.sessions.length === 0;
 
           return (
@@ -110,8 +85,6 @@ export function SessionList({
                   <button
                     type="button"
                     className="ghost tiny"
-                    // Todos los botones se llaman igual: sin la carpeta, un lector de
-                    // pantalla anuncia seis "Nueva sesión" idénticos.
                     aria-label={`${t('action.newSession')}: ${displayTitle(section.workspace)}`}
                     disabled={createPending !== undefined}
                     onClick={() => onCreate(section.workspace!.id)}
@@ -155,8 +128,6 @@ export function SessionList({
         const collapsed =
           section.kind === 'stale' &&
           !showStale &&
-          // Una archivada casi siempre cae en «antiguas»; plegarlo escondía justo lo
-          // que el usuario acababa de pedir ver.
           !section.sessions.some((session) => session.archived === true);
 
         return (
@@ -201,7 +172,6 @@ export function SessionList({
   );
 }
 
-/** One session. The same row in both shapes: the state is always visible. */
 function SessionRow({
   session,
   onOpen,
@@ -218,9 +188,7 @@ function SessionRow({
   onUnarchive?: (session: SessionSummary) => void;
   canArchive: boolean;
   canUnarchive: boolean;
-  /** Sesión cuyo archivo está en vuelo: su botón se deshabilita. */
   archivePending?: string;
-  /** Sesión cuya restauración está en vuelo. */
   restorePending?: string;
 }) {
   const { t } = useI18n();
@@ -231,14 +199,9 @@ function SessionRow({
 
   return (
     <li className="session-row">
-      {/* Un botón de verdad, no un `li` con `role="button"`: dentro vive otro botón
-          y las interacciones anidadas confundían a los lectores de pantalla.
-          Además, la tecla Enter sobre Archivar burbujeaba al `li` y abría la sesión. */}
       <button
         type="button"
         className="session-open"
-        // El estado y, si toca, la marca de archivada: el nombre del botón no los
-        // arrastra, pero un lector de pantalla los anuncia al enfocar la fila.
         aria-describedby={archived ? `${stateId} ${archivedId}` : stateId}
         onClick={() => onOpen(session)}
       >
@@ -248,8 +211,6 @@ function SessionRow({
         </span>
       </button>
       <div className="session-meta">
-        {/* El estado queda fuera del nombre del botón: `aria-describedby` lo asocia
-            sin que el nombre arrastre "working" en cada fila. */}
         <span id={stateId} className={`badge ${session.state}`}>
           {t(STATE_KEY[session.state])}
         </span>
@@ -293,7 +254,6 @@ function SessionRow({
   );
 }
 
-/** Catalogue key for an elapsed value. */
 function unitKey(age: {
   unit: 'now' | 'minutes' | 'hours' | 'days';
 }): 'time.now' | 'time.minutes' | 'time.hours' | 'time.days' {

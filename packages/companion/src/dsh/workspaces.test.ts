@@ -8,14 +8,6 @@ import {
   toWorkspace,
 } from './workspaces.js';
 
-/**
- * The folder adapter.
- *
- * It has to survive three very different hosts: one with `list`, one that only
- * streams, and one with no workspaces at all. The third is not a failure — it is the
- * host this project had until yesterday, and it must keep working.
- */
-
 const row = {
   workspaceId: 'ws-1',
   path: 'C:/work/dsh-mobile',
@@ -25,7 +17,6 @@ const row = {
   updatedAt: '2026-01-02T00:00:00.000Z',
 };
 
-/** A context whose `workspaceController` is whatever the test needs. */
 function ctxWith(controller: unknown): HostContext {
   return { workspaceController: controller } as HostContext;
 }
@@ -49,7 +40,6 @@ describe('mapping a row', () => {
   });
 
   it('drops a row without an id or a path', () => {
-    // A folder that cannot be opened cannot be shown either.
     expect(toWorkspace({ ...row, workspaceId: undefined })).toBeUndefined();
     expect(toWorkspace({ ...row, path: '' })).toBeUndefined();
     expect(toWorkspace(null)).toBeUndefined();
@@ -87,9 +77,6 @@ describe('reading from a host', () => {
   });
 
   it('reads the real frame shape: { type: baseline, value: {...} }', async () => {
-    // This is what the Host controller actually yields. The first version of this
-    // file tested `{ items }`, so it passed while the real host returned nothing and
-    // folders were silently dead.
     const controller = {
       async *follow() {
         yield {
@@ -116,7 +103,6 @@ describe('reading from a host', () => {
   });
 
   it('does not hang when the stream ignores the abort', async () => {
-    // A host that never yields must not hold the command open.
     const controller = {
       // eslint-disable-next-line require-yield
       async *follow() {
@@ -177,8 +163,6 @@ describe('availability', () => {
   });
 
   it('does not throw when the controller getter throws', () => {
-    // It runs while the plugin loads: a throwing getter must not take DSH down over a
-    // capability flag.
     const hostile = {
       get workspaceController(): never {
         throw new Error('boom');
@@ -192,8 +176,6 @@ describe('availability', () => {
 
 describe('archived sessions', () => {
   it('reads them from the same baseline as the folders', async () => {
-    // `{ type: 'baseline', value: { items, archivedSessionIds } }`: el host no las quita
-    // de la lista, solo las marca, así que el móvil tiene que hacerlo.
     const controller = {
       async *follow() {
         yield {
@@ -212,7 +194,6 @@ describe('archived sessions', () => {
   });
 
   it('hides nothing when the host has no workspaces', async () => {
-    // Sin dato, es peor esconder una sesión viva que mostrar una cerrada.
     expect((await listArchivedSessions({} as HostContext)).size).toBe(0);
     expect((await listArchivedSessions(ctxWith({}))).size).toBe(0);
   });
@@ -234,8 +215,6 @@ describe('archived sessions', () => {
 
 describe('an empty baseline is not a reason to wait', () => {
   it('returns immediately when the baseline carries nothing', async () => {
-    // Un host sin carpetas manda `{ items: [] }`. Si se rechaza por estar vacío, cada
-    // lectura espera el timeout entero y la primera pantalla tarda segundos.
     const controller = {
       async *follow() {
         yield {

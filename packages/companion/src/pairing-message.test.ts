@@ -2,11 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { buildPairingMessage } from './pairing-message.js';
 import type { ResolvedOrigin } from './public-origin.js';
 
-/**
- * El mensaje del comando es lo que sustituye a abrir una URL a mano. Si promete
- * un enlace que no funciona, el usuario pierde el tiempo en el teléfono.
- */
-
 const TAILNET: ResolvedOrigin = {
   origin: 'https://maquina.tailnet.ts.net',
   source: 'tailscale',
@@ -49,7 +44,6 @@ describe('mensaje de emparejamiento', () => {
   });
 
   it('avisa mientras el origen aún no se ha resuelto', () => {
-    // Sin origen no se puede prometer nada: se cae a loopback y se dice.
     const { text, compromised } = buildPairingMessage({ ...base, port: 6768 });
     expect(compromised).toBe(true);
     expect(text).toContain('http://127.0.0.1:6768');
@@ -94,8 +88,6 @@ describe('el QR sustituye al código copiado a mano', () => {
   });
 
   it('sin QR sigue dando el enlace, para no dejarte sin salida', () => {
-    // El QR puede fallar (por ejemplo si la librería no puede con el texto). El
-    // comando tiene que seguir sirviendo.
     const { text } = buildPairingMessage({ ...base, origin: TAILNET, port: 6768 });
     expect(text).toContain('https://maquina.tailnet.ts.net/#/pair?v=1&c=ABCD1234EFGH5678');
     expect(text).not.toContain('Scan this');

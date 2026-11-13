@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DeviceRegistry, hashToken, type DevicePersistence, type StoredDevice } from './devices.js';
 
-/** Persistencia en memoria: el registro se prueba sin tocar disco. */
 class MemoryPersistence implements DevicePersistence {
   devices: StoredDevice[] = [];
   saves = 0;
@@ -113,7 +112,6 @@ describe('registro de dispositivos', () => {
     };
     const registry = new DeviceRegistry({ persistence });
     expect(registry.list()).toHaveLength(0);
-    // Sigue siendo usable para emparejar de nuevo.
     expect(registry.enroll('Pixel', 'android').device.name).toBe('Pixel');
   });
 

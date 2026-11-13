@@ -9,19 +9,6 @@ import {
   parseServerMessage,
 } from './index.js';
 
-/**
- * Workspaces are the desktop folders.
- *
- * The shapes here come from the host's real projection
- * (`@deepseek-ai/dsh-api-workspace-controller/lib/types/feed.js`): `workspaceId`,
- * `path`, `title`, `sessionIds`. Not from a guess — the first version of this file
- * invented `id/directory/order` and a reviewer proved it wrong against the packaged
- * app.
- *
- * The contract has to work **with and without** folders: a host that does not
- * expose them stays a valid host, and the app falls back to a flat list.
- */
-
 const workspace = {
   id: 'ws-1',
   title: 'dsh-mobile',
@@ -46,7 +33,6 @@ describe('workspace shape', () => {
   });
 
   it('accepts an empty title', () => {
-    // The desktop derives a display name when there is no stored title.
     expect(Workspace.parse({ ...workspace, title: '' }).title).toBe('');
   });
 
@@ -56,8 +42,6 @@ describe('workspace shape', () => {
   });
 
   it('carries no order: the array order is the order', () => {
-    // Inventing an `order` integer duplicated a truth that already travels in the
-    // order of the list.
     expect(Object.keys(Workspace.parse(workspace))).toEqual([
       'id',
       'title',
@@ -77,8 +61,6 @@ describe('session membership', () => {
   });
 
   it('an empty workspaceId does not break the whole list', () => {
-    // A host that sends '' instead of omitting it must not cost the client every
-    // session: the field is accepted and the adapter drops it.
     expect(SessionSummary.parse({ ...session, workspaceId: '' }).workspaceId).toBe('');
   });
 });
@@ -96,8 +78,6 @@ describe('union placement', () => {
   });
 
   it('workspace.list is NOT a server message', () => {
-    // A server message in the client union is a silent bug: the client would wait
-    // forever for a reply the host never meant to send.
     expect(
       parseServerMessage(JSON.stringify({ ...envelope, type: 'workspace.list' })),
     ).toBeUndefined();

@@ -2,11 +2,6 @@ import { describe, expect, it } from 'vitest';
 import type { HostContext } from '../host-api.js';
 import { listSessions, toWireSession } from './session-source.js';
 
-/**
- * El adaptador no reimplementa la lista: delega en `sessionController`, que es lo
- * que ve el escritorio. Estas pruebas fijan esa traducción.
- */
-
 interface SummaryOverrides {
   sessionId: string;
   updatedAt?: number;
@@ -14,7 +9,6 @@ interface SummaryOverrides {
   agentAvailable?: boolean;
   title?: string | null;
   asOfSeq?: number;
-  /** Proyecciones extra, como `modelSelection`. */
   values?: Record<string, unknown>;
 }
 
@@ -125,8 +119,6 @@ describe('listado de sesiones', () => {
   });
 
   it('quita las sesiones archivadas: archivar desde el móvil tiene que notarse', async () => {
-    // El host conserva la fila y solo marca el id en el baseline de workspaces. Sin
-    // este filtro, el usuario archiva y la sesión sigue en la lista.
     const ctx: HostContext = {
       sessionController: {
         list: () =>
@@ -166,8 +158,6 @@ describe('listado de sesiones', () => {
   });
 
   it('la copia marcada conserva el resto de los campos', async () => {
-    // La marca se añade con un spread: si se perdiera `model` o `workspaceId`, la fila
-    // archivada saldría sin carpeta y sin modelo.
     const ctx: HostContext = {
       sessionController: {
         list: () =>

@@ -13,20 +13,12 @@ import {
   type FolderPreferences,
 } from './preferences.js';
 
-/**
- * Folder preferences.
- *
- * The interesting cases are the ones that hide something by mistake: a session with no
- * folder must stay reachable, and an unknown stored value must not empty the list.
- */
-
 const KEY = 'dsh-mobile.folders';
 
 afterEach(() => {
   restoreStorage();
 });
 
-/** A folder section with the given sessions' activity times. */
 function section(id: string, updatedAt: number[] = []): FolderSection {
   return {
     workspace: { id, title: id, directory: `/work/${id}`, sessionIds: [] },
@@ -43,7 +35,6 @@ function section(id: string, updatedAt: number[] = []): FolderSection {
   };
 }
 
-/** The group that collects sessions whose folder is unknown. */
 function orphans(count = 1): FolderSection {
   return {
     title: '',
@@ -75,7 +66,6 @@ describe('applying the preferences', () => {
   });
 
   it('never hides the sessions with no folder', () => {
-    // No tienen id que ocultar: si desaparecieran, no habría forma de llegar a ellas.
     const visible = applyFolderPreferences([section('a'), orphans()], prefs({ hidden: ['a'] }));
     expect(visible.map((item) => item.title)).toEqual(['']);
   });
@@ -84,8 +74,6 @@ describe('applying the preferences', () => {
     const sections = [section('empty'), section('full', [1])];
     expect(applyFolderPreferences(sections, prefs())).toHaveLength(2);
 
-    // Se comprueba **cuál** queda: una prueba de longitud sola pasaría aunque se
-    // hubiera escondido la carpeta equivocada.
     const visible = applyFolderPreferences(sections, prefs({ hideEmpty: true }));
     expect(visible.map((item) => item.title)).toEqual(['full']);
   });
@@ -127,7 +115,6 @@ describe('toggling a folder', () => {
 
 describe('which message the empty list gets', () => {
   it('says nothing special when the host has no folders', () => {
-    // Sin carpetas el grupo es la lista plana: no hay ningún estado que explicar.
     expect(folderListState([orphans()], prefs())).toBe('folders');
   });
 
@@ -142,15 +129,12 @@ describe('which message the empty list gets', () => {
   });
 
   it('does not blame the user when only the empty ones were left out', () => {
-    // Es el primer arranque con «ocultar vacías»: en Ajustes está todo marcado, así que
-    // decir «todas ocultas» era mentira y además borraba los botones de sesión nueva.
     expect(folderListState([section('a'), section('b')], prefs({ hideEmpty: true }))).toBe(
       'only-empty-hidden',
     );
   });
 
   it('prefers showing the empty folders over an empty screen', () => {
-    // Si una carpeta tiene sesiones, no se oculta por hideEmpty.
     expect(
       folderListState([section('a', [3]), section('b')], prefs({ hideEmpty: true, hidden: [] })),
     ).toBe('folders');
@@ -169,7 +153,6 @@ describe('what the list actually shows', () => {
   });
 
   it('falls back to the empty folders instead of leaving nothing to tap', () => {
-    // «Ocultar vacías» despeja la lista; no puede quitar los botones de sesión nueva.
     const view = folderView([section('a'), section('b')], prefs({ hideEmpty: true }));
     expect(view.state).toBe('only-empty-hidden');
     expect(view.sections.map((item) => item.title)).toEqual(['a', 'b']);
@@ -217,8 +200,6 @@ describe('reading and storing', () => {
   });
 
   it('survives valid JSON that is not an object', () => {
-    // `null` y `[]` son JSON válido: sin guarda, leer `.hidden` lanzaba y el catch lo
-    // tapaba. La guarda hace que el motivo sea explícito.
     fakeStorage();
     for (const raw of ['null', '[]', '"texto"', '3']) {
       globalThis.localStorage.setItem(KEY, raw);

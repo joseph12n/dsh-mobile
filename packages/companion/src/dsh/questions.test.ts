@@ -2,13 +2,6 @@ import { describe, expect, it } from 'vitest';
 import type { HostContext } from '../host-api.js';
 import { answerQuestion, listPendingQuestions } from './questions.js';
 
-/**
- * El puente de preguntas: leer la proyección y responder el lote completo.
- *
- * DSH exige que cada pregunta del lote aparezca exactamente una vez, así que
- * estas pruebas fijan que el lote se traduce y se responde entero.
- */
-
 const pendingExample = {
   callId: 'call-1',
   state: 'open',

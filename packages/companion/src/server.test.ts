@@ -10,12 +10,6 @@ import { DeviceRegistry, type DevicePersistence, type StoredDevice } from './cor
 import { PairingService } from './core/pairing.js';
 import { startCompanionServer, type RunningServer } from './server.js';
 
-/**
- * El listener con sus piezas reales: canje de códigos, tokens de dispositivo y
- * autenticación. Un cliente WebSocket de verdad contra un servidor de verdad, en
- * un puerto efímero.
- */
-
 class MemoryPersistence implements DevicePersistence {
   devices: StoredDevice[] = [];
   load(): StoredDevice[] {
@@ -107,12 +101,6 @@ function hello(extra: Record<string, unknown> = {}): Record<string, unknown> {
   return { v: PROTOCOL_VERSION, id: 'hello', at: Date.now(), type: 'hello', proto: 1, ...extra };
 }
 
-/**
- * Petición GET con una cabecera `Host` concreta.
- *
- * `fetch` no deja fijarla porque es una cabecera reservada, así que aquí se usa
- * `node:http` directamente. Sirve para simular el proxy del tailnet.
- */
 function getWithHost(
   port: number,
   path: string,
@@ -162,11 +150,9 @@ describe('superficie HTTP', () => {
       expect(index.status).toBe(200);
       expect(await index.text()).toContain('DSH Mobile');
 
-      // La SPA cae al índice en cualquier ruta sin extensión.
       const deep = await fetch(`${origin}/sesiones/abc`);
       expect(deep.status).toBe(200);
 
-      // La API sigue mandando sobre los archivos.
       expect((await fetch(`${origin}/health`)).status).toBe(200);
     } finally {
       await withWeb.close();
@@ -181,7 +167,6 @@ describe('superficie HTTP', () => {
   });
 
   it('el QR toma la dirección por la que se entró, y avisa si es loopback', async () => {
-    // Sin URL pública el origen sale del Host; este servidor no tiene ninguna fijada.
     const server = await startCompanionServer({
       pairing: new PairingService(),
       devices: new DeviceRegistry({ persistence: new MemoryPersistence() }),
@@ -193,8 +178,6 @@ describe('superficie HTTP', () => {
       expect(localHtml).toContain('http://127.0.0.1:');
       expect(localHtml).toContain('will not work from a phone');
 
-      // `fetch` prohíbe fijar Host (es cabecera reservada), así que se usa http
-      // crudo: es la única forma de simular el proxy del tailnet.
       const remoteHtml = await getWithHost(server.port, '/pair', 'maquina.tailnet.ts.net');
       expect(remoteHtml).toContain('https://maquina.tailnet.ts.net');
       expect(remoteHtml).not.toContain('will not work from a phone');
@@ -214,8 +197,6 @@ describe('superficie HTTP', () => {
   });
 
   it('un Host inválido no tumba /pair ni deja la petición sin respuesta', async () => {
-    // Hallazgo de revisión: el `Host` lo controla el cliente y llegaba hasta
-    // `new URL()`, que lanzaba. Sin respuesta, y sin manejador global, caía el host.
     const server = await startCompanionServer({
       pairing: new PairingService(),
       devices: new DeviceRegistry({ persistence: new MemoryPersistence() }),
@@ -223,17 +204,12 @@ describe('superficie HTTP', () => {
     });
 
     try {
-      // Solo valores que el cliente HTTP de Node acepte enviar: un carácter NUL
-      // lo rechaza él mismo antes de salir, y ese caso ya lo cubre la prueba
-      // unitaria de `publicOriginFor`.
       for (const host of ['a b', 'ejemplo:99999', '[::1', 'http://']) {
         const html = await getWithHost(server.port, '/pair', host);
         expect(html, host).toContain('data:image/png;base64,');
-        // Cae al listener y lo dice, en vez de reventar.
         expect(html, host).toContain('http://127.0.0.1:');
       }
 
-      // El servidor sigue vivo después de los intentos.
       const health = await fetch(`http://127.0.0.1:${server.port}/health`);
       expect(health.status).toBe(200);
     } finally {
@@ -499,7 +475,6 @@ describe('preguntas sobre el WebSocket', () => {
     try {
       const client = await openClient(server.port);
       client.send(hello({ deviceToken: token }));
-      // Sin esperar al hello.ok, la primera respuesta que llegaría sería esa.
       const ready = await client.next();
       expect(ready['type']).toBe('hello.ok');
       await run(client);
@@ -660,7 +635,6 @@ describe('transcripción sobre el WebSocket', () => {
     await withTranscript(
       {
         subscribe: (_sessionId, options) => {
-          // Emite un evento tras confirmar, como haría el host real.
           setTimeout(() => options.onEvent(entry as never), 20);
           return { stop: () => undefined };
         },
@@ -811,7 +785,6 @@ describe('emparejamiento de punta a punta', () => {
     expect((paired['device'] as { name: string }).name).toBe('Pixel de prueba');
     client.close();
 
-    // El token sirve para una conexión nueva: así se comporta un teléfono real.
     const second = await openClient();
     second.send(hello({ deviceToken: token }));
     const response = await second.next();
@@ -858,7 +831,6 @@ describe('emparejamiento de punta a punta', () => {
 });
 
 describe('folders over the WebSocket', () => {
-  /** A server whose only difference is how many folders it has. */
   async function withFolders(
     folders: unknown[],
     run: (client: TestClient) => Promise<void>,
@@ -905,7 +877,6 @@ describe('folders over the WebSocket', () => {
   });
 
   it('answers with an empty list when the host has no folders', async () => {
-    // This is the host this project had until yesterday: an empty answer, not an error.
     await withFolders([], async (client) => {
       client.send({
         v: PROTOCOL_VERSION,
@@ -919,8 +890,6 @@ describe('folders over the WebSocket', () => {
     });
   });
   it('resolves capabilities on every hello, not once at startup', async () => {
-    // The workspace controller can mount after the plugin starts, so a capability
-    // sampled once lies in both directions.
     let available = false;
     const registry = new DeviceRegistry({ persistence: new MemoryPersistence() });
     const { token } = registry.enroll('Pixel', 'android');
@@ -937,7 +906,6 @@ describe('folders over the WebSocket', () => {
       const first = await openClient(server.port);
       first.send(hello({ deviceToken: token }));
       const before = await first.next();
-      // Sin capacidades el campo no viaja: `undefined`, no una lista vacía.
       expect((before['host'] as { capabilities?: unknown }).capabilities).toEqual([]);
       first.close();
 
@@ -957,7 +925,6 @@ describe('folders over the WebSocket', () => {
 });
 
 describe('models over the WebSocket', () => {
-  /** What the host can do in one scenario. */
   interface ModelDeps {
     listModels?: () => Promise<{
       default?: { provider: string; model: string };
@@ -972,12 +939,6 @@ describe('models over the WebSocket', () => {
     }>;
   }
 
-  /**
-   * Empareja, manda un marco y devuelve la respuesta.
-   *
-   * Sin esto cada caso repetía el arranque del servidor y el `send`; el analizador lo
-   * contaba como duplicación y, peor, ocultaba qué cambiaba entre un caso y otro.
-   */
   async function exchange(
     deps: ModelDeps,
     payload: Record<string, unknown>,
@@ -1050,9 +1011,6 @@ describe('models over the WebSocket', () => {
     ]);
   });
 
-  // Cada fallo del adaptador tiene su código: `unavailable` es culpa de la petición
-  // (recarga el catálogo), `not-found` de la sesión y `failed` es una avería. Un host
-  // sin el servicio es una capacidad ausente, como el handler ausente.
   it.each([
     ['unavailable', 'bad-request'],
     ['not-found', 'not-found'],
@@ -1078,7 +1036,6 @@ describe('models over the WebSocket', () => {
 
     try {
       const client = await openClient(server.port);
-      // Sin `hello`: cualquier mensaje que no sea el saludo exige dispositivo.
       client.send({ v: PROTOCOL_VERSION, id: 'm0', at: Date.now(), type: 'models.list' } as never);
       const response = await client.next();
       expect(response).toMatchObject({ type: 'error', code: 'auth-required' });
@@ -1089,7 +1046,6 @@ describe('models over the WebSocket', () => {
   });
 });
 describe('session actions over the WebSocket', () => {
-  /** What the host can do in one scenario. */
   interface ActionDeps {
     createSession?: () => Promise<{
       ok: boolean;
@@ -1105,7 +1061,6 @@ describe('session actions over the WebSocket', () => {
     }>;
   }
 
-  /** A server whose session actions are whatever the test needs. */
   async function acting(
     deps: ActionDeps,
     run: (client: TestClient) => Promise<void>,
@@ -1186,7 +1141,6 @@ describe('session actions over the WebSocket', () => {
   });
 
   it('refuses to answer when the host has no handler wired', async () => {
-    // Sin dependencia inyectada el mensaje no puede responderse, y `bad-request` lo dice.
     await acting({}, async (client) => {
       client.send({
         v: PROTOCOL_VERSION,
@@ -1208,7 +1162,6 @@ describe('session actions over the WebSocket', () => {
   });
 
   it('treats a host without the create controller as a missing capability', async () => {
-    // "No hay servicio" y "no hay handler" son la misma respuesta: este host no lo hace.
     const response = await exchange(
       { createSession: async () => ({ ok: false, code: 'no-service', message: 'no service' }) },
       { type: 'session.create', workspaceId: 'ws-1' },
@@ -1217,8 +1170,6 @@ describe('session actions over the WebSocket', () => {
     expect(response['code']).toBe('bad-request');
   });
 
-  // Cada negativa del adaptador tiene su código en el contrato. La tabla evita cuatro
-  // pruebas idénticas, que además el análisis estático contaba como duplicación.
   it.each([
     ['active', 'denied'],
     ['failed', 'internal'],
@@ -1234,8 +1185,6 @@ describe('session actions over the WebSocket', () => {
   });
 
   it('keeps `denied` for the running turn, so the app can say "stop it first"', async () => {
-    // El código existe para que la app distinga una negativa resoluble de una avería:
-    // `denied` se traduce a "para el turno", y nada más lo hace.
     const response = await exchange(
       { archiveSession: async () => archiveResult('active') },
       { type: 'workspace.archive', sessionId: 's1' },
@@ -1243,7 +1192,6 @@ describe('session actions over the WebSocket', () => {
     expect(response['code']).toBe('denied');
   });
 
-  /** Una negativa del adaptador con el código dado. */
   function archiveResult(code: string): { ok: boolean; code: string; message: string } {
     return { ok: false, code, message: code };
   }
@@ -1263,11 +1211,9 @@ describe('session actions over the WebSocket', () => {
       },
     );
     expect(response).toMatchObject({ type: 'workspace.unarchived', sessionId: 's1' });
-    // La firma es un objeto: con `(id)` el adaptador real no la reconocería.
     expect(seen).toEqual([{ sessionId: 's1' }]);
   });
 
-  // Igual que archivar: cada negativa tiene su código y `no-service` no es una avería.
   it.each([
     ['not-found', 'not-found'],
     ['no-service', 'bad-request'],
@@ -1329,12 +1275,6 @@ describe('session actions over the WebSocket', () => {
     expect(seen).toEqual([{ includeArchived: true }, {}]);
   });
 
-  /**
-   * Empareja, manda un marco y devuelve la respuesta.
-   *
-   * Existe para que cada caso sea una sola idea: antes cada prueba repetía el sobre y
-   * el `send`, y el análisis estático lo contaba como código duplicado.
-   */
   async function exchange(
     deps: ActionDeps,
     payload: Record<string, unknown>,

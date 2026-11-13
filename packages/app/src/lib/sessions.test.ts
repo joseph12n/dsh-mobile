@@ -2,11 +2,6 @@ import { describe, expect, it } from 'vitest';
 import type { SessionSummary } from '@dsh-mobile/protocol';
 import { STALE_AFTER_MS, elapsed, groupSessions } from './sessions.js';
 
-/**
- * La lista tiene que responder a una pregunta: **¿qué necesita mi atención?**
- * Por eso una sesión que espera respuesta va arriba aunque esté trabajando.
- */
-
 const NOW = 1_800_000_000_000;
 
 function session(overrides: Partial<SessionSummary> & { id: string }): SessionSummary {
@@ -36,7 +31,6 @@ describe('agrupación de sesiones', () => {
   });
 
   it('una sesión que espera y además trabaja cuenta como espera', () => {
-    // Lo pendiente es lo que bloquea al agente: no se puede esconder en "trabajando".
     const sections = groupSessions(
       [session({ id: 'a', state: 'working', pendingQuestions: 2 })],
       NOW,
@@ -55,7 +49,6 @@ describe('agrupación de sesiones', () => {
   });
 
   it('no esconde una sesión con fecha desconocida', () => {
-    // updatedAt en 0 es "no sé cuándo"; mandarla a antiguas sería inventarse la edad.
     const sections = groupSessions([session({ id: 'sin-fecha', updatedAt: 0 })], NOW);
     expect(sections[0]?.kind).toBe('idle');
   });
@@ -101,7 +94,6 @@ describe('elapsed', () => {
   });
 
   it('truncates: 6.5 days is 6, not 7', () => {
-    // Rounding up made the text contradict the group the session was in.
     expect(elapsed(NOW - 6.5 * 86_400_000, NOW)).toEqual({ unit: 'days', count: 6 });
   });
 

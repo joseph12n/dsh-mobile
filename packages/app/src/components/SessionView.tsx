@@ -9,15 +9,6 @@ import type {
 import { groupTurns, partTurn, type Turn } from '../lib/turns.js';
 import { plural, useI18n } from '../i18n/index.js';
 
-/**
- * Transcripción de una sesión.
- *
- * Las entradas llegan de dos fuentes: la página inicial (`session.history`) y el
- * flujo vivo (`session.event`). Se fusionan por `seq`, así que un evento repetido
- * —reconexión, solapamiento de página— no se pinta dos veces.
- */
-
-/** Catalogue key for a session state. */
 const STATE_KEY = {
   working: 'session.working',
   waiting: 'session.waiting',
@@ -64,15 +55,6 @@ function EventRow({ entry }: { entry: HistoryEntry }) {
   );
 }
 
-/**
- * Una racha de herramientas seguidas dentro de un turno.
- *
- * El estado y el `id` son **por racha**, no por turno: un turno puede tener varias
- * (herramientas, respuesta, más herramientas), y compartir el `id` producía ids
- * duplicados y un `aria-controls` que apuntaba al grupo equivocado. Además, con un
- * estado por turno, pulsar un botón desplegaba todas las rachas aunque dijera
- * "1 herramienta".
- */
 function ToolRun({ entries }: { entries: HistoryEntry[] }) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
@@ -85,8 +67,6 @@ function ToolRun({ entries }: { entries: HistoryEntry[] }) {
         className="ghost tiny"
         onClick={() => setOpen((previous) => !previous)}
         aria-expanded={open}
-        // Solo apunta al grupo cuando existe: una referencia a un id que no está
-        // renderizado es ARIA inválido.
         aria-controls={open ? id : undefined}
       >
         {plural(t, 'session.tools', entries.length)}
@@ -104,12 +84,6 @@ function ToolRun({ entries }: { entries: HistoryEntry[] }) {
   );
 }
 
-/**
- * Un turno: lo que pidió el humano y lo que provocó.
- *
- * Las herramientas van **plegadas** porque son muchas y ruidosas; los mensajes y
- * los cambios de estado siempre se ven, dentro del turno y **en su orden real**.
- */
 function TurnBlock({ turn, number }: { turn: Turn; number: number }) {
   const { t } = useI18n();
   const parts = partTurn(turn.entries);
@@ -137,22 +111,11 @@ function TurnBlock({ turn, number }: { turn: Turn; number: number }) {
   );
 }
 
-/**
- * Modelo y nivel de razonamiento de la sesión.
- *
- * Es el mismo catálogo que ofrece el escritorio: el host lo describe con
- * `session.modelCatalog` y el cambio va por `session.selectModel`, así que la
- * lista no puede quedarse corta respecto a lo que el host admite de verdad.
- *
- * Se usa un `<select>` nativo porque en un teléfono ya trae el selector del
- * sistema, con búsqueda y accesibilidad resueltas.
- */
 function ModelBar({
   model,
   catalog,
   onSelect,
 }: {
-  /** Puede faltar mientras la lista no conozca el modelo de la sesión. */
   model: ModelSelection | undefined;
   catalog: ModelCatalog;
   onSelect: (selection: ModelSelection) => void;
@@ -163,16 +126,12 @@ function ModelBar({
     group.models.map((option) => ({ provider: group.id, option })),
   );
 
-  // Lo que la sesión usará si nadie ha elegido: el modelo del despliegue.
   const current = model ?? catalog.default;
   const index = choices.findIndex(
     (choice) => choice.provider === current?.provider && choice.option.id === current?.model,
   );
   const selected = choices[index];
   const efforts = selected?.option.reasoningEfforts ?? [];
-  // El elegido de verdad, si lo hay. El `defaultReasoningEffort` es lo que el host
-  // aplicaría sin elección: sirve para mostrarlo, no para arrastrarlo como si el
-  // usuario lo hubiera elegido.
   const explicitEffort = model?.reasoningEffort;
   const effort = explicitEffort ?? selected?.option.defaultReasoningEffort ?? '';
 
@@ -180,8 +139,6 @@ function ModelBar({
     const choice = choices[next];
     if (!choice) return;
 
-    // El nivel anterior puede no existir en el modelo nuevo: se conserva solo si lo
-    // anuncia, y si no se usa el que ese modelo trae por defecto.
     const available = choice.option.reasoningEfforts ?? [];
     const keep =
       explicitEffort && available.some((item) => item.id === explicitEffort)
@@ -221,7 +178,6 @@ function ModelBar({
           <select
             value={index >= 0 ? String(index) : ''}
             onChange={(event) => {
-              // El hueco no es una opción: `Number('')` es 0 y elegiría el primero.
               if (event.target.value === '') return;
               choose(Number(event.target.value));
             }}
@@ -263,14 +219,11 @@ function ModelBar({
         )}
       </div>
 
-      {/* Un proveedor que no se pudo leer se dice: un catálogo corto sin motivo
-          parece un fallo de la app. */}
       {catalog.failures.length > 0 && <p className="muted small">{failuresText(catalog)}</p>}
     </>
   );
 }
 
-/** Proveedores que el host no pudo leer, en una línea. */
 function failuresText(catalog: ModelCatalog): string {
   return catalog.failures.map((failure) => `${failure.name}: ${failure.message}`).join(' · ');
 }
@@ -293,11 +246,8 @@ export function SessionView({
   entries: HistoryEntry[];
   hasMore: boolean;
   loading: boolean;
-  /** Modelo con el que seguirá la sesión, si el host lo proyecta. */
   model?: ModelSelection;
-  /** Catálogo de modelos, cuando el host anunció `model.select`. */
   catalog?: ModelCatalog;
-  /** Error del último cambio de modelo. */
   error?: string;
   onBack: () => void;
   onLoadMore: () => void;
@@ -357,20 +307,14 @@ export function SessionView({
         </div>
       )}
 
-      {/*
-        Una sesión archivada se puede leer, pero no continuar: el host rechaza el turno.
-        Escribir aquí acababa en una pantalla de error por algo que la app podía impedir.
-      */}
       {session.archived ? (
         <p className="muted">{t('session.archivedNote')}</p>
       ) : (
-        /* Composer fijo al final: se escribe sin perder de vista la conversación. */
         <div className="composer">
           <textarea
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={(event) => {
-              // Enter envía; Shift+Enter hace salto de línea.
               if (event.key === 'Enter' && !event.shiftKey) {
                 event.preventDefault();
                 send();

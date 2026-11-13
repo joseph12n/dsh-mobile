@@ -1,13 +1,3 @@
-// Servidor de vista previa para revisar el diseño sin DSH.
-//
-//   node scripts/preview-server.mjs [puerto]
-//
-// Sirve la PWA compilada con datos de ejemplo en un puerto local, para poder
-// mirar la interfaz en un navegador.
-//
-// **No escribe en el log del plugin**: el módulo de log añade líneas a
-// `$DSH_HOME/companion/probe.log`, así que aquí se desactiva antes de importarlo.
-// La variable se lee al cargar el módulo, de ahí el import dinámico.
 process.env.DSH_MOBILE_LOG_FILE = '0';
 
 const { startCompanionServer } = await import('../packages/companion/dist/server.js');
@@ -28,16 +18,12 @@ const memory = {
 
 const now = Date.now();
 
-// Token fijo opcional: permite reiniciar el servidor y comprobar que la PWA se
-// reconecta sola, sin volver a emparejar (DSH_MOBILE_PREVIEW_TOKEN=...).
 const previewToken = process.env.DSH_MOBILE_PREVIEW_TOKEN;
 const devices = new DeviceRegistry({
   persistence: memory,
   ...(previewToken ? { generateToken: () => previewToken } : {}),
 });
 
-// Dispositivo ya emparejado: el token se imprime para poder inyectarlo en el
-// navegador y mirar las pantallas sin pasar por el QR.
 const preview = devices.enroll('Vista previa', 'preview');
 
 const server = await startCompanionServer({
@@ -92,7 +78,6 @@ const server = await startCompanionServer({
       running: false,
       pendingQuestions: 0,
     },
-    // Sin carpeta asignada: el grupo final de la lista agrupada.
     {
       id: 'session-orphan',
       title: 'Sesión sin carpeta',
@@ -102,7 +87,6 @@ const server = await startCompanionServer({
       running: false,
       pendingQuestions: 0,
     },
-    // Apunta a una carpeta que ya no existe: no se puede perder.
     {
       id: 'session-lost-folder',
       title: 'Sesión de una carpeta borrada',
@@ -113,7 +97,6 @@ const server = await startCompanionServer({
       running: false,
       pendingQuestions: 0,
     },
-    // Una sesión vieja, para que se vea el grupo plegable de "Más antiguas".
     {
       id: 'session-d',
       workspaceId: 'ws-2',
@@ -170,8 +153,6 @@ const server = await startCompanionServer({
           text: 'Lista. Añade la columna `conciliada` y es idempotente. Antes de aplicarla quiero confirmar que el respaldo está hecho.',
         },
       },
-      // Segunda racha en el MISMO turno: es el caso que producía ids duplicados y
-      // desplegaba todas las rachas a la vez. Tiene que verse en la vista previa.
       {
         seq: 4,
         at: now - 40_000,
@@ -190,8 +171,6 @@ const server = await startCompanionServer({
     ],
     hasMore: false,
   }),
-  // Demostración de la **cabecera viva**: a los 2 s el host pasa a "trabajando" y
-  // se queda ahí. Sirve para ver que el estado del encabezado cambia sin recargar.
   subscribeSession: (_sessionId, { onEvent }) => {
     const primero = setTimeout(
       () => onEvent({ seq: 900, at: Date.now(), event: { kind: 'state', state: 'working' } }),
