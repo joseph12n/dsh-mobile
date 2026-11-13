@@ -1524,7 +1524,9 @@ button.ghost.tiny {
   flex-direction: column;
   max-height: 220px;
   overflow-y: auto;
-  margin-top: 8px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius);
   background: var(--surface-2);
@@ -1574,6 +1576,7 @@ button.ghost.tiny {
 }
 
 .command-result {
+  display: block;
   flex: 0 0 auto;
   margin: 8px 0 0;
   padding: 10px 12px;

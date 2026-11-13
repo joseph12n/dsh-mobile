@@ -9,7 +9,7 @@ import { PROTOCOL_VERSION, WEBSOCKET_PATH, parseServerMessage } from '@dsh-mobil
 import type { ServerMessage } from '@dsh-mobile/protocol';
 import { DeviceRegistry, type DevicePersistence, type StoredDevice } from './core/devices.js';
 import { PairingService } from './core/pairing.js';
-import { startCompanionServer, type RunningServer } from './server.js';
+import { startCompanionServer, type RunningServer, type ServerDeps } from './server.js';
 
 class MemoryPersistence implements DevicePersistence {
   devices: StoredDevice[] = [];
@@ -100,6 +100,42 @@ async function openClient(port?: number): Promise<TestClient> {
 
 function hello(extra: Record<string, unknown> = {}): Record<string, unknown> {
   return { v: PROTOCOL_VERSION, id: 'hello', at: Date.now(), type: 'hello', proto: 1, ...extra };
+}
+
+type TestServer = Awaited<ReturnType<typeof startCompanionServer>>;
+
+async function pairClient(
+  server: TestServer,
+  code: string,
+  deviceName: string,
+): Promise<TestClient> {
+  const client = await openClient(server.port);
+  client.send(hello());
+  await client.next();
+  client.send({
+    v: PROTOCOL_VERSION,
+    id: `pair-${deviceName}`,
+    at: Date.now(),
+    type: 'pair.redeem',
+    code,
+    deviceName,
+    platform: 'node',
+  });
+  expect((await client.next())['type']).toBe('pair.ok');
+  return client;
+}
+
+async function commandHost(
+  deps: Pick<ServerDeps, 'listCommands' | 'runCommand'>,
+): Promise<{ server: TestServer; pairing: PairingService }> {
+  const pairing = new PairingService();
+  const server = await startCompanionServer({
+    pairing,
+    devices: new DeviceRegistry({ persistence: new MemoryPersistence() }),
+    port: 0,
+    ...deps,
+  });
+  return { server, pairing };
 }
 
 function getWithHost(
@@ -362,32 +398,14 @@ describe('difusión a los dispositivos emparejados', () => {
 
 describe('comandos sobre el WebSocket', () => {
   it('lista y ejecuta a través del host', async () => {
-    const localPairing = new PairingService();
-    const server = await startCompanionServer({
-      pairing: localPairing,
-      devices: new DeviceRegistry({ persistence: new MemoryPersistence() }),
-      port: 0,
+    const { server, pairing } = await commandHost({
       listCommands: (sessionId) => [{ name: 'plan', description: `plan para ${sessionId}` }],
       runCommand: async ({ line }) => ({
         ok: true,
         result: { kind: 'success', text: `eco ${line}` },
       }),
     });
-    const localCode = localPairing.issue().code;
-
-    const client = await openClient(server.port);
-    client.send(hello());
-    await client.next();
-    client.send({
-      v: PROTOCOL_VERSION,
-      id: 'pair-commands',
-      at: Date.now(),
-      type: 'pair.redeem',
-      code: localCode,
-      deviceName: 'Comandos',
-      platform: 'node',
-    });
-    expect((await client.next())['type']).toBe('pair.ok');
+    const client = await pairClient(server, pairing.issue().code, 'Comandos');
 
     client.send({
       v: PROTOCOL_VERSION,
@@ -418,32 +436,14 @@ describe('comandos sobre el WebSocket', () => {
   });
 
   it('devuelve el error del host al ejecutar', async () => {
-    const localPairing = new PairingService();
-    const server = await startCompanionServer({
-      pairing: localPairing,
-      devices: new DeviceRegistry({ persistence: new MemoryPersistence() }),
-      port: 0,
+    const { server, pairing } = await commandHost({
       runCommand: async () => ({
         ok: false,
         code: 'bad-request',
         message: 'Ese comando no está permitido.',
       }),
     });
-    const localCode = localPairing.issue().code;
-
-    const client = await openClient(server.port);
-    client.send(hello());
-    await client.next();
-    client.send({
-      v: PROTOCOL_VERSION,
-      id: 'pair-commands-error',
-      at: Date.now(),
-      type: 'pair.redeem',
-      code: localCode,
-      deviceName: 'Comandos',
-      platform: 'node',
-    });
-    expect((await client.next())['type']).toBe('pair.ok');
+    const client = await pairClient(server, pairing.issue().code, 'Comandos');
 
     client.send({
       v: PROTOCOL_VERSION,

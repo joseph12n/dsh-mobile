@@ -511,6 +511,8 @@ export function App() {
     [client, openSession?.id],
   );
 
+  const commandProps = commandCapable ? { commands, onRunCommand: runOpenCommand } : {};
+
   const loadMore = useCallback(async () => {
     const connection = client.current;
     if (!connection || !openSession || entries.length === 0) return;
@@ -936,7 +938,7 @@ export function App() {
                 entries={entries}
                 hasMore={hasMore}
                 loading={loadingHistory}
-                {...(commandCapable ? { commands, onRunCommand: runOpenCommand } : {})}
+                {...commandProps}
                 questions={questions.filter((batch) => batch.sessionId === openSession.id)}
                 onAnswerQuestion={(callId, sessionId, answers) =>
                   void answer(callId, sessionId, answers)

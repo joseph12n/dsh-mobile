@@ -563,29 +563,30 @@ export function SessionView({
       ) : (
         <>
           {matches.length > 0 && (
-            <div className="command-menu" role="group" aria-label={t('command.open')}>
+            <ul className="command-menu" aria-label={t('command.open')}>
               {matches.map((command) => (
-                <button
-                  key={command.name}
-                  type="button"
-                  className="command-option"
-                  onClick={() => chooseCommand(command)}
-                >
-                  <span className="command-name">/{command.name}</span>
-                  <span className="command-description">{command.description}</span>
-                  {command.hint && <span className="command-hint">{command.hint}</span>}
-                </button>
+                <li key={command.name}>
+                  <button
+                    type="button"
+                    className="command-option"
+                    onClick={() => chooseCommand(command)}
+                  >
+                    <span className="command-name">/{command.name}</span>
+                    <span className="command-description">{command.description}</span>
+                    {command.hint && <span className="command-hint">{command.hint}</span>}
+                  </button>
+                </li>
               ))}
-            </div>
+            </ul>
           )}
 
           {commandResult && (
-            <p className={`command-result ${commandResult.kind}`} role="status">
+            <output className={`command-result ${commandResult.kind}`}>
               <span className="command-result-label">
                 {t(commandResult.kind === 'success' ? 'command.done' : 'command.error')}
               </span>
               {commandResult.text ?? t('command.noOutput')}
-            </p>
+            </output>
           )}
 
           {sendError && (

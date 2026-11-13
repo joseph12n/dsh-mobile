@@ -40,6 +40,8 @@ import { toWireSession, type SessionRecord } from './dsh/session-source.js';
 export const DEFAULT_PORT = 6768;
 const HOST = '127.0.0.1';
 
+type CommandFailureCode = 'not-found' | 'bad-request' | 'internal';
+
 export interface ServerDeps {
   pairing: PairingService;
   devices: DeviceRegistry;
@@ -88,7 +90,7 @@ export interface ServerDeps {
   listCommands?: (sessionId: string) => CommandInfo[] | Promise<CommandInfo[]>;
   runCommand?: (input: { sessionId: string; line: string }) => Promise<{
     ok: boolean;
-    code?: 'not-found' | 'bad-request' | 'internal';
+    code?: CommandFailureCode;
     message?: string;
     result?: CommandResult;
   }>;
@@ -96,7 +98,7 @@ export interface ServerDeps {
     callId: string;
     sessionId: string;
     answers: QuestionAnswerItem[];
-  }) => { ok: boolean; code?: 'not-found' | 'bad-request' | 'internal'; message?: string };
+  }) => { ok: boolean; code?: CommandFailureCode; message?: string };
   readHistory?: (
     sessionId: string,
     options: { before?: number; limit?: number },
