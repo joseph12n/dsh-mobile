@@ -250,18 +250,20 @@ function ModelSection({
   status,
   onSelect,
   onReload,
+  onToggle,
 }: {
   model?: ModelSelection;
   catalog?: ModelCatalog;
   status: CatalogStatus;
   onSelect: (selection: ModelSelection) => void;
   onReload?: () => void;
+  onToggle?: () => void;
 }) {
   const { t } = useI18n();
 
   if (catalog && catalog.groups.length > 0) {
     return (
-      <details className="session-model">
+      <details className="session-model" onToggle={() => onToggle?.()}>
         <summary>
           <span className="muted small">{t('model.label')}</span>
           <span className="session-model-name">{modelLabel(model, catalog)}</span>
@@ -379,6 +381,13 @@ export function SessionView({
     atBottom.current = area.scrollHeight - area.scrollTop - area.clientHeight < 48;
   };
 
+  const keepBottom = (): void => {
+    requestAnimationFrame(() => {
+      const area = scrollRef.current;
+      if (area && atBottom.current) area.scrollTop = area.scrollHeight;
+    });
+  };
+
   const send = async (): Promise<void> => {
     const text = draft.trim();
     if (!text || sending) return;
@@ -430,17 +439,18 @@ export function SessionView({
         </p>
       )}
 
-      <div className="session-scroll" ref={scrollRef} onScroll={trackScroll}>
-        {onSelectModel && (
-          <ModelSection
-            {...(model ? { model } : {})}
-            {...(catalog ? { catalog } : {})}
-            status={catalogStatus ?? 'idle'}
-            onSelect={onSelectModel}
-            {...(onReloadModels ? { onReload: onReloadModels } : {})}
-          />
-        )}
+      {onSelectModel && (
+        <ModelSection
+          {...(model ? { model } : {})}
+          {...(catalog ? { catalog } : {})}
+          status={catalogStatus ?? 'idle'}
+          onSelect={onSelectModel}
+          onToggle={keepBottom}
+          {...(onReloadModels ? { onReload: onReloadModels } : {})}
+        />
+      )}
 
+      <div className="session-scroll" ref={scrollRef} onScroll={trackScroll}>
         {hasMore && (
           <button type="button" className="ghost load-more" onClick={onLoadMore} disabled={loading}>
             {loading ? t('session.loading') : t('session.loadMore')}
