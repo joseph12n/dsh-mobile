@@ -79,6 +79,50 @@ export function reapIdleClients(
   }
 }
 
+interface ProviderActionOutcome {
+  ok: boolean;
+  code?: CommandFailureCode;
+  message?: string;
+  connection?: ProviderConnection;
+}
+
+async function settleProvider(
+  socket: WebSocket,
+  id: string,
+  run: () => Promise<ProviderActionOutcome>,
+  fallback: ProviderConnection,
+  type: 'provider.connected' | 'provider.disconnected',
+): Promise<void> {
+  const outcome = await run();
+  if (socket.readyState !== socket.OPEN) return;
+
+  if (!outcome.ok) {
+    send(
+      socket,
+      errorMessage(
+        id,
+        outcome.code ?? 'internal',
+        outcome.message ?? 'The provider could not be configured.',
+      ),
+    );
+    return;
+  }
+
+  const frame = {
+    v: PROTOCOL_VERSION,
+    id,
+    at: Date.now(),
+    ...(outcome.connection ?? fallback),
+  };
+
+  send(
+    socket,
+    type === 'provider.connected'
+      ? { ...frame, type: 'provider.connected' }
+      : { ...frame, type: 'provider.disconnected' },
+  );
+}
+
 export interface ServerDeps {
   pairing: PairingService;
   devices: DeviceRegistry;
@@ -658,7 +702,8 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
       }
 
       if (message.type === 'provider.connect') {
-        if (!deps.connectProvider) {
+        const connect = deps.connectProvider;
+        if (!connect) {
           send(
             socket,
             errorMessage(message.id, 'bad-request', 'This host cannot connect providers.'),
@@ -666,36 +711,19 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
           return;
         }
 
-        const outcome = await deps.connectProvider({
-          provider: message.provider,
-          apiKey: message.apiKey,
-        });
-        if (socket.readyState !== socket.OPEN) return;
-
-        if (!outcome.ok) {
-          send(
-            socket,
-            errorMessage(
-              message.id,
-              outcome.code ?? 'internal',
-              outcome.message ?? 'The provider could not be connected.',
-            ),
-          );
-          return;
-        }
-
-        send(socket, {
-          v: PROTOCOL_VERSION,
-          id: message.id,
-          at: Date.now(),
-          type: 'provider.connected',
-          ...(outcome.connection ?? { provider: message.provider, credential: 'set' }),
-        });
+        await settleProvider(
+          socket,
+          message.id,
+          () => connect({ provider: message.provider, apiKey: message.apiKey }),
+          { provider: message.provider, credential: 'set' },
+          'provider.connected',
+        );
         return;
       }
 
       if (message.type === 'provider.disconnect') {
-        if (!deps.disconnectProvider) {
+        const disconnect = deps.disconnectProvider;
+        if (!disconnect) {
           send(
             socket,
             errorMessage(message.id, 'bad-request', 'This host cannot disconnect providers.'),
@@ -703,28 +731,13 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
           return;
         }
 
-        const outcome = await deps.disconnectProvider({ provider: message.provider });
-        if (socket.readyState !== socket.OPEN) return;
-
-        if (!outcome.ok) {
-          send(
-            socket,
-            errorMessage(
-              message.id,
-              outcome.code ?? 'internal',
-              outcome.message ?? 'The provider could not be disconnected.',
-            ),
-          );
-          return;
-        }
-
-        send(socket, {
-          v: PROTOCOL_VERSION,
-          id: message.id,
-          at: Date.now(),
-          type: 'provider.disconnected',
-          ...(outcome.connection ?? { provider: message.provider, credential: 'unknown' }),
-        });
+        await settleProvider(
+          socket,
+          message.id,
+          () => disconnect({ provider: message.provider }),
+          { provider: message.provider, credential: 'unknown' },
+          'provider.disconnected',
+        );
         return;
       }
 

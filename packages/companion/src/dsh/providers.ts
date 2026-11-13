@@ -1,4 +1,5 @@
 import type {
+  ProviderAction,
   ProviderConnection,
   ProviderCredential,
   ProviderTestResult,
@@ -14,7 +15,7 @@ import {
 } from '../host-api.js';
 
 const API_KEY = /^[\x21-\x7E]+$/;
-const CREDENTIAL_REF = /^[A-Za-z_][A-Za-z0-9_]*$/;
+const CREDENTIAL_REF = /^[A-Za-z_]\w*$/;
 const MAX_KEY_LENGTH = 8_192;
 const TEST_TIMEOUT_MS = 8_000;
 
@@ -104,7 +105,8 @@ function refOf(profile: Record<string, unknown> | undefined): string | undefined
 
 function deriveRef(provider: string): string {
   const base = provider.toUpperCase().replace(/[^A-Z0-9]/g, '_');
-  return `${/^[A-Z_]/.test(base) ? base : `PROVIDER_${base}`}_API_KEY`;
+  const prefix = /^[A-Z_]/.test(base) ? base : `PROVIDER_${base}`;
+  return `${prefix}_API_KEY`;
 }
 
 function allRefs(llm: LlmService, settings: SettingsService): Set<string> {
@@ -114,6 +116,51 @@ function allRefs(llm: LlmService, settings: SettingsService): Set<string> {
     if (ref) refs.add(ref);
   }
   return refs;
+}
+
+function actionFor(
+  entry: ConfigurableProvider,
+  profile: Record<string, unknown> | undefined,
+  credential: ProviderCredential,
+): ProviderAction {
+  if (entry.nativeAuth && !profile) return 'desktop';
+  if (!profile) return 'add-provider';
+  return credential === 'set' ? 'none' : 'add-key';
+}
+
+function resolveRef(
+  llm: LlmService,
+  settings: SettingsService,
+  entry: ConfigurableProvider,
+): { ref?: string; error?: string } {
+  const existing = refOf(profileAt(settings, entry));
+  const ref = existing ?? deriveRef(entry.provider);
+  if (!existing && allRefs(llm, settings).has(ref)) {
+    return { error: 'The derived credential name is already used by another provider.' };
+  }
+  return { ref };
+}
+
+async function addProviderProfile(
+  settings: SettingsService,
+  entry: ConfigurableProvider,
+  ref: string,
+): Promise<string | undefined> {
+  const descriptor = descriptorFor(settings, entry.settingsNs);
+  if (!descriptor) return 'The key was stored, but the provider settings are not available.';
+
+  const patch = entry.settingsPath.reduceRight<Record<string, unknown>>(
+    (value, segment) => ({ [segment]: value }),
+    { apiKeyEnv: ref },
+  );
+
+  try {
+    await settings.update(entry.settingsNs, patch, descriptor.revision);
+    return undefined;
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    return `The key was stored, but the provider could not be added: ${detail}`;
+  }
 }
 
 function validateKey(raw: string): string | undefined {
@@ -172,42 +219,34 @@ export async function listProviders(ctx: HostContext): Promise<ProviderView[]> {
   }
 
   const configured = new Set(routes.map((route) => route.id));
-  const views: ProviderView[] = [];
-  const seen = new Set<string>();
+  const entries = catalog(llm);
+  const seen = new Set(entries.map((entry) => entry.provider));
 
-  for (const entry of catalog(llm)) {
-    seen.add(entry.provider);
-    const profile = profileAt(settings, entry);
-    const ref = refOf(profile);
+  const views: ProviderView[] = await Promise.all(
+    entries.map(async (entry) => {
+      const profile = profileAt(settings, entry);
+      const ref = refOf(profile);
 
-    let credential: ProviderCredential = 'unknown';
-    let credentialSource: ProviderView['credentialSource'];
-    if (ref) {
-      try {
-        const description = await credentials.describe(ref);
-        credential = description.configured ? 'set' : 'missing';
-        credentialSource = description.source;
-      } catch {}
-    }
+      let credential: ProviderCredential = 'unknown';
+      let credentialSource: ProviderView['credentialSource'];
+      if (ref) {
+        try {
+          const description = await credentials.describe(ref);
+          credential = description.configured ? 'set' : 'missing';
+          credentialSource = description.source;
+        } catch {}
+      }
 
-    const action =
-      entry.nativeAuth && !profile
-        ? 'desktop'
-        : !profile
-          ? 'add-provider'
-          : credential === 'set'
-            ? 'none'
-            : 'add-key';
-
-    views.push({
-      id: entry.provider,
-      name: entry.displayName,
-      configured: configured.has(entry.provider),
-      credential,
-      ...(credentialSource ? { credentialSource } : {}),
-      action,
-    });
-  }
+      return {
+        id: entry.provider,
+        name: entry.displayName,
+        configured: configured.has(entry.provider),
+        credential,
+        ...(credentialSource ? { credentialSource } : {}),
+        action: actionFor(entry, profile, credential),
+      };
+    }),
+  );
 
   for (const route of routes) {
     if (seen.has(route.id)) continue;
@@ -312,16 +351,15 @@ export async function connectProvider(
   }
 
   const profile = profileAt(settings, entry);
-  const existingRef = refOf(profile);
-  const ref = existingRef ?? deriveRef(entry.provider);
-
-  if (!existingRef && allRefs(llm, settings).has(ref)) {
+  const resolved = resolveRef(llm, settings, entry);
+  if (!resolved.ref) {
     return {
       ok: false,
       code: 'bad-request',
-      message: 'The derived credential name is already used by another provider.',
+      message: resolved.error ?? 'The provider has no usable credential name.',
     };
   }
+  const ref = resolved.ref;
 
   try {
     await credentials.set(ref, key);
@@ -330,30 +368,8 @@ export async function connectProvider(
   }
 
   if (!profile) {
-    const descriptor = descriptorFor(settings, entry.settingsNs);
-    if (!descriptor) {
-      return {
-        ok: false,
-        code: 'internal',
-        message: 'The key was stored, but the provider settings are not available.',
-      };
-    }
-
-    const patch = entry.settingsPath.reduceRight<Record<string, unknown>>(
-      (value, segment) => ({ [segment]: value }),
-      { apiKeyEnv: ref },
-    );
-
-    try {
-      await settings.update(entry.settingsNs, patch, descriptor.revision);
-    } catch (error) {
-      const detail = error instanceof Error ? error.message : String(error);
-      return {
-        ok: false,
-        code: 'internal',
-        message: `The key was stored, but the provider could not be added: ${detail}`,
-      };
-    }
+    const error = await addProviderProfile(settings, entry, ref);
+    if (error) return { ok: false, code: 'internal', message: error };
   }
 
   return {
