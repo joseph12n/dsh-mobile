@@ -70,6 +70,7 @@ export function App() {
   const [openSession, setOpenSession] = useState<SessionSummary | undefined>(undefined);
   const listHeadingRef = useRef<HTMLHeadingElement>(null);
   const wasOpen = useRef(false);
+  const questionsRef = useRef<QuestionBatch[]>([]);
   const [entries, setEntries] = useState<HistoryEntry[]>([]);
   const [hasMore, setHasMore] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
@@ -143,6 +144,25 @@ export function App() {
     [cancelRetry, scheduleRetry],
   );
 
+  const updateSession = useCallback(
+    (sessionId: string, patch: (session: SessionSummary) => Partial<SessionSummary>) => {
+      setOpenSession((previous) =>
+        previous && previous.id === sessionId ? { ...previous, ...patch(previous) } : previous,
+      );
+      setView((previous) =>
+        previous.kind === 'sessions'
+          ? {
+              ...previous,
+              sessions: previous.sessions.map((session) =>
+                session.id === sessionId ? { ...session, ...patch(session) } : session,
+              ),
+            }
+          : previous,
+      );
+    },
+    [],
+  );
+
   const start = useCallback(
     async (endpoint: string, pairingCode?: string) => {
       cancelRetry();
@@ -161,40 +181,56 @@ export function App() {
       connection.onPush((message) => {
         if (message.type === 'question.pending') {
           const incoming = message.question;
-          setQuestions((previous) => [
-            ...previous.filter((batch) => batch.callId !== incoming.callId),
+          const next = [
+            ...questionsRef.current.filter((batch) => batch.callId !== incoming.callId),
             incoming,
-          ]);
-        } else if (message.type === 'question.settled') {
-          setQuestions((previous) => previous.filter((batch) => batch.callId !== message.callId));
-        } else if (message.type === 'session.event') {
+          ];
+          questionsRef.current = next;
+          setQuestions(next);
+          const pendingQuestions = next.filter(
+            (batch) => batch.sessionId === incoming.sessionId,
+          ).length;
+          updateSession(incoming.sessionId, () => ({ pendingQuestions, state: 'waiting' }));
+          return;
+        }
+
+        if (message.type === 'question.settled') {
+          const next = questionsRef.current.filter((batch) => batch.callId !== message.callId);
+          questionsRef.current = next;
+          setQuestions(next);
+          const pendingQuestions = next.filter(
+            (batch) => batch.sessionId === message.sessionId,
+          ).length;
+          updateSession(message.sessionId, (session) => ({
+            pendingQuestions,
+            ...(pendingQuestions === 0 && session.state === 'waiting'
+              ? { state: 'idle' as const }
+              : {}),
+          }));
+          return;
+        }
+
+        if (message.type === 'session.state') {
+          updateSession(message.sessionId, () => ({ state: message.state }));
+          return;
+        }
+
+        if (message.type === 'session.event') {
           setEntries((previous) =>
             previous.some((entry) => entry.seq === message.seq)
               ? previous
               : [...previous, { seq: message.seq, at: message.at, event: message.event }],
           );
-
-          if (message.event.kind === 'state') {
-            const { sessionId, event } = message;
-            const state = event.state;
-            setOpenSession((previous) =>
-              previous && previous.id === sessionId ? { ...previous, state } : previous,
-            );
-            setView((previous) =>
-              previous.kind === 'sessions'
-                ? {
-                    ...previous,
-                    sessions: previous.sessions.map((session) =>
-                      session.id === sessionId ? { ...session, state } : session,
-                    ),
-                  }
-                : previous,
-            );
-          }
+          updateSession(message.sessionId, () => ({
+            updatedAt: message.at,
+            ...(message.event.kind === 'state' ? { state: message.event.state } : {}),
+          }));
         }
       });
 
       try {
+        questionsRef.current = [];
+        setQuestions([]);
         const token = storage.token();
         const hello = await connection.connect(pairingCode ? undefined : token);
 
@@ -234,7 +270,7 @@ export function App() {
         handleFailure(error, endpoint);
       }
     },
-    [client, cancelRetry, handleFailure, scheduleRetry],
+    [client, cancelRetry, handleFailure, scheduleRetry, updateSession],
   );
 
   useEffect(() => {
