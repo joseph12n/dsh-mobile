@@ -170,6 +170,10 @@ export async function listSessions(
 
   // Archivadas: el host mantiene la fila y solo marca el id, así que sin esto archivar
   // desde el teléfono parecía no hacer nada. Se piden aparte y un fallo no esconde nada.
+  //
+  // Ojo con la degradación: si esta lectura falla y se pidieron las archivadas, las
+  // filas viajan **sin marcar**, o sea como vivas. Es preferible a perder la lista, y
+  // se recupera sola en la siguiente recarga.
   const archived = await listArchivedSessions(ctx).catch(() => new Set<string>());
 
   // Con `includeArchived` se devuelven marcadas en vez de quitarlas: la vista de

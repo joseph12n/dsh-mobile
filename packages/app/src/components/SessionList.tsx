@@ -152,7 +152,12 @@ export function SessionList({
   return (
     <>
       {sections.map((section) => {
-        const collapsed = section.kind === 'stale' && !showStale;
+        const collapsed =
+          section.kind === 'stale' &&
+          !showStale &&
+          // Una archivada casi siempre cae en «antiguas»; plegarlo escondía justo lo
+          // que el usuario acababa de pedir ver.
+          !section.sessions.some((session) => session.archived === true);
 
         return (
           <section key={section.kind} className={`group ${section.kind}`}>
@@ -221,6 +226,7 @@ function SessionRow({
   const { t } = useI18n();
   const age = elapsed(session.updatedAt);
   const stateId = useId();
+  const archivedId = useId();
   const archived = session.archived === true;
 
   return (
@@ -231,7 +237,9 @@ function SessionRow({
       <button
         type="button"
         className="session-open"
-        aria-describedby={stateId}
+        // El estado y, si toca, la marca de archivada: el nombre del botón no los
+        // arrastra, pero un lector de pantalla los anuncia al enfocar la fila.
+        aria-describedby={archived ? `${stateId} ${archivedId}` : stateId}
         onClick={() => onOpen(session)}
       >
         <span className="session-title">{session.title}</span>
@@ -252,7 +260,7 @@ function SessionRow({
                 type="button"
                 className="ghost tiny"
                 aria-label={`${t('action.restore')}: ${session.title}`}
-                disabled={restorePending !== undefined}
+                disabled={restorePending === session.id}
                 onClick={() => onUnarchive(session)}
               >
                 {t('action.restore')}
@@ -264,13 +272,17 @@ function SessionRow({
                 type="button"
                 className="ghost tiny"
                 aria-label={`${t('action.archive')}: ${session.title}`}
-                disabled={archivePending !== undefined}
+                disabled={archivePending === session.id}
                 onClick={() => onArchive(session)}
               >
                 {t('action.archive')}
               </button>
             )}
-        {archived && <span className="badge archived">{t('sessions.archived')}</span>}
+        {archived && (
+          <span id={archivedId} className="badge archived">
+            {t('action.archived')}
+          </span>
+        )}
         {session.pendingQuestions > 0 && (
           <span className="badge waiting">
             {plural(t, 'session.questionCount', session.pendingQuestions)}

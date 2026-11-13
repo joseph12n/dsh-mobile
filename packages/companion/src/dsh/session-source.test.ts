@@ -165,6 +165,48 @@ describe('listado de sesiones', () => {
     expect('archived' in toWireSession(records[1]!)).toBe(false);
   });
 
+  it('la copia marcada conserva el resto de los campos', async () => {
+    // La marca se añade con un spread: si se perdiera `model` o `workspaceId`, la fila
+    // archivada saldría sin carpeta y sin modelo.
+    const ctx: HostContext = {
+      sessionController: {
+        list: () =>
+          Promise.resolve({
+            items: [
+              summary({
+                sessionId: 's1',
+                title: 'Archivada',
+                asOfSeq: 77,
+                values: {
+                  modelSelection: {
+                    next: { provider: 'deepseek', model: 'chat', reasoningEffort: 'high' },
+                  },
+                },
+              }),
+            ],
+          }),
+      },
+      workspaceController: {
+        list: () =>
+          Promise.resolve({
+            items: [{ workspaceId: 'ws-1', path: '/work', title: 'w', sessionIds: ['s1'] }],
+            archivedSessionIds: ['s1'],
+          }),
+      },
+    };
+
+    const records = await listSessions(ctx, { includeArchived: true });
+    const wire = toWireSession(records[0]!);
+    expect(wire).toMatchObject({
+      id: 's1',
+      title: 'Archivada',
+      seq: 77,
+      workspaceId: 'ws-1',
+      archived: true,
+      model: { provider: 'deepseek', model: 'chat', reasoningEffort: 'high' },
+    });
+  });
+
   it('lee el modelo de la proyección, prefiriendo el que se aplicará', async () => {
     const records = await listSessions(
       ctxWith([

@@ -100,6 +100,29 @@ describe('archivadas', () => {
     await expect(listing).resolves.toEqual([]);
   });
 
+  it('no manda la clave cuando no se piden', async () => {
+    stubSocket();
+    const { socket, client } = await connected();
+
+    const listing = client.listSessions();
+    await flush();
+    expect('includeArchived' in lastSent(socket)).toBe(false);
+
+    answer(socket, { type: 'sessions.ok', sessions: [] });
+    await listing;
+  });
+
+  it('propaga el not-found al restaurar', async () => {
+    stubSocket();
+    const { socket, client } = await connected(['workspace.unarchive']);
+
+    const restoring = client.unarchive('gone');
+    await flush();
+    answer(socket, { type: 'error', code: 'not-found', message: 'gone' });
+
+    await expect(restoring).rejects.toMatchObject({ code: 'not-found' });
+  });
+
   it('restaura y exige la confirmación', async () => {
     stubSocket();
     const { socket, client } = await connected(['workspace.unarchive']);

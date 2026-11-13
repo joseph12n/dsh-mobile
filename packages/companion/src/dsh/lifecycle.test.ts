@@ -147,6 +147,22 @@ describe('unarchiving a session', () => {
     expect(canUnarchiveSession(ctxWith({}))).toBe(false);
   });
 
+  it('keeps an unknown host code as failed', async () => {
+    const ctx = ctxWith({
+      workspaceController: {
+        unarchiveSession: async () => {
+          throw Object.assign(new Error('weird'), { code: 'workspace/something-else' });
+        },
+      },
+    });
+
+    expect(await unarchiveSession(ctx, { sessionId: 's1' })).toMatchObject({
+      ok: false,
+      code: 'failed',
+      message: 'weird',
+    });
+  });
+
   it('is advertised only when the controller has the method', () => {
     expect(
       canUnarchiveSession(ctxWith({ workspaceController: { unarchiveSession: async () => 1 } })),

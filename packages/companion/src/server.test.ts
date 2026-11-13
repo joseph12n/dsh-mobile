@@ -1098,7 +1098,11 @@ describe('session actions over the WebSocket', () => {
       sessionId?: string;
     }>;
     archiveSession?: () => Promise<{ ok: boolean; code?: string; message?: string }>;
-    unarchiveSession?: () => Promise<{ ok: boolean; code?: string; message?: string }>;
+    unarchiveSession?: (request?: unknown) => Promise<{
+      ok: boolean;
+      code?: string;
+      message?: string;
+    }>;
   }
 
   /** A server whose session actions are whatever the test needs. */
@@ -1245,14 +1249,22 @@ describe('session actions over the WebSocket', () => {
   }
 
   it('restores an archived session', async () => {
+    const seen: unknown[] = [];
     const response = await exchange(
-      { unarchiveSession: async () => ({ ok: true }) },
+      {
+        unarchiveSession: async (request) => {
+          seen.push(request);
+          return { ok: true };
+        },
+      },
       {
         type: 'workspace.unarchive',
         sessionId: 's1',
       },
     );
     expect(response).toMatchObject({ type: 'workspace.unarchived', sessionId: 's1' });
+    // La firma es un objeto: con `(id)` el adaptador real no la reconocería.
+    expect(seen).toEqual([{ sessionId: 's1' }]);
   });
 
   // Igual que archivar: cada negativa tiene su código y `no-service` no es una avería.

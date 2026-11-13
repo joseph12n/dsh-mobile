@@ -396,6 +396,12 @@ button.ghost.tiny {
   border-color: color-mix(in srgb, var(--danger) 40%, transparent);
 }
 
+/* Archivada: se distingue del estado del turno sin gritar. */
+.badge.archived {
+  color: var(--muted);
+  border-style: dashed;
+}
+
 /* --- Preguntas pendientes ------------------------------------------------- */
 
 .questions {

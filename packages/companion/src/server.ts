@@ -94,6 +94,7 @@ export interface ServerDeps {
 
   /** Catálogo de modelos del host. Sin ella, `models.list` se rechaza. */
   listModels?: () => Promise<ModelCatalog>;
+
   /** Cambia el modelo de una sesión. Sin ella, `model.select` se rechaza. */
   selectModel?: (request: {
     sessionId: string;
