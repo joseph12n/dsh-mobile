@@ -147,6 +147,8 @@ tool use so they do not dirty your log.
   running subagents and the open tasks, with the details one tap away.
 - **Manage the paired devices**: see the list with the last time each was seen, revoke one, and
   forget this phone (which revokes it on the host first).
+- **Connect model providers**: add a key for a provider the host knows, test it, and let the
+  host store it. The key never comes back; custom endpoints and OAuth stay on the desktop.
 - **Write** to the agent and **cancel** the running turn.
 - Open the gear for language, contrast, folder preferences and the paired device. The phone's
   back gesture closes the sheet or the conversation before it leaves the app.

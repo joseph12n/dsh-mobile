@@ -11,6 +11,9 @@ import {
   type HostInfo,
   type ModelCatalog,
   type ModelSelection,
+  type ProviderConnection,
+  type ProviderTestResult,
+  type ProviderView,
   type QuestionAnswerItem,
   type ServerMessage,
   type SessionActivity,
@@ -284,6 +287,57 @@ export class CompanionClient {
     if (response.type !== 'devices.revoked') {
       throw new ConnectionError('The host did not confirm the revocation.', 'internal');
     }
+  }
+
+  async listProviders(): Promise<ProviderView[]> {
+    const response = await this.#request({ type: 'providers.list' });
+    if (response.type === 'error') throw new ConnectionError(response.message, response.code);
+    return response.type === 'providers.ok' ? response.providers : [];
+  }
+
+  async testProvider(provider: string, apiKey: string): Promise<ProviderTestResult> {
+    const response = await this.#request(
+      { type: 'provider.test', provider, apiKey },
+      COMMAND_TIMEOUT_MS,
+    );
+    if (response.type === 'error') throw new ConnectionError(response.message, response.code);
+    return response.type === 'provider.tested'
+      ? {
+          provider: response.provider,
+          ok: response.ok,
+          code: response.code,
+          ...(response.detail ? { detail: response.detail } : {}),
+        }
+      : { provider, ok: false, code: 'unreachable' };
+  }
+
+  async connectProvider(provider: string, apiKey: string): Promise<ProviderConnection> {
+    const response = await this.#request(
+      { type: 'provider.connect', provider, apiKey },
+      COMMAND_TIMEOUT_MS,
+    );
+    if (response.type === 'error') throw new ConnectionError(response.message, response.code);
+    if (response.type !== 'provider.connected') {
+      throw new ConnectionError('The host did not confirm the connection.', 'internal');
+    }
+    return {
+      provider: response.provider,
+      credential: response.credential,
+      ...(response.credentialSource ? { credentialSource: response.credentialSource } : {}),
+    };
+  }
+
+  async disconnectProvider(provider: string): Promise<ProviderConnection> {
+    const response = await this.#request({ type: 'provider.disconnect', provider });
+    if (response.type === 'error') throw new ConnectionError(response.message, response.code);
+    if (response.type !== 'provider.disconnected') {
+      throw new ConnectionError('The host did not confirm the disconnection.', 'internal');
+    }
+    return {
+      provider: response.provider,
+      credential: response.credential,
+      ...(response.credentialSource ? { credentialSource: response.credentialSource } : {}),
+    };
   }
 
   async history(

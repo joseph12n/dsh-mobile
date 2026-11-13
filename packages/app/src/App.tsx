@@ -8,6 +8,8 @@ import {
   type HostInfo,
   type ModelCatalog,
   type ModelSelection,
+  type ProviderTestResult,
+  type ProviderView,
   type QuestionAnswerItem,
   type QuestionBatch,
   type SessionActivity,
@@ -74,6 +76,9 @@ export function App() {
   const [device, setDevice] = useState<DeviceInfo | undefined>(undefined);
   const [devices, setDevices] = useState<DeviceInfo[]>([]);
   const [deviceError, setDeviceError] = useState<string | undefined>(undefined);
+  const [providers, setProviders] = useState<ProviderView[]>([]);
+  const [providersLoading, setProvidersLoading] = useState(false);
+  const [providersError, setProvidersError] = useState<string | undefined>(undefined);
   const [openSession, setOpenSession] = useState<SessionSummary | undefined>(undefined);
   const [commands, setCommands] = useState<CommandInfo[]>([]);
   const [activity, setActivity] = useState<SessionActivity | undefined>(undefined);
@@ -479,6 +484,78 @@ export function App() {
   const devicesCapable =
     view.kind === 'sessions' && view.host.capabilities.includes('devices.manage');
 
+  const providersCapable =
+    view.kind === 'sessions' && view.host.capabilities.includes('providers.list');
+  const providersConnectable =
+    view.kind === 'sessions' && view.host.capabilities.includes('provider.connect');
+
+  const loadProviders = useCallback(async () => {
+    const connection = client.current;
+    if (!connection || !providersCapable) {
+      setProviders([]);
+      return;
+    }
+
+    setProvidersLoading(true);
+    try {
+      setProviders(await connection.listProviders());
+      setProvidersError(undefined);
+    } catch (error) {
+      setProviders([]);
+      setProvidersError(messageOf(error));
+    } finally {
+      setProvidersLoading(false);
+    }
+  }, [client, providersCapable]);
+
+  const testProvider = useCallback(
+    async (provider: string, apiKey: string): Promise<ProviderTestResult | undefined> => {
+      const connection = client.current;
+      if (!connection) return undefined;
+
+      try {
+        return await connection.testProvider(provider, apiKey);
+      } catch (error) {
+        setProvidersError(messageOf(error));
+        return undefined;
+      }
+    },
+    [client],
+  );
+
+  const connectProvider = useCallback(
+    async (provider: string, apiKey: string): Promise<{ ok: boolean; message?: string }> => {
+      const connection = client.current;
+      if (!connection) return { ok: false };
+
+      try {
+        await connection.connectProvider(provider, apiKey);
+        await loadProviders();
+        void loadModels(connection);
+        return { ok: true };
+      } catch (error) {
+        return { ok: false, message: messageOf(error) };
+      }
+    },
+    [client, loadProviders, loadModels],
+  );
+
+  const disconnectProvider = useCallback(
+    async (provider: string): Promise<{ ok: boolean; message?: string }> => {
+      const connection = client.current;
+      if (!connection) return { ok: false };
+
+      try {
+        await connection.disconnectProvider(provider);
+        await loadProviders();
+        return { ok: true };
+      } catch (error) {
+        return { ok: false, message: messageOf(error) };
+      }
+    },
+    [client, loadProviders],
+  );
+
   const loadDevices = useCallback(async () => {
     const connection = client.current;
     if (!connection || !devicesCapable) {
@@ -501,7 +578,8 @@ export function App() {
     }
     setSettingsOpen(true);
     void loadDevices();
-  }, [loadDevices]);
+    void loadProviders();
+  }, [loadDevices, loadProviders]);
 
   const revokeDevice = useCallback(
     async (deviceId: string) => {
@@ -1130,6 +1208,14 @@ export function App() {
         canManageDevices={devicesCapable}
         onRevokeDevice={(deviceId) => void revokeDevice(deviceId)}
         {...(deviceError ? { deviceError } : {})}
+        providers={providers}
+        providersLoading={providersLoading}
+        {...(providersError ? { providersError } : {})}
+        canListProviders={providersCapable}
+        canConnectProviders={providersConnectable}
+        onTestProvider={testProvider}
+        onConnectProvider={connectProvider}
+        onDisconnectProvider={disconnectProvider}
         onForget={forget}
       />
     </main>

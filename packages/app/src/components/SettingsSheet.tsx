@@ -3,6 +3,8 @@ import {
   PROTOCOL_NAME,
   PROTOCOL_VERSION,
   type DeviceInfo,
+  type ProviderTestResult,
+  type ProviderView,
   type Workspace,
 } from '@dsh-mobile/protocol';
 import { displayTitle } from '../lib/folders.js';
@@ -17,6 +19,7 @@ import { useI18n } from '../i18n/index.js';
 import { LOCALES, LOCALE_LABELS, type Locale, type MessageKey } from '../i18n/locales.js';
 import { ForgetDeviceButton } from './ForgetDeviceButton.js';
 import { PairedDevices } from './PairedDevices.js';
+import { ProvidersSection } from './ProvidersSection.js';
 import { Sheet } from './Sheet.js';
 
 const ORDER_KEY: Record<FolderOrder, MessageKey> = {
@@ -39,6 +42,14 @@ export function SettingsSheet({
   canManageDevices,
   onRevokeDevice,
   deviceError,
+  providers,
+  providersLoading,
+  providersError,
+  canListProviders,
+  canConnectProviders,
+  onTestProvider,
+  onConnectProvider,
+  onDisconnectProvider,
   onForget,
 }: {
   open: boolean;
@@ -54,6 +65,17 @@ export function SettingsSheet({
   canManageDevices: boolean;
   onRevokeDevice: (deviceId: string) => void;
   deviceError?: string;
+  providers: ProviderView[];
+  providersLoading: boolean;
+  providersError?: string;
+  canListProviders: boolean;
+  canConnectProviders: boolean;
+  onTestProvider: (provider: string, apiKey: string) => Promise<ProviderTestResult | undefined>;
+  onConnectProvider: (
+    provider: string,
+    apiKey: string,
+  ) => Promise<{ ok: boolean; message?: string }>;
+  onDisconnectProvider: (provider: string) => Promise<{ ok: boolean; message?: string }>;
   onForget: () => void;
 }) {
   const { t, locale, setLocale } = useI18n();
@@ -146,6 +168,21 @@ export function SettingsSheet({
               </label>
             ))}
           </div>
+        </section>
+      )}
+
+      {connected && canListProviders && (
+        <section className="sheet-section" aria-labelledby={`${id}-providers`}>
+          <h3 id={`${id}-providers`}>{t('settings.providers')}</h3>
+          <ProvidersSection
+            providers={providers}
+            canConnect={canConnectProviders}
+            loading={providersLoading}
+            {...(providersError ? { error: providersError } : {})}
+            onTest={onTestProvider}
+            onConnect={onConnectProvider}
+            onDisconnect={onDisconnectProvider}
+          />
         </section>
       )}
 
