@@ -18,6 +18,7 @@ import { useContrast, CONTRASTS, type Contrast } from '../lib/contrast.js';
 import { useI18n } from '../i18n/index.js';
 import { LOCALES, LOCALE_LABELS, type Locale, type MessageKey } from '../i18n/locales.js';
 import { ForgetDeviceButton } from './ForgetDeviceButton.js';
+import { ChevronDownIcon } from './icons.js';
 import { PairedDevices } from './PairedDevices.js';
 import { ProvidersSection } from './ProvidersSection.js';
 import { Sheet } from './Sheet.js';
@@ -172,8 +173,11 @@ export function SettingsSheet({
       )}
 
       {connected && canListProviders && (
-        <section className="sheet-section" aria-labelledby={`${id}-providers`}>
-          <h3 id={`${id}-providers`}>{t('settings.providers')}</h3>
+        <details className="sheet-section sheet-collapsible">
+          <summary className="sheet-summary">
+            <h3>{t('settings.providers')}</h3>
+            <ChevronDownIcon />
+          </summary>
           <ProvidersSection
             providers={providers}
             canConnect={canConnectProviders}
@@ -183,7 +187,7 @@ export function SettingsSheet({
             onConnect={onConnectProvider}
             onDisconnect={onDisconnectProvider}
           />
-        </section>
+        </details>
       )}
 
       {connected && (
