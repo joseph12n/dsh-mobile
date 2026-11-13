@@ -391,6 +391,7 @@ export function App() {
       setEntries([]);
       setHasMore(false);
       setModelError(undefined);
+      setSendError(undefined);
       setLoadingHistory(true);
 
       try {
@@ -428,14 +429,19 @@ export function App() {
     }
   }, [client, openSession, entries]);
 
+  const [sendError, setSendError] = useState<string | undefined>(undefined);
+
   const sendText = useCallback(
-    async (text: string) => {
+    async (text: string): Promise<boolean> => {
       const connection = client.current;
-      if (!connection || !openSession) return;
+      if (!connection || !openSession) return false;
+      setSendError(undefined);
       try {
         await connection.reply(openSession.id, text);
+        return true;
       } catch (error) {
-        setView({ kind: 'error', endpoint: connection.url, message: messageOf(error) });
+        setSendError(messageOf(error));
+        return false;
       }
     },
     [client, openSession],
@@ -765,7 +771,8 @@ export function App() {
                 }}
                 onLoadMore={() => void loadMore()}
                 onCancel={() => void stop()}
-                onSend={(text) => void sendText(text)}
+                onSend={sendText}
+                {...(sendError ? { sendError } : {})}
                 {...(openSession.model ? { model: openSession.model } : {})}
                 {...(view.host.capabilities.includes('model.select')
                   ? {

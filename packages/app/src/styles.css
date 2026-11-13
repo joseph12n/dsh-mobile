@@ -1116,6 +1116,11 @@ button.ghost.tiny {
   }
 }
 
+.composer-error {
+  margin: 8px 0 0;
+  font-size: 13px;
+}
+
 .composer {
   flex: 0 0 auto;
   display: flex;

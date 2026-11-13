@@ -319,6 +319,7 @@ export function SessionView({
   catalog,
   catalogStatus,
   error,
+  sendError,
   onBack,
   onLoadMore,
   onCancel,
@@ -334,15 +335,17 @@ export function SessionView({
   catalog?: ModelCatalog;
   catalogStatus?: CatalogStatus;
   error?: string;
+  sendError?: string;
   onBack: () => void;
   onLoadMore: () => void;
   onCancel: () => void;
-  onSend: (text: string) => void;
+  onSend: (text: string) => Promise<boolean>;
   onSelectModel?: (selection: ModelSelection) => void;
   onReloadModels?: () => void;
 }) {
   const { t } = useI18n();
   const [draft, setDraft] = useState('');
+  const [sending, setSending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -376,12 +379,14 @@ export function SessionView({
     atBottom.current = area.scrollHeight - area.scrollTop - area.clientHeight < 48;
   };
 
-  const send = (): void => {
+  const send = async (): Promise<void> => {
     const text = draft.trim();
-    if (!text) return;
+    if (!text || sending) return;
     atBottom.current = true;
-    onSend(text);
-    setDraft('');
+    setSending(true);
+    const accepted = await onSend(text);
+    setSending(false);
+    if (accepted) setDraft('');
   };
 
   return (
@@ -462,33 +467,40 @@ export function SessionView({
       {session.archived ? (
         <p className="muted">{t('session.archivedNote')}</p>
       ) : (
-        <div className="composer">
-          <textarea
-            ref={textareaRef}
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' && !event.shiftKey) {
-                event.preventDefault();
-                send();
-              }
-            }}
-            placeholder={t('session.placeholder')}
-            aria-label={t('session.placeholder')}
-            rows={1}
-            autoCapitalize="sentences"
-            enterKeyHint="send"
-          />
-          <button
-            type="button"
-            className="send-button"
-            onClick={send}
-            disabled={!draft.trim()}
-            aria-label={t('session.send')}
-          >
-            <SendIcon />
-          </button>
-        </div>
+        <>
+          {sendError && (
+            <p className="error composer-error" role="alert">
+              {sendError}
+            </p>
+          )}
+          <div className="composer">
+            <textarea
+              ref={textareaRef}
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && !event.shiftKey) {
+                  event.preventDefault();
+                  void send();
+                }
+              }}
+              placeholder={t('session.placeholder')}
+              aria-label={t('session.placeholder')}
+              rows={1}
+              autoCapitalize="sentences"
+              enterKeyHint="send"
+            />
+            <button
+              type="button"
+              className="send-button"
+              onClick={() => void send()}
+              disabled={!draft.trim() || sending}
+              aria-label={t('session.send')}
+            >
+              <SendIcon />
+            </button>
+          </div>
+        </>
       )}
     </section>
   );
