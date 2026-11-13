@@ -1,9 +1,9 @@
 process.env.DSH_MOBILE_LOG_FILE = '0';
 
-const { startCompanionServer } = await import('../packages/companion/dist/server.js');
-const { findWebRoot } = await import('../packages/companion/dist/routes/web-root.js');
-const { PairingService } = await import('../packages/companion/dist/core/pairing.js');
-const { DeviceRegistry } = await import('../packages/companion/dist/core/devices.js');
+const { startCompanionServer } = await import('../../packages/companion/dist/server.js');
+const { findWebRoot } = await import('../../packages/companion/dist/routes/web-root.js');
+const { PairingService } = await import('../../packages/companion/dist/core/pairing.js');
+const { DeviceRegistry } = await import('../../packages/companion/dist/core/devices.js');
 
 const port = Number(process.argv[2] ?? 6799);
 const memory = {

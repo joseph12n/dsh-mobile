@@ -30,8 +30,10 @@ certs/
 Thumbs.db
 desktop.ini
 
-# Capturas de vista previa (no son entregables)
-.preview/
+# Herramientas de vista previa: capturas y dependencias descargadas
+# (el arnés y sus scripts sí se versionan; ver tools/preview/README.md)
+tools/preview/out/
+tools/preview/axe.min.js
 
 # Skills de agentes instaladas con `npx skills` (contenido de terceros, local).
 # El repo no las publica: se restauran con `npx skills experimental_install`.

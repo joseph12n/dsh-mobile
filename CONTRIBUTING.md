@@ -25,19 +25,21 @@ pnpm test
 
 ## Commands
 
-| Command             | What it does                                           |
-| ------------------- | ------------------------------------------------------ |
-| `pnpm build`        | Builds the packages and embeds the PWA in the plugin   |
-| `pnpm test`         | Vitest, the whole suite                                |
-| `pnpm test:watch`   | Vitest in watch mode                                   |
-| `pnpm typecheck`    | `tsc --noEmit` per package                             |
-| `pnpm lint`         | ESLint                                                 |
-| `pnpm lint:fix`     | ESLint, fixing what it can                             |
-| `pnpm format`       | Prettier, writing                                      |
-| `pnpm format:check` | Prettier, checking only                                |
-| `pnpm smoke`        | Starts the built server and walks the contract         |
-| `pnpm clean`        | Removes build output                                   |
-| `pnpm dev`          | PWA in development mode                                |
+| Command             | What it does                                         |
+| ------------------- | ---------------------------------------------------- |
+| `pnpm build`        | Builds the packages and embeds the PWA in the plugin |
+| `pnpm test`         | Vitest, the whole suite                              |
+| `pnpm test:watch`   | Vitest in watch mode                                 |
+| `pnpm typecheck`    | `tsc --noEmit` per package                           |
+| `pnpm lint`         | ESLint                                               |
+| `pnpm lint:fix`     | ESLint, fixing what it can                           |
+| `pnpm format`       | Prettier, writing                                    |
+| `pnpm format:check` | Prettier, checking only                              |
+| `pnpm smoke`        | Starts the built server and walks the contract       |
+| `pnpm clean`        | Removes build output                                 |
+| `pnpm dev`          | PWA in development mode                              |
+| `pnpm preview`      | Built PWA + fake host on `127.0.0.1:6799`            |
+| `pnpm preview:host` | Fake host only, for the Vite dev server              |
 
 The build finishes by copying the compiled PWA into `packages/companion/dist/web`. That copy
 is what a published or linked plugin serves: the plugin no longer depends on finding the
@@ -62,7 +64,10 @@ packages/
     src/persist/   the little that reaches disk (the device file)
     src/routes/    static serving and origin checks
     src/server.ts  the WebSocket listener and the contract wiring
+    dist/web/      the compiled PWA, copied here by `pnpm build`
   app/         PWA (React + Vite)
+tools/preview/ local fake host, fake data and CDP drivers (never shipped)
+scripts/       assembly, smoke and the command-line entry points
 ```
 
 ### Layer rules
