@@ -503,7 +503,7 @@ export function SessionView({
         </button>
 
         <div className="session-ident">
-          <h2 className="session-heading" tabIndex={-1} ref={headingRef}>
+          <h2 className="session-heading" tabIndex={-1} ref={headingRef} title={session.title}>
             {session.title}
           </h2>
           <span className="session-state">
