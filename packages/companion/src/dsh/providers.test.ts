@@ -110,7 +110,7 @@ describe('listProviders', () => {
         name: 'Native Auth',
         configured: false,
         credential: 'unknown',
-        action: 'desktop',
+        action: 'add-provider',
       },
       {
         id: 'newprov',
@@ -240,12 +240,18 @@ describe('connectProvider', () => {
     expect(JSON.stringify(outcome)).not.toContain(KEY);
   });
 
-  it('rechaza proveedores de autenticación nativa, desconocidos y claves inválidas', async () => {
+  it('intenta la clave de un proveedor con autenticación nativa y avisa si faltan sus ajustes', async () => {
     const { ctx, store } = context();
 
-    await expect(connectProvider(ctx, { provider: 'native', apiKey: KEY })).resolves.toMatchObject({
-      ok: false,
-    });
+    const outcome = await connectProvider(ctx, { provider: 'native', apiKey: KEY });
+    expect(outcome.ok).toBe(false);
+    expect(outcome.message).toContain('settings');
+    expect(store.get('NATIVE_API_KEY')).toBe(KEY);
+  });
+
+  it('rechaza proveedores desconocidos y claves inválidas', async () => {
+    const { ctx, store } = context();
+
     await expect(connectProvider(ctx, { provider: 'nope', apiKey: KEY })).resolves.toMatchObject({
       ok: false,
     });

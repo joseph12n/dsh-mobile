@@ -123,7 +123,6 @@ function actionFor(
   profile: Record<string, unknown> | undefined,
   credential: ProviderCredential,
 ): ProviderAction {
-  if (entry.nativeAuth && !profile) return 'desktop';
   if (!profile) return 'add-provider';
   return credential === 'set' ? 'none' : 'add-key';
 }
@@ -332,13 +331,6 @@ export async function connectProvider(
   const entry = findEntry(llm, input.provider);
   if (!entry) {
     return { ok: false, code: 'bad-request', message: 'Unknown provider.' };
-  }
-  if (entry.nativeAuth) {
-    return {
-      ok: false,
-      code: 'bad-request',
-      message: 'This provider signs in on the desktop.',
-    };
   }
 
   const key = validateKey(input.apiKey);
