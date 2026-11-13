@@ -24,9 +24,10 @@ import {
   unarchiveSession,
 } from './dsh/lifecycle.js';
 import { canListModels, canSelectModel, listModels, selectModel } from './dsh/models.js';
+import { createQuestionBridge } from './dsh/question-bridge.js';
 import type { HostContext } from './host-api.js';
 import { reportToLog, reportToText, runProbe, type ProbeReport } from './probe.js';
-import { DEFAULT_PORT, startCompanionServer } from './server.js';
+import { DEFAULT_PORT, startCompanionServer, type RunningServer } from './server.js';
 import type { Capability } from '@dsh-mobile/protocol';
 
 export const name = 'dsh-mobile-companion';
@@ -49,6 +50,13 @@ export function apply(ctx: HostContext): void {
   let origin: ResolvedOrigin | undefined;
   let listeningPort: number | undefined;
   let listenerError: string | undefined;
+  let runningServer: RunningServer | undefined;
+
+  const questionBridge = createQuestionBridge(ctx, {
+    push: (message) => runningServer?.broadcast(message),
+    clients: () => runningServer?.clientCount() ?? 0,
+  });
+  disposers.push(() => questionBridge.dispose());
 
   const linkFor = (code: string): string => {
     const port = listeningPort ?? DEFAULT_PORT;
@@ -202,15 +210,23 @@ export function apply(ctx: HostContext): void {
     ...options,
     ...(publicUrl ? { publicUrl } : {}),
     ...(webRoot ? { webRoot } : {}),
-    listSessions: (options) => listSessions(ctx, options),
+    listSessions: async (options) => {
+      const records = await listSessions(ctx, options);
+      const counts = questionBridge.counts();
+      for (const record of records) {
+        const extra = counts.get(record.id) ?? 0;
+        if (extra > 0) record.pendingQuestions += extra;
+      }
+      return records;
+    },
     listWorkspaces: () => listWorkspaces(ctx),
     createSession: (request) => createSession(ctx, request),
     archiveSession: (request) => archiveSession(ctx, request),
     unarchiveSession: (request) => unarchiveSession(ctx, request),
     listModels: () => listModels(ctx),
     selectModel: (request) => selectModel(ctx, request),
-    listQuestions: () => listPendingQuestions(ctx),
-    answerQuestion: (input) => answerQuestion(ctx, input),
+    listQuestions: () => [...listPendingQuestions(ctx), ...questionBridge.pendingBatches()],
+    answerQuestion: (input) => questionBridge.answer(input) ?? answerQuestion(ctx, input),
     readHistory: (sessionId, options) => readHistory(ctx, sessionId, options),
     subscribeSession: (sessionId, options) => subscribeSession(ctx, sessionId, options),
     cancelRun: (sessionId) => cancelRun(ctx, sessionId),
@@ -223,7 +239,9 @@ export function apply(ctx: HostContext): void {
     report: () => probe(),
   })
     .then((running) => {
+      runningServer = running;
       disposers.push(() => {
+        runningServer = undefined;
         void running.close().catch(() => undefined);
       });
 

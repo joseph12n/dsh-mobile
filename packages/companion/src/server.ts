@@ -106,6 +106,8 @@ export interface ServerDeps {
 export interface RunningServer {
   port: number;
   publicUrl: string;
+  broadcast(message: ServerMessage): void;
+  clientCount(): number;
   close(): Promise<void>;
 }
 
@@ -304,6 +306,8 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
 
   wss.on('error', (error: Error) => log(`WebSocket server error: ${error.message}`));
 
+  const clients = new Set<WebSocket>();
+
   wss.on('connection', (socket: WebSocket) => {
     const connection: Connection = {
       device: undefined,
@@ -383,6 +387,7 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
             return;
           }
           connection.device = device;
+          clients.add(socket);
         }
 
         send(socket, {
@@ -416,6 +421,7 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
 
         const enrolled = devices.enroll(message.deviceName, message.platform);
         connection.device = enrolled.device;
+        clients.add(socket);
         log(`device paired: ${enrolled.device.name} (${enrolled.device.platform})`);
 
         send(socket, {
@@ -826,6 +832,7 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
 
     socket.on('error', (error: Error) => log(`WebSocket error: ${error.message}`));
     socket.on('close', () => {
+      clients.delete(socket);
       for (const [, subscription] of subscriptions) subscription.stop();
       subscriptions.clear();
       log('connection closed');
@@ -843,6 +850,14 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
       resolve({
         port: listeningPort,
         publicUrl: localOrigin(),
+        broadcast(message: ServerMessage) {
+          for (const client of clients) {
+            if (client.readyState === client.OPEN) send(client, message);
+          }
+        },
+        clientCount() {
+          return clients.size;
+        },
         async close() {
           for (const client of wss.clients) client.terminate();
           await new Promise<void>((done) => wss.close(() => done()));

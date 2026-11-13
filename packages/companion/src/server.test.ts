@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { WebSocket } from 'ws';
 import { PROTOCOL_VERSION, WEBSOCKET_PATH, parseServerMessage } from '@dsh-mobile/protocol';
+import type { ServerMessage } from '@dsh-mobile/protocol';
 import { DeviceRegistry, type DevicePersistence, type StoredDevice } from './core/devices.js';
 import { PairingService } from './core/pairing.js';
 import { startCompanionServer, type RunningServer } from './server.js';
@@ -309,6 +310,53 @@ describe('contrato sobre WebSocket', () => {
     const response = await client.next();
     expect(response['code']).toBe('auth-invalid');
     client.close();
+  });
+});
+
+describe('difusión a los dispositivos emparejados', () => {
+  it('solo llega a quien tiene dispositivo', async () => {
+    const localPairing = new PairingService();
+    const server = await startCompanionServer({
+      pairing: localPairing,
+      devices: new DeviceRegistry({ persistence: new MemoryPersistence() }),
+      port: 0,
+    });
+    const localCode = localPairing.issue().code;
+
+    const paired = await openClient(server.port);
+    paired.send(hello());
+    await paired.next();
+    paired.send({
+      v: PROTOCOL_VERSION,
+      id: 'pair-broadcast',
+      at: Date.now(),
+      type: 'pair.redeem',
+      code: localCode,
+      deviceName: 'Difusión',
+      platform: 'node',
+    });
+    expect((await paired.next())['type']).toBe('pair.ok');
+
+    const stranger = await openClient(server.port);
+
+    const frame: ServerMessage = {
+      v: PROTOCOL_VERSION,
+      id: 'broadcast-1',
+      at: Date.now(),
+      type: 'question.settled',
+      callId: 'call-broadcast',
+      sessionId: 'session-broadcast',
+    };
+    server.broadcast(frame);
+
+    const delivered = await paired.next();
+    expect(delivered['type']).toBe('question.settled');
+    expect(delivered['callId']).toBe('call-broadcast');
+    await expect(stranger.next(200)).rejects.toThrow('timeout');
+
+    paired.close();
+    stranger.close();
+    await server.close();
   });
 });
 

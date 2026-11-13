@@ -149,7 +149,25 @@ batch**: every question must appear exactly once. That is why the contract model
 `QuestionBatch`, not loose questions.
 
 `selected: []` without `custom` means **skipped**, and that is a legitimate answer — different
-from not answering. Answering needs the session's **root agent alive**; if it is not, the host
+from not answering.
+
+There are two paths, because DSH has two:
+
+- **Timed questions** live in the `userQuestions` projection (open, then continued after the
+  deadline). The phone reads them from `sessions.list` and answers through
+  `ctx.userQuestions.answer`, which accepts continued questions.
+- **Blocking questions do not enter that projection at all.** They are answered on the
+  `user-questions/request` Cordis waterfall. The companion registers a listener there
+  (`prepend`, `global`) and: publishes the batch to every paired device, calls `next()` so the
+  desktop keeps its own card, and resolves with whichever answer arrives first. The phone's
+  answer returns through `question.answer`; the bridge settles the card on every path
+  (answered on the phone, answered on the desktop, or turn cancelled).
+
+The bridge batches are added to the session's `pendingQuestions` count and to the
+`question.pending` pushes after `sessions.list`, so the list shows _waiting for you_ and a phone
+that reconnects still sees the question. Timed requests are left to the projection path.
+
+Answering a question still needs the session's **root agent alive**; if it is not, the host
 answers `not-found` saying so.
 
 ## 10. Transcript

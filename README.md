@@ -138,7 +138,8 @@ tool use so they do not dirty your log.
 - Open a session and read the transcript, with paged history and live events.
 - **Choose the model and reasoning effort** from the top of the conversation, without
   scrolling back through it.
-- **Answer questions and approvals**, with the full text and the options.
+- **Answer questions and approvals**, with the full text and the options — including the
+  agent's blocking `ask_user_question`, which does not need a timed preset.
 - **Write** to the agent and **cancel** the running turn.
 - Open the gear for language, contrast, folder preferences and the paired device. The phone's
   back gesture closes the sheet or the conversation before it leaves the app.
