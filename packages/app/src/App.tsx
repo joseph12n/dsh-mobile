@@ -556,184 +556,188 @@ export function App() {
     setView({ kind: 'pairing', endpoint: endpointFromLocation() });
   };
 
+  const inConversation = view.kind === 'sessions' && openSession !== undefined;
+
   return (
-    <main className="shell">
+    <main className={`shell${inConversation ? ' is-conversation' : ''}`}>
       <header className="head">
         <h1>DSH Mobile</h1>
         <p className="muted">{t('app.subtitle')}</p>
       </header>
 
-      {view.kind === 'checking' && <section className="card">{t('state.checking')}</section>}
+      <div className="shell-body">
+        {view.kind === 'checking' && <section className="card">{t('state.checking')}</section>}
 
-      {view.kind === 'connecting' && (
-        <section className="card">
-          <h2>{t('state.connecting')}</h2>
-          <p className="muted">{view.endpoint}</p>
-        </section>
-      )}
+        {view.kind === 'connecting' && (
+          <section className="card">
+            <h2>{t('state.connecting')}</h2>
+            <p className="muted">{view.endpoint}</p>
+          </section>
+        )}
 
-      {view.kind === 'pairing' && (
-        <section className="card">
-          <h2>{t('state.pairing')}</h2>
-          <p>{t('pairing.explain')}</p>
+        {view.kind === 'pairing' && (
+          <section className="card">
+            <h2>{t('state.pairing')}</h2>
+            <p>{t('pairing.explain')}</p>
 
-          <label className="field">
-            <span>{t('pairing.code')}</span>
-            <input
-              value={code}
-              onChange={(event) => setCode(event.target.value.toUpperCase())}
-              placeholder="ABCD1234…"
-              autoCapitalize="characters"
-              autoComplete="one-time-code"
-              inputMode="text"
+            <label className="field">
+              <span>{t('pairing.code')}</span>
+              <input
+                value={code}
+                onChange={(event) => setCode(event.target.value.toUpperCase())}
+                placeholder="ABCD1234…"
+                autoCapitalize="characters"
+                autoComplete="one-time-code"
+                inputMode="text"
+              />
+            </label>
+
+            <label className="field">
+              <span>{t('pairing.host')}</span>
+              <input
+                value={endpointInput || view.endpoint}
+                onChange={(event) => setEndpointInput(event.target.value)}
+                placeholder="wss://machine.tailnet.ts.net/ws"
+                autoCapitalize="none"
+                autoComplete="url"
+                inputMode="url"
+              />
+            </label>
+
+            <button
+              type="button"
+              disabled={!code.trim()}
+              onClick={() =>
+                void start(normalizeEndpoint(endpointInput || view.endpoint), code.trim())
+              }
+            >
+              {t('pairing.submit')}
+            </button>
+            {(view.noticeKey || view.notice) && (
+              <p className="error">{view.noticeKey ? t(view.noticeKey) : view.notice}</p>
+            )}
+          </section>
+        )}
+
+        {view.kind === 'reconnecting' && (
+          <section className="card">
+            <h2>{t('state.reconnecting')}</h2>
+            <p className="muted">
+              {t('reconnect.kept')}{' '}
+              {t('reconnect.attempt', {
+                attempt: view.attempt,
+                seconds: Math.round(view.retryInMs / 1000),
+              })}
+            </p>
+            <p className="muted small">{view.endpoint}</p>
+            <button type="button" onClick={() => void start(view.endpoint)}>
+              {t('reconnect.now')}
+            </button>
+          </section>
+        )}
+
+        {view.kind === 'error' && (
+          <section className="card">
+            <h2>{t('state.error')}</h2>
+            <p className="error">{view.message}</p>
+            <button type="button" onClick={() => void start(view.endpoint)}>
+              {t('error.retry')}
+            </button>
+            <button type="button" className="ghost" onClick={forget}>
+              {t('error.forget')}
+            </button>
+          </section>
+        )}
+
+        {view.kind === 'sessions' && (
+          <>
+            <QuestionsCard
+              questions={questions}
+              titleFor={(id) => view.sessions.find((item) => item.id === id)?.title ?? id}
+              onSubmit={(callId, sessionId, answers) => void answer(callId, sessionId, answers)}
             />
-          </label>
 
-          <label className="field">
-            <span>{t('pairing.host')}</span>
-            <input
-              value={endpointInput || view.endpoint}
-              onChange={(event) => setEndpointInput(event.target.value)}
-              placeholder="wss://machine.tailnet.ts.net/ws"
-              autoCapitalize="none"
-              autoComplete="url"
-              inputMode="url"
-            />
-          </label>
-
-          <button
-            type="button"
-            disabled={!code.trim()}
-            onClick={() =>
-              void start(normalizeEndpoint(endpointInput || view.endpoint), code.trim())
-            }
-          >
-            {t('pairing.submit')}
-          </button>
-          {(view.noticeKey || view.notice) && (
-            <p className="error">{view.noticeKey ? t(view.noticeKey) : view.notice}</p>
-          )}
-        </section>
-      )}
-
-      {view.kind === 'reconnecting' && (
-        <section className="card">
-          <h2>{t('state.reconnecting')}</h2>
-          <p className="muted">
-            {t('reconnect.kept')}{' '}
-            {t('reconnect.attempt', {
-              attempt: view.attempt,
-              seconds: Math.round(view.retryInMs / 1000),
-            })}
-          </p>
-          <p className="muted small">{view.endpoint}</p>
-          <button type="button" onClick={() => void start(view.endpoint)}>
-            {t('reconnect.now')}
-          </button>
-        </section>
-      )}
-
-      {view.kind === 'error' && (
-        <section className="card">
-          <h2>{t('state.error')}</h2>
-          <p className="error">{view.message}</p>
-          <button type="button" onClick={() => void start(view.endpoint)}>
-            {t('error.retry')}
-          </button>
-          <button type="button" className="ghost" onClick={forget}>
-            {t('error.forget')}
-          </button>
-        </section>
-      )}
-
-      {view.kind === 'sessions' && (
-        <>
-          <QuestionsCard
-            questions={questions}
-            titleFor={(id) => view.sessions.find((item) => item.id === id)?.title ?? id}
-            onSubmit={(callId, sessionId, answers) => void answer(callId, sessionId, answers)}
-          />
-
-          {openSession ? (
-            <SessionView
-              session={openSession}
-              entries={entries}
-              hasMore={hasMore}
-              loading={loadingHistory}
-              onBack={() => {
-                openSessionId.current = undefined;
-                setOpenSession(undefined);
-                setEntries([]);
-              }}
-              onLoadMore={() => void loadMore()}
-              onCancel={() => void stop()}
-              onSend={(text) => void sendText(text)}
-              {...(openSession.model ? { model: openSession.model } : {})}
-              {...(catalog ? { catalog } : {})}
-              {...(catalog
-                ? { onSelectModel: (selection: ModelSelection) => void changeModel(selection) }
-                : {})}
-              {...(modelError ? { error: modelError } : {})}
-            />
-          ) : (
-            <section className="card">
-              <div className="row">
-                <h2>{t('sessions.title')}</h2>
-                <button type="button" className="ghost" onClick={() => void reload()}>
-                  {t('sessions.refresh')}
-                </button>
-              </div>
-
-              {view.host.capabilities.includes('workspace.unarchive') && (
+            {openSession ? (
+              <SessionView
+                session={openSession}
+                entries={entries}
+                hasMore={hasMore}
+                loading={loadingHistory}
+                onBack={() => {
+                  openSessionId.current = undefined;
+                  setOpenSession(undefined);
+                  setEntries([]);
+                }}
+                onLoadMore={() => void loadMore()}
+                onCancel={() => void stop()}
+                onSend={(text) => void sendText(text)}
+                {...(openSession.model ? { model: openSession.model } : {})}
+                {...(catalog ? { catalog } : {})}
+                {...(catalog
+                  ? { onSelectModel: (selection: ModelSelection) => void changeModel(selection) }
+                  : {})}
+                {...(modelError ? { error: modelError } : {})}
+              />
+            ) : (
+              <section className="card">
                 <div className="row">
-                  <button
-                    type="button"
-                    className="ghost tiny"
-                    aria-pressed={showArchived}
-                    onClick={() => void toggleArchived()}
-                  >
-                    {t('sessions.archived')}
+                  <h2>{t('sessions.title')}</h2>
+                  <button type="button" className="ghost" onClick={() => void reload()}>
+                    {t('sessions.refresh')}
                   </button>
                 </div>
-              )}
 
-              {actionError && (
-                <p className="error" role="alert">
-                  {'key' in actionError ? t(actionError.key) : actionError.text}
-                </p>
-              )}
+                {view.host.capabilities.includes('workspace.unarchive') && (
+                  <div className="row">
+                    <button
+                      type="button"
+                      className="ghost tiny"
+                      aria-pressed={showArchived}
+                      onClick={() => void toggleArchived()}
+                    >
+                      {t('sessions.archived')}
+                    </button>
+                  </div>
+                )}
 
-              {usesFolders(view.workspaces) && (
-                <Settings
+                {actionError && (
+                  <p className="error" role="alert">
+                    {'key' in actionError ? t(actionError.key) : actionError.text}
+                  </p>
+                )}
+
+                {usesFolders(view.workspaces) && (
+                  <Settings
+                    workspaces={view.workspaces}
+                    preferences={preferences}
+                    onChange={setPreferences}
+                  />
+                )}
+
+                <SessionList
+                  sessions={view.sessions}
                   workspaces={view.workspaces}
+                  onOpen={(session) => void open(session)}
+                  onCreate={(workspaceId) => void createInFolder(workspaceId)}
+                  onArchive={(session) => void archive(session)}
+                  onUnarchive={(session) => void restore(session)}
+                  canCreate={view.host.capabilities.includes('session.create')}
+                  canArchive={view.host.capabilities.includes('workspace.archive')}
+                  canUnarchive={view.host.capabilities.includes('workspace.unarchive')}
+                  {...(creatingIn ? { createPending: creatingIn } : {})}
+                  {...(archiving ? { archivePending: archiving } : {})}
+                  {...(restoring ? { restorePending: restoring } : {})}
                   preferences={preferences}
-                  onChange={setPreferences}
                 />
-              )}
 
-              <SessionList
-                sessions={view.sessions}
-                workspaces={view.workspaces}
-                onOpen={(session) => void open(session)}
-                onCreate={(workspaceId) => void createInFolder(workspaceId)}
-                onArchive={(session) => void archive(session)}
-                onUnarchive={(session) => void restore(session)}
-                canCreate={view.host.capabilities.includes('session.create')}
-                canArchive={view.host.capabilities.includes('workspace.archive')}
-                canUnarchive={view.host.capabilities.includes('workspace.unarchive')}
-                {...(creatingIn ? { createPending: creatingIn } : {})}
-                {...(archiving ? { archivePending: archiving } : {})}
-                {...(restoring ? { restorePending: restoring } : {})}
-                preferences={preferences}
-              />
-
-              <button type="button" className="ghost" onClick={forget}>
-                {t('error.forget')}
-              </button>
-            </section>
-          )}
-        </>
-      )}
+                <button type="button" className="ghost" onClick={forget}>
+                  {t('error.forget')}
+                </button>
+              </section>
+            )}
+          </>
+        )}
+      </div>
 
       <footer className="foot">
         <label className="locale-picker">

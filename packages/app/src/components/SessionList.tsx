@@ -206,7 +206,7 @@ function SessionRow({
         onClick={() => onOpen(session)}
       >
         <span className="session-title">{session.title}</span>
-        <span className="muted small">
+        <span className="session-age muted small">
           {age ? t(unitKey(age), { count: 'count' in age ? age.count : 0 }) : ''}
         </span>
       </button>
