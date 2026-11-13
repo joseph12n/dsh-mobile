@@ -21,7 +21,7 @@ import {
 import { classifyFailure, retryDelay } from './lib/reconnect.js';
 import { storage } from './lib/storage.js';
 import { QuestionsCard } from './components/Questions.js';
-import { SessionView } from './components/SessionView.js';
+import { SessionView, type CatalogStatus } from './components/SessionView.js';
 import { SessionList } from './components/SessionList.js';
 import { Settings } from './components/Settings.js';
 import { ForgetDeviceButton } from './components/ForgetDeviceButton.js';
@@ -66,6 +66,7 @@ export function App() {
   const [showArchived, setShowArchived] = useState(false);
   const [endpointInput, setEndpointInput] = useState('');
   const [catalog, setCatalog] = useState<ModelCatalog | undefined>(undefined);
+  const [catalogStatus, setCatalogStatus] = useState<CatalogStatus>('idle');
   const [questions, setQuestions] = useState<QuestionBatch[]>([]);
   const [openSession, setOpenSession] = useState<SessionSummary | undefined>(undefined);
   const listHeadingRef = useRef<HTMLHeadingElement>(null);
@@ -163,6 +164,25 @@ export function App() {
     [],
   );
 
+  const loadModels = useCallback(async (connection: CompanionClient) => {
+    setCatalogStatus('loading');
+    try {
+      const loaded = await connection.listModels();
+      if (client.current !== connection) return;
+      setCatalog(loaded);
+      setCatalogStatus('ready');
+    } catch {
+      if (client.current !== connection) return;
+      setCatalog(undefined);
+      setCatalogStatus('error');
+    }
+  }, []);
+
+  const reloadModels = (): void => {
+    const connection = client.current;
+    if (connection) void loadModels(connection);
+  };
+
   const start = useCallback(
     async (endpoint: string, pairingCode?: string) => {
       cancelRetry();
@@ -254,14 +274,10 @@ export function App() {
         setView({ kind: 'sessions', endpoint, host: hello.host, sessions, workspaces });
 
         if (hello.host.capabilities.includes('model.select')) {
-          void connection
-            .listModels()
-            .then((loaded) => {
-              if (client.current === connection) setCatalog(loaded);
-            })
-            .catch(() => setCatalog(undefined));
+          void loadModels(connection);
         } else {
           setCatalog(undefined);
+          setCatalogStatus('idle');
         }
 
         const stillOpen = openSessionId.current;
@@ -270,7 +286,7 @@ export function App() {
         handleFailure(error, endpoint);
       }
     },
-    [client, cancelRetry, handleFailure, scheduleRetry, updateSession],
+    [client, cancelRetry, handleFailure, scheduleRetry, updateSession, loadModels],
   );
 
   useEffect(() => {
@@ -459,15 +475,12 @@ export function App() {
         if (request !== modelRequest.current) return;
 
         if (error instanceof ConnectionError && error.code === 'bad-request') {
-          void connection
-            .listModels()
-            .then(setCatalog)
-            .catch(() => undefined);
+          void loadModels(connection);
         }
         setModelError(messageOf(error));
       }
     },
-    [client, openSession],
+    [client, openSession, loadModels],
   );
 
   const stop = useCallback(async () => {
@@ -754,9 +767,13 @@ export function App() {
                 onCancel={() => void stop()}
                 onSend={(text) => void sendText(text)}
                 {...(openSession.model ? { model: openSession.model } : {})}
-                {...(catalog ? { catalog } : {})}
-                {...(catalog
-                  ? { onSelectModel: (selection: ModelSelection) => void changeModel(selection) }
+                {...(view.host.capabilities.includes('model.select')
+                  ? {
+                      onSelectModel: (selection: ModelSelection) => void changeModel(selection),
+                      catalogStatus,
+                      onReloadModels: reloadModels,
+                      ...(catalog ? { catalog } : {}),
+                    }
                   : {})}
                 {...(modelError ? { error: modelError } : {})}
               />

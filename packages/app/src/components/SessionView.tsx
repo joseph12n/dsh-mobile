@@ -8,7 +8,16 @@ import type {
 } from '@dsh-mobile/protocol';
 import { groupTurns, partTurn, type Turn } from '../lib/turns.js';
 import { plural, useI18n } from '../i18n/index.js';
-import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, SendIcon, StopIcon } from './icons.js';
+import {
+  ChevronDownIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  RefreshIcon,
+  SendIcon,
+  StopIcon,
+} from './icons.js';
+
+export type CatalogStatus = 'idle' | 'loading' | 'ready' | 'error';
 
 const STATE_KEY = {
   working: 'session.working',
@@ -235,6 +244,72 @@ function failuresText(catalog: ModelCatalog): string {
   return catalog.failures.map((failure) => `${failure.name}: ${failure.message}`).join(' · ');
 }
 
+function ModelSection({
+  model,
+  catalog,
+  status,
+  onSelect,
+  onReload,
+}: {
+  model?: ModelSelection;
+  catalog?: ModelCatalog;
+  status: CatalogStatus;
+  onSelect: (selection: ModelSelection) => void;
+  onReload?: () => void;
+}) {
+  const { t } = useI18n();
+
+  if (catalog && catalog.groups.length > 0) {
+    return (
+      <details className="session-model">
+        <summary>
+          <span className="muted small">{t('model.label')}</span>
+          <span className="session-model-name">{modelLabel(model, catalog)}</span>
+          <ChevronDownIcon />
+        </summary>
+        <ModelBar model={model} catalog={catalog} onSelect={onSelect} />
+      </details>
+    );
+  }
+
+  if (status === 'loading') {
+    return (
+      <div className="session-model session-model-status" role="status" aria-busy="true">
+        <span className="muted small">{t('model.label')}</span>
+        <span className="skeleton-line" aria-hidden="true" />
+      </div>
+    );
+  }
+
+  if (status === 'error') {
+    return (
+      <div className="session-model session-model-status" role="status">
+        <span className="muted small">{t('model.unavailable')}</span>
+        {onReload && (
+          <button
+            type="button"
+            className="ghost icon-button"
+            aria-label={t('model.retry')}
+            onClick={onReload}
+          >
+            <RefreshIcon />
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  if (catalog) {
+    return (
+      <div className="session-model session-model-status" role="status">
+        <span className="muted small">{t('model.none')}</span>
+      </div>
+    );
+  }
+
+  return null;
+}
+
 export function SessionView({
   session,
   entries,
@@ -242,12 +317,14 @@ export function SessionView({
   loading,
   model,
   catalog,
+  catalogStatus,
   error,
   onBack,
   onLoadMore,
   onCancel,
   onSend,
   onSelectModel,
+  onReloadModels,
 }: {
   session: SessionSummary;
   entries: HistoryEntry[];
@@ -255,12 +332,14 @@ export function SessionView({
   loading: boolean;
   model?: ModelSelection;
   catalog?: ModelCatalog;
+  catalogStatus?: CatalogStatus;
   error?: string;
   onBack: () => void;
   onLoadMore: () => void;
   onCancel: () => void;
   onSend: (text: string) => void;
   onSelectModel?: (selection: ModelSelection) => void;
+  onReloadModels?: () => void;
 }) {
   const { t } = useI18n();
   const [draft, setDraft] = useState('');
@@ -347,15 +426,14 @@ export function SessionView({
       )}
 
       <div className="session-scroll" ref={scrollRef} onScroll={trackScroll}>
-        {catalog && onSelectModel && (
-          <details className="session-model">
-            <summary>
-              <span className="muted small">{t('model.label')}</span>
-              <span className="session-model-name">{modelLabel(model, catalog)}</span>
-              <ChevronDownIcon />
-            </summary>
-            <ModelBar model={model} catalog={catalog} onSelect={onSelectModel} />
-          </details>
+        {onSelectModel && (
+          <ModelSection
+            {...(model ? { model } : {})}
+            {...(catalog ? { catalog } : {})}
+            status={catalogStatus ?? 'idle'}
+            onSelect={onSelectModel}
+            {...(onReloadModels ? { onReload: onReloadModels } : {})}
+          />
         )}
 
         {hasMore && (
