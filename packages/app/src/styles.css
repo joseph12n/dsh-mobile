@@ -45,6 +45,8 @@
   --font: 'Montserrat', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono: ui-monospace, 'SFMono-Regular', Menlo, monospace;
 
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+
   color-scheme: dark;
 }
 
@@ -345,10 +347,10 @@ button {
   font-weight: 500;
   cursor: pointer;
   transition:
-    background-color 120ms ease-out,
-    color 120ms ease-out,
-    border-color 120ms ease-out,
-    transform 120ms ease-out;
+    background-color 120ms ease,
+    color 120ms ease,
+    border-color 120ms ease,
+    transform 120ms var(--ease-out);
 }
 
 button:active:not(:disabled) {
@@ -911,7 +913,7 @@ button.ghost.tiny {
   flex: 0 0 auto;
   margin-left: auto;
   color: var(--muted);
-  transition: transform 150ms ease-out;
+  transition: transform 150ms var(--ease-out);
 }
 
 .session-model[open] > summary svg {
@@ -998,7 +1000,7 @@ button.ghost.tiny {
 .tool-toggle svg {
   width: 16px;
   height: 16px;
-  transition: transform 140ms ease-out;
+  transition: transform 140ms var(--ease-out);
 }
 
 .tool-toggle[aria-expanded='true'] svg {
@@ -1009,11 +1011,15 @@ button.ghost.tiny {
   margin: 6px 0 0;
   padding-left: 12px;
   border-left: 1px solid var(--line);
-  animation: reveal 160ms cubic-bezier(0.16, 1, 0.3, 1);
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    opacity 160ms var(--ease-out),
+    transform 160ms var(--ease-out);
 }
 
-@keyframes reveal {
-  from {
+@starting-style {
+  .transcript.nested {
     opacity: 0;
     transform: translateY(-4px);
   }
@@ -1106,13 +1112,24 @@ button.ghost.tiny {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
+  button:active:not(:disabled) {
+    transform: none;
+  }
+
+  .tool-toggle svg,
+  .session-model > summary svg {
+    transition: none;
+  }
+
+  .transcript.nested {
+    transition: opacity 120ms ease;
+    transform: none;
+  }
+
+  @starting-style {
+    .transcript.nested {
+      transform: none;
+    }
   }
 }
 
