@@ -1032,10 +1032,12 @@ button.ghost.tiny {
 }
 
 .session-model {
-  margin-bottom: 8px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--surface-2);
+  flex: 0 0 auto;
+  margin: 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
 }
 
 .session-model > summary {
@@ -1043,7 +1045,7 @@ button.ghost.tiny {
   align-items: center;
   gap: 8px;
   min-height: 44px;
-  padding: 0 12px;
+  padding: 0;
   list-style: none;
   cursor: pointer;
   color: var(--text-secondary);
@@ -1070,11 +1072,12 @@ button.ghost.tiny {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: var(--text);
 }
 
 .session-model .model-bar {
   margin: 0;
-  padding: 0 12px 12px;
+  padding: 0 0 12px;
 }
 
 .session-model-status {
@@ -1082,7 +1085,7 @@ button.ghost.tiny {
   align-items: center;
   gap: 8px;
   min-height: 44px;
-  padding: 0 12px;
+  padding: 0;
 }
 
 .session-model-status .icon-button {
