@@ -4,6 +4,7 @@ import { groupSessions, elapsed } from '../lib/sessions.js';
 import { displayTitle, groupByFolder, usesFolders } from '../lib/folders.js';
 import { folderView, type FolderPreferences } from '../lib/preferences.js';
 import { plural, useI18n } from '../i18n/index.js';
+import { ArchiveIcon, PlusIcon, RestoreIcon } from './icons.js';
 
 const STATE_KEY = {
   working: 'session.working',
@@ -84,12 +85,12 @@ export function SessionList({
                 {section.workspace && canCreate && onCreate && (
                   <button
                     type="button"
-                    className="ghost tiny"
+                    className="ghost icon-button"
                     aria-label={`${t('action.newSession')}: ${displayTitle(section.workspace)}`}
                     disabled={createPending !== undefined}
                     onClick={() => onCreate(section.workspace!.id)}
                   >
-                    {t('action.newSession')}
+                    <PlusIcon />
                   </button>
                 )}
               </header>
@@ -211,34 +212,10 @@ function SessionRow({
         </span>
       </button>
       <div className="session-meta">
-        <span id={stateId} className={`badge ${session.state}`}>
+        <span id={stateId} className="state">
+          <span className={`dot ${session.state}`} aria-hidden="true" />
           {t(STATE_KEY[session.state])}
         </span>
-        {archived
-          ? canUnarchive &&
-            onUnarchive && (
-              <button
-                type="button"
-                className="ghost tiny"
-                aria-label={`${t('action.restore')}: ${session.title}`}
-                disabled={restorePending === session.id}
-                onClick={() => onUnarchive(session)}
-              >
-                {t('action.restore')}
-              </button>
-            )
-          : canArchive &&
-            onArchive && (
-              <button
-                type="button"
-                className="ghost tiny"
-                aria-label={`${t('action.archive')}: ${session.title}`}
-                disabled={archivePending === session.id}
-                onClick={() => onArchive(session)}
-              >
-                {t('action.archive')}
-              </button>
-            )}
         {archived && (
           <span id={archivedId} className="badge archived">
             {t('action.archived')}
@@ -249,6 +226,33 @@ function SessionRow({
             {plural(t, 'session.questionCount', session.pendingQuestions)}
           </span>
         )}
+        <div className="session-actions">
+          {archived
+            ? canUnarchive &&
+              onUnarchive && (
+                <button
+                  type="button"
+                  className="ghost icon-button"
+                  aria-label={`${t('action.restore')}: ${session.title}`}
+                  disabled={restorePending === session.id}
+                  onClick={() => onUnarchive(session)}
+                >
+                  <RestoreIcon />
+                </button>
+              )
+            : canArchive &&
+              onArchive && (
+                <button
+                  type="button"
+                  className="ghost icon-button"
+                  aria-label={`${t('action.archive')}: ${session.title}`}
+                  disabled={archivePending === session.id}
+                  onClick={() => onArchive(session)}
+                >
+                  <ArchiveIcon />
+                </button>
+              )}
+        </div>
       </div>
     </li>
   );
