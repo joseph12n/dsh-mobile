@@ -273,7 +273,7 @@ button.danger {
   font-weight: 500;
 }
 
-.card p:not(.error):not(.question-text) {
+.card > p:not(.error):not(.question-text) {
   margin: 0 0 16px;
   line-height: 1.5;
   color: var(--muted);
@@ -757,6 +757,10 @@ button.ghost.tiny {
   margin-top: 20px;
   padding-top: 20px;
   border-top: 1px solid var(--line);
+}
+
+.question-batch > p {
+  margin: 0 0 12px;
 }
 
 .question-item + .question-item {
