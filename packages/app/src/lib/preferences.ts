@@ -6,12 +6,14 @@ export type FolderOrder = (typeof FOLDER_ORDERS)[number];
 
 export interface FolderPreferences {
   hidden: readonly string[];
+  collapsed: readonly string[];
   order: FolderOrder;
   hideEmpty: boolean;
 }
 
 export const DEFAULT_FOLDER_PREFERENCES: FolderPreferences = {
   hidden: [],
+  collapsed: [],
   order: 'host',
   hideEmpty: false,
 };
@@ -34,9 +36,13 @@ export function storedFolderPreferences(): FolderPreferences {
     const hidden = Array.isArray(record.hidden)
       ? record.hidden.filter((id): id is string => typeof id === 'string' && id.length > 0)
       : [];
+    const collapsed = Array.isArray(record.collapsed)
+      ? record.collapsed.filter((id): id is string => typeof id === 'string' && id.length > 0)
+      : [];
 
     return {
       hidden,
+      collapsed,
       order: isFolderOrder(record.order) ? record.order : 'host',
       hideEmpty: record.hideEmpty === true,
     };
@@ -76,6 +82,21 @@ export function toggleHidden(
     : [...preferences.hidden, workspaceId];
 
   return { ...preferences, hidden };
+}
+
+export function toggleCollapsed(
+  preferences: FolderPreferences,
+  workspaceId: string,
+): FolderPreferences {
+  const collapsed = preferences.collapsed.includes(workspaceId)
+    ? preferences.collapsed.filter((id) => id !== workspaceId)
+    : [...preferences.collapsed, workspaceId];
+
+  return { ...preferences, collapsed };
+}
+
+export function isCollapsed(preferences: FolderPreferences, workspaceId: string): boolean {
+  return preferences.collapsed.includes(workspaceId);
 }
 
 function lastActivity(section: FolderSection): number {

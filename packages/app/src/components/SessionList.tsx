@@ -1,10 +1,24 @@
-import { useId, useState } from 'react';
+import { useId, useState, type CSSProperties } from 'react';
 import type { SessionSummary, Workspace } from '@dsh-mobile/protocol';
 import { groupSessions, elapsed } from '../lib/sessions.js';
-import { displayTitle, groupByFolder, usesFolders } from '../lib/folders.js';
-import { folderView, type FolderPreferences } from '../lib/preferences.js';
+import {
+  compactPath,
+  displayTitle,
+  folderAccent,
+  groupByFolder,
+  parentPath,
+  usesFolders,
+} from '../lib/folders.js';
+import { folderView, isCollapsed, type FolderPreferences } from '../lib/preferences.js';
 import { plural, useI18n } from '../i18n/index.js';
-import { ArchiveIcon, MessagesIcon, PlusIcon, RestoreIcon } from './icons.js';
+import {
+  ArchiveIcon,
+  ChevronRightIcon,
+  FolderIcon,
+  MessagesIcon,
+  PlusIcon,
+  RestoreIcon,
+} from './icons.js';
 
 const STATE_KEY = {
   working: 'session.working',
@@ -28,6 +42,7 @@ export function SessionList({
   onCreate,
   onArchive,
   onUnarchive,
+  onToggleFolder,
   canCreate = false,
   canArchive = false,
   canUnarchive = false,
@@ -42,6 +57,7 @@ export function SessionList({
   onCreate?: (workspaceId: string) => void;
   onArchive?: (session: SessionSummary) => void;
   onUnarchive?: (session: SessionSummary) => void;
+  onToggleFolder: (workspaceId: string) => void;
   canCreate?: boolean;
   canArchive?: boolean;
   canUnarchive?: boolean;
@@ -77,48 +93,93 @@ export function SessionList({
     return (
       <>
         {folders.map((section, index) => {
-          const id = section.workspace?.id ?? 'no-folder';
+          const id = section.workspace?.id;
+          const listId = `folder-${index}`;
+          const title = section.workspace ? displayTitle(section.workspace) : t('group.noFolder');
+          const location = section.workspace
+            ? compactPath(parentPath(section.workspace.directory))
+            : '';
+          const collapsed = id !== undefined && preferences ? isCollapsed(preferences, id) : false;
           const empty = section.sessions.length === 0;
 
           return (
-            <section key={id} className="group folder">
-              <header className="group-head">
-                <h3 title={section.workspace?.directory}>
-                  {section.workspace ? displayTitle(section.workspace) : t('group.noFolder')}
+            <section
+              key={id ?? 'no-folder'}
+              className={`group folder${collapsed ? ' is-collapsed' : ''}`}
+              style={id ? ({ '--folder-accent': folderAccent(id) } as CSSProperties) : undefined}
+            >
+              <header className="group-head folder-head">
+                <h3 className="folder-heading">
+                  {id !== undefined ? (
+                    <button
+                      type="button"
+                      className="folder-toggle"
+                      aria-expanded={!collapsed}
+                      aria-controls={!collapsed && !empty ? listId : undefined}
+                      onClick={() => onToggleFolder(id)}
+                    >
+                      <ChevronRightIcon />
+                      <span className="folder-icon" aria-hidden="true">
+                        <FolderIcon />
+                      </span>
+                      <span className="folder-ident">
+                        <span className="folder-name" title={section.workspace?.directory}>
+                          {title}
+                        </span>
+                        {location && (
+                          <span className="folder-path" aria-hidden="true">
+                            {location}
+                          </span>
+                        )}
+                      </span>
+                      <span className="count">{section.sessions.length}</span>
+                    </button>
+                  ) : (
+                    <span className="folder-toggle folder-static">
+                      <span className="folder-icon" aria-hidden="true">
+                        <FolderIcon />
+                      </span>
+                      <span className="folder-ident">
+                        <span className="folder-name">{title}</span>
+                      </span>
+                      <span className="count">{section.sessions.length}</span>
+                    </span>
+                  )}
                 </h3>
-                <span className="count">{section.sessions.length}</span>
-                {section.workspace && canCreate && onCreate && (
+
+                {id !== undefined && canCreate && onCreate && (
                   <button
                     type="button"
                     className="ghost icon-button"
-                    aria-label={`${t('action.newSession')}: ${displayTitle(section.workspace)}`}
+                    aria-label={`${t('action.newSession')}: ${title}`}
                     disabled={createPending !== undefined}
-                    onClick={() => onCreate(section.workspace!.id)}
+                    onClick={() => onCreate(id)}
                   >
                     <PlusIcon />
                   </button>
                 )}
               </header>
 
-              {empty ? (
-                <p className="muted small">{t('group.emptyFolder')}</p>
-              ) : (
-                <ul className="sessions" id={`folder-${index}`}>
-                  {section.sessions.map((session) => (
-                    <SessionRow
-                      key={session.id}
-                      session={session}
-                      onOpen={onOpen}
-                      {...(onArchive ? { onArchive } : {})}
-                      {...(onUnarchive ? { onUnarchive } : {})}
-                      canArchive={canArchive}
-                      canUnarchive={canUnarchive}
-                      {...(archivePending ? { archivePending } : {})}
-                      {...(restorePending ? { restorePending } : {})}
-                    />
-                  ))}
-                </ul>
-              )}
+              {!collapsed &&
+                (empty ? (
+                  <p className="muted small">{t('group.emptyFolder')}</p>
+                ) : (
+                  <ul className="sessions" id={listId}>
+                    {section.sessions.map((session) => (
+                      <SessionRow
+                        key={session.id}
+                        session={session}
+                        onOpen={onOpen}
+                        {...(onArchive ? { onArchive } : {})}
+                        {...(onUnarchive ? { onUnarchive } : {})}
+                        canArchive={canArchive}
+                        canUnarchive={canUnarchive}
+                        {...(archivePending ? { archivePending } : {})}
+                        {...(restorePending ? { restorePending } : {})}
+                      />
+                    ))}
+                  </ul>
+                ))}
             </section>
           );
         })}

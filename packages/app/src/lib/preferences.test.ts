@@ -6,9 +6,11 @@ import {
   DEFAULT_FOLDER_PREFERENCES,
   folderListState,
   folderView,
+  isCollapsed,
   isFolderOrder,
   storeFolderPreferences,
   storedFolderPreferences,
+  toggleCollapsed,
   toggleHidden,
   type FolderPreferences,
 } from './preferences.js';
@@ -113,6 +115,22 @@ describe('toggling a folder', () => {
   });
 });
 
+describe('collapsing a folder', () => {
+  it('collapses and expands without touching the order', () => {
+    const first = toggleCollapsed(prefs({ order: 'name' }), 'a');
+    expect(first).toMatchObject({ collapsed: ['a'], order: 'name', hideEmpty: false });
+    expect(isCollapsed(first, 'a')).toBe(true);
+
+    const second = toggleCollapsed(first, 'a');
+    expect(second.collapsed).toEqual([]);
+    expect(isCollapsed(second, 'a')).toBe(false);
+  });
+
+  it('keeps the other collapsed ids', () => {
+    expect(toggleCollapsed(prefs({ collapsed: ['x'] }), 'y').collapsed).toEqual(['x', 'y']);
+  });
+});
+
 describe('which message the empty list gets', () => {
   it('says nothing special when the host has no folders', () => {
     expect(folderListState([orphans()], prefs())).toBe('folders');
@@ -183,8 +201,19 @@ describe('reading and storing', () => {
 
   it('round-trips what was stored', () => {
     fakeStorage();
-    storeFolderPreferences({ hidden: ['a'], order: 'recent', hideEmpty: true });
-    expect(storedFolderPreferences()).toEqual({ hidden: ['a'], order: 'recent', hideEmpty: true });
+    storeFolderPreferences({ hidden: ['a'], collapsed: ['b'], order: 'recent', hideEmpty: true });
+    expect(storedFolderPreferences()).toEqual({
+      hidden: ['a'],
+      collapsed: ['b'],
+      order: 'recent',
+      hideEmpty: true,
+    });
+  });
+
+  it('starts with no collapsed folders when an older store had none', () => {
+    fakeStorage();
+    globalThis.localStorage.setItem(KEY, JSON.stringify({ hidden: ['a'], order: 'name' }));
+    expect(storedFolderPreferences().collapsed).toEqual([]);
   });
 
   it('ignores an order it does not know', () => {
@@ -220,6 +249,12 @@ describe('reading and storing', () => {
     fakeStorage();
     globalThis.localStorage.setItem(KEY, JSON.stringify({ hidden: ['a', 3, '', null] }));
     expect(storedFolderPreferences().hidden).toEqual(['a']);
+  });
+
+  it('drops collapsed ids that are not strings', () => {
+    fakeStorage();
+    globalThis.localStorage.setItem(KEY, JSON.stringify({ collapsed: ['a', 3, '', null] }));
+    expect(storedFolderPreferences().collapsed).toEqual(['a']);
   });
 
   it('survives a storage that throws', () => {
