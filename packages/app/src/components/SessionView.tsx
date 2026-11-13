@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type {
   HistoryEntry,
   ModelCatalog,
@@ -8,6 +8,7 @@ import type {
 } from '@dsh-mobile/protocol';
 import { groupTurns, partTurn, type Turn } from '../lib/turns.js';
 import { plural, useI18n } from '../i18n/index.js';
+import { ChevronDownIcon, ChevronLeftIcon, SendIcon, StopIcon } from './icons.js';
 
 const STATE_KEY = {
   working: 'session.working',
@@ -257,29 +258,66 @@ export function SessionView({
 }) {
   const { t } = useI18n();
   const [draft, setDraft] = useState('');
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const atBottom = useRef(true);
+
+  useEffect(() => {
+    atBottom.current = true;
+    const area = scrollRef.current;
+    if (area) area.scrollTop = area.scrollHeight;
+  }, [session.id]);
+
+  useEffect(() => {
+    const area = scrollRef.current;
+    if (area && atBottom.current) area.scrollTop = area.scrollHeight;
+  }, [entries]);
+
+  const trackScroll = (): void => {
+    const area = scrollRef.current;
+    if (!area) return;
+    atBottom.current = area.scrollHeight - area.scrollTop - area.clientHeight < 48;
+  };
 
   const send = (): void => {
     const text = draft.trim();
     if (!text) return;
+    atBottom.current = true;
     onSend(text);
     setDraft('');
   };
 
   return (
     <section className="card session-view">
-      <div className="row">
-        <button type="button" className="ghost" onClick={onBack}>
-          {t('session.back')}
+      <header className="session-top">
+        <button
+          type="button"
+          className="ghost icon-button"
+          onClick={onBack}
+          aria-label={t('session.back')}
+        >
+          <ChevronLeftIcon />
         </button>
+
+        <div className="session-ident">
+          <h2 className="session-heading">{session.title}</h2>
+          <span className="session-state">
+            <span className={`dot ${session.state}`} aria-hidden="true" />
+            {t(STATE_KEY[session.state] ?? 'session.idle')}
+            {session.archived && ` · ${t('action.archived')}`}
+          </span>
+        </div>
+
         {!session.archived && (
-          <button type="button" className="ghost" onClick={onCancel}>
-            {t('session.stop')}
+          <button
+            type="button"
+            className="ghost icon-button"
+            onClick={onCancel}
+            aria-label={t('session.stop')}
+          >
+            <StopIcon />
           </button>
         )}
-      </div>
-
-      <h2 className="session-heading">{session.title}</h2>
-      <p className="muted small">{t(STATE_KEY[session.state] ?? 'session.idle')}</p>
+      </header>
 
       {error && (
         <p className="error" role="alert">
@@ -287,25 +325,34 @@ export function SessionView({
         </p>
       )}
 
-      {catalog && onSelectModel && (
-        <ModelBar model={model} catalog={catalog} onSelect={onSelectModel} />
-      )}
+      <div className="session-scroll" ref={scrollRef} onScroll={trackScroll}>
+        {catalog && onSelectModel && (
+          <details className="session-model">
+            <summary>
+              <span className="muted small">{t('model.label')}</span>
+              <span className="session-model-name">{modelLabel(model, catalog)}</span>
+              <ChevronDownIcon />
+            </summary>
+            <ModelBar model={model} catalog={catalog} onSelect={onSelectModel} />
+          </details>
+        )}
 
-      {hasMore && (
-        <button type="button" className="ghost load-more" onClick={onLoadMore} disabled={loading}>
-          {loading ? t('session.loading') : t('session.loadMore')}
-        </button>
-      )}
+        {hasMore && (
+          <button type="button" className="ghost load-more" onClick={onLoadMore} disabled={loading}>
+            {loading ? t('session.loading') : t('session.loadMore')}
+          </button>
+        )}
 
-      {entries.length === 0 ? (
-        <p className="muted">{loading ? t('session.loading') : t('session.empty')}</p>
-      ) : (
-        <div className="transcript">
-          {groupTurns(entries).map((turn, index) => (
-            <TurnBlock key={turn.id} turn={turn} number={index + 1} />
-          ))}
-        </div>
-      )}
+        {entries.length === 0 ? (
+          <p className="muted">{loading ? t('session.loading') : t('session.empty')}</p>
+        ) : (
+          <div className="transcript">
+            {groupTurns(entries).map((turn, index) => (
+              <TurnBlock key={turn.id} turn={turn} number={index + 1} />
+            ))}
+          </div>
+        )}
+      </div>
 
       {session.archived ? (
         <p className="muted">{t('session.archivedNote')}</p>
@@ -321,14 +368,34 @@ export function SessionView({
               }
             }}
             placeholder={t('session.placeholder')}
-            rows={2}
+            rows={1}
             autoCapitalize="sentences"
+            enterKeyHint="send"
           />
-          <button type="button" onClick={send} disabled={!draft.trim()}>
-            {t('session.send')}
+          <button
+            type="button"
+            className="send-button"
+            onClick={send}
+            disabled={!draft.trim()}
+            aria-label={t('session.send')}
+          >
+            <SendIcon />
           </button>
         </div>
       )}
     </section>
   );
+}
+
+function modelLabel(model: ModelSelection | undefined, catalog: ModelCatalog): string {
+  const selection = model ?? catalog.default;
+  if (!selection) return '';
+
+  const group = catalog.groups.find((item) => item.id === selection.provider);
+  const option = group?.models.find((item) => item.id === selection.model);
+  const name = option?.name ?? selection.model;
+  const effortId = selection.reasoningEffort ?? option?.defaultReasoningEffort;
+  const effort = option?.reasoningEfforts?.find((item) => item.id === effortId);
+
+  return effort ? `${name} · ${effort.name}` : name;
 }
