@@ -3,6 +3,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import QRCode from 'qrcode';
 import { WebSocketServer, type WebSocket } from 'ws';
 import {
+  HEARTBEAT_INTERVAL_MS,
   MAX_FRAME_BYTES,
   MAX_FRAMES_PER_MINUTE,
   PROTOCOL_VERSION,
@@ -43,9 +44,42 @@ const HOST = '127.0.0.1';
 
 type CommandFailureCode = 'not-found' | 'bad-request' | 'internal';
 
+export interface ServerLimits {
+  maxConnections: number;
+  maxDevices: number;
+  handshakeTimeoutMs: number;
+  heartbeatIntervalMs: number;
+  flushIntervalMs: number;
+}
+
+const DEFAULT_LIMITS: ServerLimits = {
+  maxConnections: 50,
+  maxDevices: 32,
+  handshakeTimeoutMs: 10_000,
+  heartbeatIntervalMs: HEARTBEAT_INTERVAL_MS,
+  flushIntervalMs: 30_000,
+};
+
+export function reapIdleClients(
+  clients: Iterable<{ ping(): void; terminate(): void }>,
+  alive: WeakSet<object>,
+): void {
+  for (const client of clients) {
+    if (!alive.has(client)) {
+      client.terminate();
+      continue;
+    }
+    alive.delete(client);
+    try {
+      client.ping();
+    } catch {}
+  }
+}
+
 export interface ServerDeps {
   pairing: PairingService;
   devices: DeviceRegistry;
+  limits?: Partial<ServerLimits>;
   port?: number;
   publicUrl?: string;
   capabilities?: Capability[] | (() => Capability[]);
@@ -223,6 +257,7 @@ function pairingPage(
 
 export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
   const { pairing, devices } = deps;
+  const limits = { ...DEFAULT_LIMITS, ...deps.limits };
   const capabilities = (): Capability[] =>
     typeof deps.capabilities === 'function' ? deps.capabilities() : (deps.capabilities ?? []);
   const requestedPort = deps.port ?? DEFAULT_PORT;
@@ -321,6 +356,7 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
 
   const clients = new Set<WebSocket>();
   const deviceSockets = new Map<string, Set<WebSocket>>();
+  const alive = new WeakSet<object>();
 
   function trackDevice(socket: WebSocket, device: Device): void {
     clients.add(socket);
@@ -345,12 +381,24 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
   }
 
   wss.on('connection', (socket: WebSocket) => {
+    if (wss.clients.size > limits.maxConnections) {
+      socket.close(1013, 'too many connections');
+      return;
+    }
+
     const connection: Connection = {
       device: undefined,
       sawHello: false,
       frameCount: 0,
       windowStart: Date.now(),
     };
+
+    alive.add(socket);
+    socket.on('pong', () => alive.add(socket));
+
+    const handshakeTimer = setTimeout(() => {
+      if (!connection.sawHello) socket.close(1008, 'hello timeout');
+    }, limits.handshakeTimeoutMs);
 
     log('connection open');
 
@@ -412,6 +460,7 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
         }
 
         connection.sawHello = true;
+        clearTimeout(handshakeTimer);
 
         if (message.deviceToken) {
           const device = devices.authenticate(message.deviceToken);
@@ -440,6 +489,18 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
       if (message.type === 'pair.redeem') {
         if (!connection.sawHello) {
           send(socket, errorMessage(message.id, 'auth-required', 'Send `hello` before pairing.'));
+          return;
+        }
+
+        if (devices.list().length >= limits.maxDevices) {
+          send(
+            socket,
+            errorMessage(
+              message.id,
+              'denied',
+              'The device limit was reached. Revoke a device and try again.',
+            ),
+          );
           return;
         }
 
@@ -1003,6 +1064,7 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
 
     socket.on('error', (error: Error) => log(`WebSocket error: ${error.message}`));
     socket.on('close', () => {
+      clearTimeout(handshakeTimer);
       untrackDevice(socket);
       for (const [, subscription] of subscriptions) subscription.stop();
       subscriptions.clear();
@@ -1018,6 +1080,12 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
         typeof address === 'object' && address !== null ? address.port : requestedPort;
       log(`listener on ${localOrigin()} (ws ${WEBSOCKET_PATH})`);
 
+      const heartbeatTimer = setInterval(
+        () => reapIdleClients(wss.clients, alive),
+        limits.heartbeatIntervalMs,
+      );
+      const flushTimer = setInterval(() => devices.flush(), limits.flushIntervalMs);
+
       resolve({
         port: listeningPort,
         publicUrl: localOrigin(),
@@ -1026,6 +1094,8 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
           return clients.size;
         },
         async close() {
+          clearInterval(heartbeatTimer);
+          clearInterval(flushTimer);
           for (const client of wss.clients) client.terminate();
           await new Promise<void>((done) => wss.close(() => done()));
           await new Promise<void>((done) => http.close(() => done()));

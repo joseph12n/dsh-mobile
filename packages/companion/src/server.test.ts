@@ -3,13 +3,18 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { request as httpRequest } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { WebSocket } from 'ws';
 import { PROTOCOL_VERSION, WEBSOCKET_PATH, parseServerMessage } from '@dsh-mobile/protocol';
 import type { ServerMessage } from '@dsh-mobile/protocol';
 import { DeviceRegistry, type DevicePersistence, type StoredDevice } from './core/devices.js';
 import { PairingService } from './core/pairing.js';
-import { startCompanionServer, type RunningServer, type ServerDeps } from './server.js';
+import {
+  reapIdleClients,
+  startCompanionServer,
+  type RunningServer,
+  type ServerDeps,
+} from './server.js';
 
 class MemoryPersistence implements DevicePersistence {
   devices: StoredDevice[] = [];
@@ -102,6 +107,21 @@ function hello(extra: Record<string, unknown> = {}): Record<string, unknown> {
   return { v: PROTOCOL_VERSION, id: 'hello', at: Date.now(), type: 'hello', proto: 1, ...extra };
 }
 
+function nextClose(url: string, timeoutMs = 2000): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const socket = new WebSocket(url);
+    const timer = setTimeout(() => {
+      socket.terminate();
+      reject(new Error('timeout esperando el cierre'));
+    }, timeoutMs);
+    socket.on('close', (code) => {
+      clearTimeout(timer);
+      resolve(code);
+    });
+    socket.on('error', () => undefined);
+  });
+}
+
 type TestServer = Awaited<ReturnType<typeof startCompanionServer>>;
 
 async function pairClient(
@@ -127,7 +147,7 @@ async function pairClient(
 }
 
 async function hostWith(
-  deps: Pick<ServerDeps, 'listCommands' | 'runCommand' | 'readActivity'>,
+  deps: Pick<ServerDeps, 'listCommands' | 'runCommand' | 'readActivity' | 'limits'>,
 ): Promise<{ server: TestServer; pairing: PairingService }> {
   const pairing = new PairingService();
   const server = await startCompanionServer({
@@ -588,6 +608,70 @@ describe('dispositivos sobre el WebSocket', () => {
 
     client.close();
     await server.close();
+  });
+});
+
+describe('límites del servidor', () => {
+  const url = (port: number): string => `ws://127.0.0.1:${port}${WEBSOCKET_PATH}`;
+
+  it('cierra la conexión extra cuando se alcanza el tope', async () => {
+    const { server } = await hostWith({ limits: { maxConnections: 1 } });
+    const authorized = await openClient(server.port);
+    authorized.send(hello());
+    await authorized.next();
+
+    await expect(nextClose(url(server.port))).resolves.toBe(1013);
+
+    authorized.send({ v: PROTOCOL_VERSION, id: 'ping-limit', at: Date.now(), type: 'ping' });
+    expect((await authorized.next())['type']).toBe('pong');
+
+    authorized.close();
+    await server.close();
+  });
+
+  it('cierra una conexión que no saluda a tiempo', async () => {
+    const { server } = await hostWith({ limits: { handshakeTimeoutMs: 60 } });
+    await expect(nextClose(url(server.port))).resolves.toBe(1008);
+    await server.close();
+  });
+
+  it('rechaza emparejar por encima del tope de dispositivos', async () => {
+    const { server, pairing } = await hostWith({ limits: { maxDevices: 1 } });
+    const { client: first } = await pairClient(server, pairing.issue().code, 'First');
+
+    const second = await openClient(server.port);
+    second.send(hello());
+    await second.next();
+    second.send({
+      v: PROTOCOL_VERSION,
+      id: 'pair-over-limit',
+      at: Date.now(),
+      type: 'pair.redeem',
+      code: pairing.issue().code,
+      deviceName: 'Second',
+      platform: 'node',
+    });
+    const response = await second.next();
+    expect(response['type']).toBe('error');
+    expect(response['code']).toBe('denied');
+
+    first.close();
+    second.close();
+    await server.close();
+  });
+
+  it('reapIdleClients termina a los que no responden y hace ping a los vivos', () => {
+    const alive = new WeakSet<object>();
+    const live = { ping: vi.fn(), terminate: vi.fn() };
+    const dead = { ping: vi.fn(), terminate: vi.fn() };
+    alive.add(live);
+
+    reapIdleClients([live, dead], alive);
+
+    expect(live.ping).toHaveBeenCalledTimes(1);
+    expect(live.terminate).not.toHaveBeenCalled();
+    expect(alive.has(live)).toBe(false);
+    expect(dead.terminate).toHaveBeenCalledTimes(1);
   });
 });
 

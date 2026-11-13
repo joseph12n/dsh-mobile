@@ -231,6 +231,12 @@ it. `session.activity` is a read-only request for the open session:
   `devices.changed` to the rest. The frames carry public device metadata only, never the token
   or its hash. Revoking yourself is the "forget this phone" path; the next request with the old
   token is `auth-invalid`.
+- **Bounded listener.** At most 50 concurrent sockets and 32 paired devices; a socket that does
+  not send `hello` within 10 s closes; a 20 s heartbeat reaps half-open clients; `lastSeenAt`
+  is flushed to disk every 30 s only when it changed; `probe.log` rotates at 1 MiB keeping one
+  copy. Pairing is reachable from the tailnet, so the tailnet ACLs are the real perimeter:
+  there is no per-IP redeem limit because every connection arrives from loopback through
+  `tailscale serve`, and codes are 128-bit, single-use and short-lived.
 - **Narrow scope**: sessions, questions, runs and commands. No settings, credentials or plugin
   management.
 - **The host decides.** Capabilities are announced in `hello.ok` and the server does not send
