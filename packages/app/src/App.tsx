@@ -19,6 +19,7 @@ import {
   normalizeEndpoint,
 } from './lib/connection.js';
 import { classifyFailure, retryDelay } from './lib/reconnect.js';
+import { backFrom, pushEntry, topEntry } from './lib/navigation.js';
 import { storage } from './lib/storage.js';
 import { QuestionsCard } from './components/Questions.js';
 import { SessionView, type CatalogStatus } from './components/SessionView.js';
@@ -83,6 +84,7 @@ export function App() {
 
   const openSessionId = useRef<string | undefined>(undefined);
   const reopenRef = useRef<((sessionId: string) => Promise<void>) | undefined>(undefined);
+  const openSeq = useRef(0);
 
   const refreshSeq = useRef(0);
 
@@ -382,11 +384,23 @@ export function App() {
     reopenRef.current = reopen;
   }, [reopen]);
 
+  const leaveSession = useCallback(() => {
+    openSeq.current += 1;
+    openSessionId.current = undefined;
+    setOpenSession(undefined);
+    setEntries([]);
+    setHasMore(false);
+    setLoadingHistory(false);
+  }, []);
+
   const open = useCallback(
     async (session: SessionSummary) => {
-      openSessionId.current = session.id;
       const connection = client.current;
       if (!connection) return;
+
+      const generation = ++openSeq.current;
+      openSessionId.current = session.id;
+      pushEntry(globalThis.history, { view: 'session', id: session.id });
 
       setOpenSession(session);
       setEntries([]);
@@ -397,17 +411,30 @@ export function App() {
 
       try {
         const page = await connection.history(session.id, { limit: 40 });
+        if (generation !== openSeq.current) return;
+
         setEntries([...page.entries].sort((a, b) => a.seq - b.seq));
         setHasMore(page.hasMore);
         await connection.subscribe(session.id, session.seq);
       } catch (error) {
+        if (generation !== openSeq.current) return;
         setView({ kind: 'error', endpoint: connection.url, message: messageOf(error) });
       } finally {
-        setLoadingHistory(false);
+        if (generation === openSeq.current) setLoadingHistory(false);
       }
     },
     [client],
   );
+
+  useEffect(() => {
+    const onPopState = (): void => {
+      if (topEntry(globalThis.history)?.view === 'session') return;
+      leaveSession();
+    };
+
+    globalThis.addEventListener('popstate', onPopState);
+    return () => globalThis.removeEventListener('popstate', onPopState);
+  }, [leaveSession]);
 
   const loadMore = useCallback(async () => {
     const connection = client.current;
@@ -779,9 +806,8 @@ export function App() {
                 hasMore={hasMore}
                 loading={loadingHistory}
                 onBack={() => {
-                  openSessionId.current = undefined;
-                  setOpenSession(undefined);
-                  setEntries([]);
+                  if (backFrom(globalThis.history, { view: 'session', id: openSession.id })) return;
+                  leaveSession();
                 }}
                 onLoadMore={() => void loadMore()}
                 onCancel={() => void stop()}
