@@ -9,23 +9,6 @@ import {
   type SessionsService,
 } from './host-api.js';
 
-/**
- * Spike de viabilidad (Fase 0).
- *
- * No intenta hacer el producto: intenta **averiguar qué es cierto en esta
- * máquina**. Cada comprobación registra lo que encontró o por qué no pudo, y
- * ninguna lanza hacia el host.
- *
- * Lo que se busca, en orden:
- *  - E0.1 preguntas pendientes, vía la proyección `userQuestions`
- *  - E0.2 sesiones vivas y transcripción
- *  - E0.3 por dónde se inyecta texto: aquí se enumeran los servicios reales en
- *    lugar de adivinar nombres
- */
-
-/** Servicios que podrían servir para leer o inyectar conversación. */
-// `workspace` se incluye a proposito: el escritorio agrupa por workspace y el
-// plugin necesita saber si ese servicio esta montado antes de prometer carpetas.
 const RELEVANT_SERVICE =
   /agent|turn|prompt|input|inbox|rpc|session|question|tool|workspace|project/i;
 
@@ -39,24 +22,19 @@ export interface SessionFacts {
   messageCount: number | undefined;
   asOfSeq: number | undefined;
   projectionKeys: string[] | undefined;
-  /** Valor crudo de la proyección `userQuestions`, para inspeccionar su forma. */
   pendingQuestions: unknown;
 }
 
 export interface ProbeReport {
   timestamp: string;
-  /** Nombres de todos los servicios montados, según el registro de cordis. */
   serviceNames: string[];
-  /** Métodos de los servicios que podrían tocar la conversación. */
   serviceDetails: ServiceDetail[];
   services: Record<string, string>;
   sessionCount: number | undefined;
   sessions: SessionFacts[];
-  /** Qué APIs candidatas existen, por nombre. */
   injectionCandidates: Record<string, string>;
 }
 
-/** Describe un valor sin volcarlo entero. */
 function describe(value: unknown): string {
   if (value === undefined) return 'absent';
   if (value === null) return 'null';
@@ -67,7 +45,6 @@ function describe(value: unknown): string {
   return `object{${keys.slice(0, 12).join(', ')}}`;
 }
 
-/** Resumen legible de una forma desconocida: tipo, longitud y primeras claves. */
 function summarize(value: unknown): string {
   if (Array.isArray(value)) {
     return `array(${value.length}) first element: ${describe(value[0])}`;
@@ -107,10 +84,6 @@ function sessionFacts(
   return facts;
 }
 
-/**
- * Ejecuta las comprobaciones y devuelve los hechos. No escribe nada en las
- * sesiones: es un sondeo de lectura.
- */
 export function runProbe(ctx: HostContext): ProbeReport {
   const sessions = service<SessionsService>(ctx, 'sessions');
   const projections = service<ProjectionsService>(ctx, 'sessionProjections');
@@ -130,7 +103,6 @@ export function runProbe(ctx: HostContext): ProbeReport {
     commands: describe(service(ctx, 'commands')),
     userQuestions: describe(userQuestions),
     tools: describe(service(ctx, 'tools')),
-    // Si existe, el escritorio agrupa por carpeta y el plugin puede hacer lo mismo.
     workspaceController: describe(workspaceController),
   };
 
@@ -149,7 +121,6 @@ export function runProbe(ctx: HostContext): ProbeReport {
     }
   }
 
-  // E0.3: qué hay disponible para meter texto en una sesión.
   const sessionController = service<Record<string, unknown>>(ctx, 'sessionController');
   const injectionCandidates: Record<string, string> = {
     sessionController: describe(sessionController),
@@ -171,7 +142,6 @@ export function runProbe(ctx: HostContext): ProbeReport {
   };
 }
 
-/** Vuelca el informe al log de evidencia, línea por línea. */
 export function reportToLog(report: ProbeReport): void {
   log('===== PHASE 0: probe =====');
   log(`mounted services (${report.serviceNames.length}): ${report.serviceNames.join(', ')}`);
@@ -194,7 +164,6 @@ export function reportToLog(report: ProbeReport): void {
   log('===== end of probe =====');
 }
 
-/** Informe en texto, para devolverlo desde el comando. */
 export function reportToText(report: ProbeReport): string {
   const lines: string[] = [];
   lines.push(`Phase 0 probe — ${report.timestamp}`);

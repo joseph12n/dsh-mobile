@@ -1,15 +1,3 @@
-/**
- * Puente de preguntas y aprobaciones.
- *
- * DSH guarda las preguntas en la proyección `userQuestions` de cada sesión y las
- * responde por lotes: `userQuestions.answer(agent, callId, { answers })` exige
- * que cada pregunta del lote aparezca **exactamente una vez**. Por eso el modelo
- * del contrato es un lote y no una pregunta suelta.
- *
- * Responder requiere el **agente raíz vivo** de la sesión, no solo la sesión:
- * `sessionController.prompt` acepta un id, pero la respuesta a una pregunta se
- * dirige al agente que la formuló.
- */
 import type {
   QuestionAnswerItem,
   QuestionBatch,
@@ -23,7 +11,6 @@ import {
   type SessionsService,
 } from '../host-api.js';
 
-/** Un ítem de la proyección, tal como puede llegar (no confiamos en su forma). */
 interface RawQuestionItem {
   id?: unknown;
   question?: unknown;
@@ -73,7 +60,6 @@ function toItem(raw: unknown): QuestionItem | undefined {
         .filter((option): option is { label: string; description?: string } => option !== undefined)
     : [];
 
-  // Las aprobaciones tienen acciones fijas: no admiten texto libre.
   const intent = asString(item.intent);
 
   return {
@@ -106,12 +92,10 @@ function toBatch(raw: unknown, sessionId: string): QuestionBatch | undefined {
     sessionId,
     state,
     items,
-    // La proyección no guarda el instante de la pregunta; 0 significa "desconocido".
     createdAt: 0,
   };
 }
 
-/** Lee la proyección `userQuestions` de una sesión viva. */
 function pendingOf(
   ctx: HostContext,
   sessionId: string,
@@ -135,13 +119,6 @@ function pendingOf(
   }
 }
 
-/**
- * Todos los lotes pendientes de todas las sesiones vivas.
- *
- * Sin sesión viva no hay proyección que leer, así que las preguntas de sesiones
- * cerradas no aparecen: es coherente con un mando que controla lo que está
- * pasando ahora.
- */
 export function listPendingQuestions(ctx: HostContext): QuestionBatch[] {
   const projections = service<ProjectionsService>(ctx, 'sessionProjections');
   const sessions = service<SessionsService>(ctx, 'sessions');
@@ -159,17 +136,10 @@ export function listPendingQuestions(ctx: HostContext): QuestionBatch[] {
 
 export interface AnswerOutcome {
   ok: boolean;
-  /** Código del contrato cuando falla. */
   code?: 'not-found' | 'bad-request' | 'internal';
   message?: string;
 }
 
-/**
- * Responde un lote.
- *
- * Devuelve un resultado en vez de lanzar: el servidor tiene que poder contestar
- * con un código de error del contrato.
- */
 export function answerQuestion(
   ctx: HostContext,
   input: { callId: string; sessionId: string; answers: QuestionAnswerItem[] },

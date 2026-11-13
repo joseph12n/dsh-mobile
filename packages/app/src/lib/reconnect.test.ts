@@ -2,18 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { ConnectionError, PairingError } from './connection.js';
 import { RETRY_DELAYS_MS, classifyFailure, retryDelay } from './reconnect.js';
 
-/**
- * What happens with a failure is the whole point of this module.
- *
- * Getting it wrong either deletes a valid pairing (when it should have retried) or
- * loops forever on something that will never fix itself.
- */
-
 describe('retry backoff', () => {
   it('grows and then caps', () => {
     const delays = [0, 1, 2, 3, 4, 5, 6, 20].map(retryDelay);
     expect(delays.slice(0, 6)).toEqual([...RETRY_DELAYS_MS]);
-    // Anything past the table repeats the last value instead of growing forever.
     expect(delays[6]).toBe(30_000);
     expect(delays[7]).toBe(30_000);
   });
@@ -49,8 +41,6 @@ describe('failure classification', () => {
   });
 
   it('a pairing error beats an inner connection code', () => {
-    // El canje falla con código propio: aunque el mensaje traiga un código de
-    // protocolo, lo que toca es volver al formulario.
     expect(classifyFailure(new PairingError('no', 'not-found'))).toBe('pairing');
   });
 

@@ -35,14 +35,7 @@ type View =
   | {
       kind: 'pairing';
       endpoint: string;
-      /**
-       * A catalogue key, not the translated text.
-       *
-       * Storing the text froze the notice in whatever language was active when the
-       * failure happened: switching language left it behind in the old one.
-       */
       noticeKey?: MessageKey;
-      /** For messages that come from somewhere else (the host, a thrown error). */
       notice?: string;
     }
   | { kind: 'reconnecting'; endpoint: string; attempt: number; retryInMs: number }
@@ -52,18 +45,10 @@ type View =
       endpoint: string;
       host: HostInfo;
       sessions: SessionSummary[];
-      /** Folders of the desktop. Empty when the host does not expose them. */
       workspaces: Workspace[];
     }
   | { kind: 'error'; endpoint: string; message: string };
 
-/**
- * Aviso de una acción fallida.
- *
- * Se guarda la **clave**, no el texto: traducir al pintar evita el aviso congelado en
- * el idioma que estaba activo cuando falló, que es la misma trampa que ya arregló
- * `noticeKey` en la pantalla de emparejamiento.
- */
 type ActionNotice = { key: MessageKey } | { text: string };
 
 export function App() {
@@ -72,18 +57,12 @@ export function App() {
   const { preferences, setPreferences } = useFolderPreferences();
   const [view, setView] = useState<View>({ kind: 'checking' });
   const [code, setCode] = useState('');
-  /** Last failed session action, shown above the list. */
   const [actionError, setActionError] = useState<ActionNotice | undefined>(undefined);
-  /** Folder whose "New session" is in flight: a second tap would create another session. */
   const [creatingIn, setCreatingIn] = useState<string | undefined>(undefined);
-  /** Session whose archive is in flight: a second tap would answer not-found. */
   const [archiving, setArchiving] = useState<string | undefined>(undefined);
-  /** Session whose restore is in flight, for the same reason. */
   const [restoring, setRestoring] = useState<string | undefined>(undefined);
-  /** Whether the list shows the archived sessions too. */
   const [showArchived, setShowArchived] = useState(false);
   const [endpointInput, setEndpointInput] = useState('');
-  /** Catalog the host offers, when it announced `model.select`. */
   const [catalog, setCatalog] = useState<ModelCatalog | undefined>(undefined);
   const [questions, setQuestions] = useState<QuestionBatch[]>([]);
   const [openSession, setOpenSession] = useState<SessionSummary | undefined>(undefined);
@@ -93,49 +72,27 @@ export function App() {
 
   const client = useMemo(() => ({ current: undefined as CompanionClient | undefined }), []);
 
-  /** Failed attempts in a row. A ref: scheduling a retry must not re-render. */
   const retry = useRef(0);
   const retryTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-  /** The open session, so it can be resubscribed after a reconnect. */
   const openSessionId = useRef<string | undefined>(undefined);
   const reopenRef = useRef<((sessionId: string) => Promise<void>) | undefined>(undefined);
 
-  /** Marca de la recarga más reciente: una respuesta vieja no puede pisar la nueva. */
   const refreshSeq = useRef(0);
 
-  /**
-   * La preferencia de archivadas, para quien no la tiene en el render.
-   *
-   * `start` se ejecuta al reconectar y no puede depender de `showArchived` sin
-   * reconstruir el socket en cada toque; `refresh` la lanza una acción que empezó antes
-   * del último cambio. En los dos casos lo correcto es el valor **vigente**.
-   */
   const showArchivedRef = useRef(false);
 
-  /** `start` calls itself to retry; the ref breaks the dependency cycle. */
   const startRef = useRef<((endpoint: string, pairingCode?: string) => Promise<void>) | undefined>(
     undefined,
   );
 
-  /** Cancels any pending retry. Called when connecting or forgetting. */
   const cancelRetry = useCallback(() => {
     clearTimeout(retryTimer.current);
     retryTimer.current = undefined;
   }, []);
 
-  /**
-   * Schedules one more attempt.
-   *
-   * The link drops all the time on a phone: it changes networks, the screen turns
-   * off, the tailnet blips. Before this, any of those left an error screen whose
-   * only button **deleted the pairing**.
-   */
   const scheduleRetry = useCallback(
     (endpoint: string) => {
-      // Un solo reloj por fallo. Un intento fallido avisa dos veces (el catch y el
-      // cierre del socket); sin esta guarda el contador avanzaba de dos en dos y el
-      // reintento manual se pisaba.
       if (retryTimer.current !== undefined) return;
       cancelRetry();
 
@@ -152,13 +109,6 @@ export function App() {
     [cancelRetry],
   );
 
-  /**
-   * Decides what a failure means.
-   *
-   * The rule: **the token is only dropped when the host says it is no longer
-   * valid**. Everything else keeps the pairing, because losing it costs a full
-   * round trip to the desktop.
-   */
   const handleFailure = useCallback(
     (error: unknown, endpoint: string) => {
       switch (classifyFailure(error)) {
@@ -189,11 +139,8 @@ export function App() {
     [cancelRetry, scheduleRetry],
   );
 
-  /** Connects, optionally redeems a pairing code, and loads the session list. */
   const start = useCallback(
     async (endpoint: string, pairingCode?: string) => {
-      // Any deliberate start cancels a pending retry: otherwise the timer fires
-      // later and tears down the connection that just succeeded.
       cancelRetry();
 
       client.current?.close();
@@ -202,13 +149,11 @@ export function App() {
       setQuestions([]);
       setView({ kind: 'connecting', endpoint });
 
-      // If the socket drops, retry. The pairing is never touched here.
       connection.onState((state) => {
         if (state.kind !== 'offline') return;
         scheduleRetry(endpoint);
       });
 
-      // Se registra antes de pedir nada: los lotes llegan empujados detrás de la lista.
       connection.onPush((message) => {
         if (message.type === 'question.pending') {
           const incoming = message.question;
@@ -220,15 +165,11 @@ export function App() {
           setQuestions((previous) => previous.filter((batch) => batch.callId !== message.callId));
         } else if (message.type === 'session.event') {
           setEntries((previous) =>
-            // Fusiona por `seq`: un evento repetido tras reconectar no se pinta dos veces.
             previous.some((entry) => entry.seq === message.seq)
               ? previous
               : [...previous, { seq: message.seq, at: message.at, event: message.event }],
           );
 
-          // La cabecera es **viva**. El estado llega dentro de la transcripción, no
-          // en un mensaje aparte: sin esto se quedaba congelado en el de la última
-          // lista hasta volver atrás.
           if (message.event.kind === 'state') {
             const { sessionId, event } = message;
             const state = event.state;
@@ -265,9 +206,6 @@ export function App() {
 
         const sessions = await connection.listSessions(showArchivedRef.current);
 
-        // Las carpetas son un extra: si fallan, la lista plana sigue siendo correcta.
-        // Antes iban en un `Promise.all` con las sesiones, así que un fallo de carpetas
-        // tiraba datos que ya estaban cargados.
         const workspaces = hello.host.capabilities.includes('workspace.list')
           ? await connection.listWorkspaces().catch(() => [])
           : [];
@@ -275,8 +213,6 @@ export function App() {
         retry.current = 0;
         setView({ kind: 'sessions', endpoint, host: hello.host, sessions, workspaces });
 
-        // El catálogo llega **después**: es un extra y una respuesta lenta no puede
-        // retrasar la lista de sesiones hasta diez segundos.
         if (hello.host.capabilities.includes('model.select')) {
           void connection
             .listModels()
@@ -288,8 +224,6 @@ export function App() {
           setCatalog(undefined);
         }
 
-        // After a reconnect the open session must be resubscribed, or the
-        // transcript stays frozen and stops receiving live events.
         const stillOpen = openSessionId.current;
         if (stillOpen) void reopenRef.current?.(stillOpen);
       } catch (error) {
@@ -299,13 +233,6 @@ export function App() {
     [client, cancelRetry, handleFailure, scheduleRetry],
   );
 
-  /**
-   * Retries when the app comes back to the foreground.
-   *
-   * The phone suspends the tab when the screen turns off, so the socket is gone
-   * by the time the user looks again. Without this they had to reload by hand —
-   * and before, that cost the pairing.
-   */
   useEffect(() => {
     const resume = (): void => {
       if (document.visibilityState !== 'visible') return;
@@ -323,7 +250,6 @@ export function App() {
     };
   }, [start, view]);
 
-  /** A pending retry must not outlive the component, and neither must the socket. */
   useEffect(
     () => () => {
       clearTimeout(retryTimer.current);
@@ -332,8 +258,6 @@ export function App() {
     },
     [client],
   );
-  // The retry calls the current version of `start`, not a stale closure. Updated in
-  // an effect: writing to a ref during render is a side effect React may repeat.
   useEffect(() => {
     startRef.current = start;
   }, [start]);
@@ -352,14 +276,6 @@ export function App() {
     [client],
   );
 
-  /**
-   * Reloads a session after reconnecting.
-   *
-   * It exists separately from `open` because `open` needs the full summary to
-   * render the header, and after a reconnect all we have is the id. It also
-   * starts from a clean transcript: the resubscription replays from the cursor,
-   * so keeping the old entries would duplicate everything.
-   */
   const reopen = useCallback(
     async (sessionId: string) => {
       const connection = client.current;
@@ -373,7 +289,6 @@ export function App() {
         const last = page.entries.at(-1)?.seq ?? 0;
         await connection.subscribe(sessionId, last);
       } catch {
-        // The list still works; leaving the stale transcript would be worse.
         setEntries([]);
       } finally {
         setLoadingHistory(false);
@@ -382,14 +297,10 @@ export function App() {
     [client],
   );
 
-  // El reintento usa la versión vigente, sin arrastrar una copia vieja.
-
-  // The reconnect path calls the current version of `reopen`, not a stale one.
   useEffect(() => {
     reopenRef.current = reopen;
   }, [reopen]);
 
-  /** Opens a session: history plus the live event stream. */
   const open = useCallback(
     async (session: SessionSummary) => {
       openSessionId.current = session.id;
@@ -416,7 +327,6 @@ export function App() {
     [client],
   );
 
-  /** Página anterior del historial. */
   const loadMore = useCallback(async () => {
     const connection = client.current;
     if (!connection || !openSession || entries.length === 0) return;
@@ -451,20 +361,15 @@ export function App() {
     [client, openSession],
   );
 
-  /** Error del último cambio de modelo, dentro de la sesión abierta. */
   const [modelError, setModelError] = useState<string | undefined>(undefined);
 
-  /** Marca de la elección más reciente: una respuesta vieja no puede pisar una nueva. */
   const modelRequest = useRef(0);
 
-  /** Cambia el modelo de la sesión abierta and keeps both views in sync. */
   const changeModel = useCallback(
     async (selection: ModelSelection) => {
       const connection = client.current;
       if (!connection || !openSession) return;
 
-      // La sesión se captura ahora: si el usuario vuelve y abre otra antes de que
-      // responda el host, la respuesta es de A y no puede escribir en B.
       const sessionId = openSession.id;
       const request = ++modelRequest.current;
 
@@ -489,8 +394,6 @@ export function App() {
       } catch (error) {
         if (request !== modelRequest.current) return;
 
-        // Si el host rechaza la elección, el catálogo del teléfono está viejo: se
-        // recarga en vez de ofrecer reintentar el mismo modelo que ya no existe.
         if (error instanceof ConnectionError && error.code === 'bad-request') {
           void connection
             .listModels()
@@ -513,12 +416,10 @@ export function App() {
     }
   }, [client, openSession]);
 
-  // Arranque: un enlace de emparejamiento manda sobre todo lo demás.
   useEffect(() => {
     const pairing = parsePairingUrl(globalThis.location.href);
 
     if (pairing) {
-      // El código no debe quedarse en la barra de direcciones.
       globalThis.history.replaceState(null, '', globalThis.location.pathname);
       const endpoint = normalizeEndpoint(pairing.e ?? endpointFromLocation());
       void start(endpoint, pairing.c);
@@ -535,7 +436,6 @@ export function App() {
     setEndpointInput(endpointFromLocation());
   }, [start]);
 
-  /** Creates a session in a folder, reloads the list and opens the new session. */
   const createInFolder = async (workspaceId: string) => {
     const connection = client.current;
     if (!connection || creatingIn) return;
@@ -545,10 +445,8 @@ export function App() {
       const sessionId = await connection.createSession(workspaceId);
       setActionError(undefined);
 
-      // Crear sin ver el resultado parece que no hizo nada: se abre la sesión.
       const sessions = await refresh();
       const created = sessions.find((session) => session.id === sessionId);
-      // Sin `await`: el botón de la carpeta se libera ya, y la sesión se abre sola.
       if (created) void open(created);
     } catch (error) {
       setActionError({ text: messageOf(error) });
@@ -557,17 +455,6 @@ export function App() {
     }
   };
 
-  /**
-   * Archives a session.
-   *
-   * If the host refuses because a turn is running, nothing is destroyed: the user is told
-   * and has to stop the turn first. Killing work from a phone without asking is not a
-   * feature.
-   *
-   * The row is removed as soon as the host confirms: waiting for the reload left the
-   * user tapping a session that was already gone. If the reload then fails, the row is
-   * already correct and the failure is reported, not hidden.
-   */
   const archive = async (session: SessionSummary) => {
     const connection = client.current;
     if (!connection || archiving) return;
@@ -580,11 +467,9 @@ export function App() {
     } catch (error) {
       const code = error instanceof ConnectionError ? error.code : undefined;
       if (code === 'not-found') {
-        // Ya no está: el objetivo está cumplido aunque el host se queje.
         dropRow(session.id);
         setActionError(undefined);
       } else {
-        // `denied` es la negativa por trabajo en marcha: se dice, no se mata el trabajo.
         setActionError(
           code === 'denied' ? { key: 'action.stopFirst' } : { text: messageOf(error) },
         );
@@ -600,7 +485,6 @@ export function App() {
     }
   };
 
-  /** Quita la fila ya, sin esperar a la lista. */
   const dropRow = (sessionId: string) => {
     setView((previous) =>
       previous.kind === 'sessions'
@@ -609,32 +493,21 @@ export function App() {
     );
   };
 
-  /**
-   * Reloads the list and returns what it loaded.
-   *
-   * **Throws** when it cannot: the previous version swallowed the failure while already
-   * showing the list, so after archiving from the phone a network blip left the row
-   * there with no message at all. Callers decide whether to report or ignore.
-   */
   const refresh = async (): Promise<SessionSummary[]> => {
     const connection = client.current;
     if (!connection) return [];
 
     const generation = ++refreshSeq.current;
-    // Se lee el ref, no el estado del render: una acción lenta que termina después del
-    // toque de «archivadas» tiene que traer la lista con la preferencia nueva.
     const sessions = await connection.listSessions(showArchivedRef.current);
     const admiteCarpetas = connection.capabilities().includes('workspace.list');
     const workspaces = admiteCarpetas ? await connection.listWorkspaces().catch(() => []) : [];
 
-    // Dos recargas solapadas: la que llega tarde no puede pisar una foto más nueva.
     if (generation === refreshSeq.current) {
       setView((state) => (state.kind === 'sessions' ? { ...state, sessions, workspaces } : state));
     }
     return sessions;
   };
 
-  /** El botón "Actualizar": un fallo aquí se dice en vez de fingir que no pasó nada. */
   const reload = async () => {
     try {
       await refresh();
@@ -644,21 +517,13 @@ export function App() {
     }
   };
 
-  /** Enseña u oculta las archivadas, y recarga con la elección nueva. */
   const toggleArchived = async () => {
     const next = !showArchived;
-    // El ref primero: la recarga que sigue lee de ahí, no del estado del render.
     showArchivedRef.current = next;
     setShowArchived(next);
     await reload();
   };
 
-  /**
-   * Devuelve una sesión archivada a la lista.
-   *
-   * No se quita la fila antes: si el host la rechaza, la sesión sigue archivada y la
-   * lista tiene que decirlo tal cual.
-   */
   const restore = async (session: SessionSummary) => {
     const connection = client.current;
     if (!connection || restoring) return;
@@ -680,12 +545,6 @@ export function App() {
     }
   };
 
-  /**
-   * Forgets the device. This is the **only** deliberate way to lose the pairing.
-   *
-   * The retry is cancelled first, and the client is closed as intentional, so
-   * neither schedules a reconnect for a device that no longer exists.
-   */
   const forget = () => {
     cancelRetry();
     retry.current = 0;
@@ -781,8 +640,6 @@ export function App() {
           <button type="button" onClick={() => void start(view.endpoint)}>
             {t('error.retry')}
           </button>
-          {/* Forgetting the device is a separate decision: it used to be the only
-              button, so a network failure cost a full re-pairing. */}
           <button type="button" className="ghost" onClick={forget}>
             {t('error.forget')}
           </button>
@@ -827,8 +684,6 @@ export function App() {
                 </button>
               </div>
 
-              {/* Sin capacidad para restaurar, el interruptor no haría nada: un host
-                  viejo descarta `includeArchived` y la lista sería la misma. */}
               {view.host.capabilities.includes('workspace.unarchive') && (
                 <div className="row">
                   <button
@@ -881,8 +736,6 @@ export function App() {
       )}
 
       <footer className="foot">
-        {/* Language lives in the footer on purpose: it is reachable before pairing,
-            when a user who cannot read the screen has the most to gain from it. */}
         <label className="locale-picker">
           <span className="visually-hidden">{t('settings.language')}</span>
           <select

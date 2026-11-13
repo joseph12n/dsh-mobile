@@ -2,11 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { CATALOGUES, LOCALES } from './locales.js';
 import { detectLocale, interpolate, isLocale, plural, translator } from './index.js';
 
-/**
- * The catalogue is the part that rots silently: a missing key shows the raw id, and
- * nobody notices until a user sees `session.tools` on screen.
- */
-
 describe('catalogue completeness', () => {
   it('every language has every key', () => {
     const keys = Object.keys(CATALOGUES.en).sort();
@@ -25,7 +20,6 @@ describe('catalogue completeness', () => {
   });
 
   it('every language keeps the placeholders of the English text', () => {
-    // A lost `{count}` renders a sentence with a hole in it.
     const placeholders = (text: string): string[] =>
       [...text.matchAll(/\{(\w+)\}/g)].map((match) => match[1] ?? '').sort();
 
@@ -46,7 +40,6 @@ describe('language detection', () => {
   });
 
   it('maps a Chinese region to the simplified script', () => {
-    // Browsers report the region; we ship one Chinese.
     expect(detectLocale(['zh-CN'])).toBe('zh-Hans');
     expect(detectLocale(['zh-TW'])).toBe('zh-Hans');
   });

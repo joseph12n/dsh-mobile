@@ -1,14 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { findTailscaleBinary, parseTailnetName, resolvePublicOrigin } from './public-origin.js';
 
-/**
- * El comando `/mobile` no tiene petición de la que sacar el `Host`, así que el
- * origen se resuelve por niveles: configuración, tailnet, loopback.
- *
- * Un enlace de emparejamiento que apunta a `127.0.0.1` es inútil desde un
- * teléfono, así que la degradación al último nivel tiene que ser **visible**.
- */
-
 describe('nombre del tailnet', () => {
   it('lee el DNSName y le quita el punto final', () => {
     expect(parseTailnetName('{"Self":{"DNSName":"maquina.tailnet.ts.net."}}')).toBe(
@@ -75,8 +67,6 @@ describe('resolución del origen público', () => {
   });
 
   it('descarta una configuración que no es un origen y sigue con la detección', async () => {
-    // El servidor ya ignora una URL inválida; el comando no puede presentarla
-    // como buena solo porque esté configurada.
     const resolved = await resolvePublicOrigin('localhost:6768', 6768, () =>
       Promise.resolve('maquina.tailnet.ts.net'),
     );

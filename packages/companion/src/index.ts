@@ -29,22 +29,8 @@ import { reportToLog, reportToText, runProbe, type ProbeReport } from './probe.j
 import { DEFAULT_PORT, startCompanionServer } from './server.js';
 import type { Capability } from '@dsh-mobile/protocol';
 
-/**
- * dsh-mobile companion — plugin host.
- *
- * Estado actual: **spike de Fase 0**. No es el producto todavía. Sirve para
- * responder con evidencia si un plugin puede ver sesiones, leer la proyección de
- * preguntas y abrir su propio listener. Todo lo que falla se registra; nunca se
- * propaga al host.
- */
-
 export const name = 'dsh-mobile-companion';
 
-/**
- * Servicios que el plugin necesita. Cordis no activa el plugin hasta que están
- * montados, así que dentro de `apply` se pueden usar sin comprobaciones de
- * carrera (aun así se accede de forma defensiva).
- */
 export const inject = ['sessions', 'sessionProjections', 'commands'];
 
 const COMMAND_DESCRIPTION = 'Pair your phone, or check the companion status';
@@ -60,23 +46,15 @@ export function apply(ctx: HostContext): void {
     return report;
   };
 
-  // --- Emparejamiento bajo demanda ---------------------------------------------
-  // El origen público se resuelve en segundo plano: consultar Tailscale no debe
-  // bloquear la carga del plugin.
   let origin: ResolvedOrigin | undefined;
   let listeningPort: number | undefined;
   let listenerError: string | undefined;
 
-  /** Enlace de emparejamiento del código actual. */
   const linkFor = (code: string): string => {
     const port = listeningPort ?? DEFAULT_PORT;
     return buildPairingUrl(origin?.origin ?? `http://127.0.0.1:${port}`, code);
   };
 
-  /**
-   * QR del enlace, ya pintado. Devuelve `undefined` si algo falla: el comando
-   * tiene que salir igual, con el enlace, aunque no se pueda pintar el código.
-   */
   const qrFor = (code: string): string | undefined => {
     try {
       return qrText(linkFor(code));
@@ -85,7 +63,6 @@ export function apply(ctx: HostContext): void {
     }
   };
 
-  /** Abre `/pair` en el navegador y cuenta lo que pasó, sin lanzar. */
   const openPairingPage = (): string => {
     const page = `${origin?.origin ?? `http://127.0.0.1:${listeningPort ?? DEFAULT_PORT}`}/pair`;
 
@@ -96,17 +73,13 @@ export function apply(ctx: HostContext): void {
     return `Opening ${page} in the desktop browser.`;
   };
 
-  /** Resuelve el origen público. No lanza: un fallo deja el nivel anterior. */
   const detectOrigin = async (port: number): Promise<void> => {
     try {
       origin = await resolvePublicOrigin(publicUrl, port);
       log(`public pairing origin: ${origin.origin} (${origin.source})`);
-    } catch {
-      // Sin detección, el comando ya cae a loopback y lo avisa.
-    }
+    } catch {}
   };
 
-  // --- /mobile: pairing. `open` is the default; `qr` and `link` are opt-ins ------
   if (ctx.commands) {
     const register = (): (() => void) =>
       ctx.commands!.register({
@@ -115,8 +88,6 @@ export function apply(ctx: HostContext): void {
         input: { hint: '[open|qr|link|status]' },
         handler: (invocation) => {
           const argument = (invocation.rawInput ?? '').trim().toLowerCase();
-
-          // `status` keeps the diagnostic probe out of the main path.
 
           if (argument === 'status' || argument === 'probe') {
             try {
@@ -133,9 +104,6 @@ export function apply(ctx: HostContext): void {
           try {
             const current = pairing.pending()[0] ?? pairing.issue();
 
-            // `qr` is opt-in on purpose: a text QR only scans when line height
-            // equals font size, which the DSH chat does not do. Printing it by
-            // default would look right and not scan.
             const wantsQr = argument === 'qr';
             const wantsLinkOnly = argument === 'link';
 
@@ -149,8 +117,6 @@ export function apply(ctx: HostContext): void {
               qr: wantsQr ? qrFor(current.code) : undefined,
             });
 
-            // Opening the pairing page is the default: the QR there is an image,
-            // so it scans whatever the chat font is.
             const opensBrowser = !wantsQr && !wantsLinkOnly && !listenerError;
 
             return {
@@ -163,7 +129,6 @@ export function apply(ctx: HostContext): void {
         },
       });
 
-    // /mobile-say <sessionId> <texto> — E0.3. Acción explícita, nunca automática.
     const registerSay = (): (() => void) =>
       ctx.commands!.register({
         name: 'mobile-say',
@@ -209,30 +174,23 @@ export function apply(ctx: HostContext): void {
     log('the commands service is not available; /mobile is disabled');
   }
 
-  // --- Estado del producto: emparejamiento y dispositivos ---------------------
   const pairing = new PairingService();
   const devices = new DeviceRegistry({
     persistence: new DevicesFile(join(COMPANION_DIR, 'devices.json')),
   });
 
-  // --- Listener propio (E0.4) --------------------------------------------------
   const portFromEnv = Number(process.env.DSH_MOBILE_PORT ?? '');
   const options = Number.isInteger(portFromEnv) && portFromEnv > 0 ? { port: portFromEnv } : {};
   const publicUrl = process.env.DSH_MOBILE_PUBLIC_URL?.trim();
   const webRoot = findWebRoot();
   log(webRoot ? `PWA served from ${webRoot}` : 'PWA not found; the host serves the API only');
 
-  // Se anuncia solo lo que este host sabe hacer, y se **evalúa en cada hello**: el
-  // controlador de workspaces puede montarse después del arranque, y una bandera
-  // congelada mentiría en las dos direcciones.
   const limits = (): Capability[] => {
     const list: Capability[] = [];
     if (hasWorkspaces(ctx)) list.push('workspace.list');
     if (canCreateSession(ctx)) list.push('session.create');
     if (canArchiveSession(ctx)) list.push('workspace.archive');
     if (canUnarchiveSession(ctx)) list.push('workspace.unarchive');
-    // Las dos mitades o ninguna: un selector que no puede cambiar el modelo no
-    // debería siquiera ofrecerse.
     if (canListModels(ctx) && canSelectModel(ctx)) list.push('model.select');
     return list;
   };
@@ -244,31 +202,24 @@ export function apply(ctx: HostContext): void {
     ...options,
     ...(publicUrl ? { publicUrl } : {}),
     ...(webRoot ? { webRoot } : {}),
-    // Sesiones: la misma fuente que usa la lista del escritorio.
     listSessions: (options) => listSessions(ctx, options),
-    // Carpetas: la proyección de workspaces del escritorio, o vacío si no existe.
     listWorkspaces: () => listWorkspaces(ctx),
     createSession: (request) => createSession(ctx, request),
     archiveSession: (request) => archiveSession(ctx, request),
     unarchiveSession: (request) => unarchiveSession(ctx, request),
-    // Modelos: el catálogo y el cambio salen del mismo controlador que el escritorio.
     listModels: () => listModels(ctx),
     selectModel: (request) => selectModel(ctx, request),
-    // Preguntas: proyección `userQuestions` y respuesta por lote.
     listQuestions: () => listPendingQuestions(ctx),
     answerQuestion: (input) => answerQuestion(ctx, input),
-    // Transcripción: historial paginado, eventos en vivo y cancelación.
     readHistory: (sessionId, options) => readHistory(ctx, sessionId, options),
     subscribeSession: (sessionId, options) => subscribeSession(ctx, sessionId, options),
     cancelRun: (sessionId) => cancelRun(ctx, sessionId),
-    // Compositor: escribir en la sesión por el mismo camino que el escritorio.
     sendReply: async (sessionId, text) => {
       const result = await injectText(ctx, sessionId, text);
       return result.ok
         ? { ok: true }
         : { ok: false, code: 'bad-request' as const, message: result.detail };
     },
-    // Siempre en vivo: un informe cacheado miente en cuanto cambian las sesiones.
     report: () => probe(),
   })
     .then((running) => {
@@ -279,18 +230,13 @@ export function apply(ctx: HostContext): void {
       listeningPort = running.port;
       log(`listener ready on port ${running.port} (try: GET /health)`);
 
-      // Se resuelve después de escuchar: así hay puerto para el último nivel.
       void detectOrigin(running.port);
     })
     .catch((error: unknown) => {
-      // Sin listener no hay a dónde emparejar, y el comando tiene que decirlo en
-      // vez de enseñar un enlace muerto.
       listenerError = String(error);
       log(`could not open the listener: ${listenerError}`);
     });
 
-  // --- Sondeo de arranque ------------------------------------------------------
-  // Se difiere para que el host termine de montar sesiones y proyecciones.
   const timer = setTimeout(() => {
     try {
       probe();
@@ -300,16 +246,13 @@ export function apply(ctx: HostContext): void {
   }, 2000);
   if (typeof timer.unref === 'function') timer.unref();
 
-  // Cierre ordenado si el host descarga el plugin.
   ctx.effect?.(function* () {
     yield () => {
       clearTimeout(timer);
       for (const dispose of disposers.reverse()) {
         try {
           dispose();
-        } catch {
-          // Un disposer defectuoso no debe impedir los demás.
-        }
+        } catch {}
       }
       log('plugin unloaded');
     };

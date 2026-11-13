@@ -9,16 +9,6 @@ import {
 import { useI18n } from '../i18n/index.js';
 import type { MessageKey } from '../i18n/locales.js';
 
-/**
- * Settings panel.
- *
- * Language and contrast already live in the footer, where they are reachable before
- * pairing; this panel holds what only makes sense once there is a list: which folders to
- * show, in what order, and whether the empty ones take a row.
- *
- * It is a `<details>` so it does not push the list down for people who never open it.
- */
-
 const ORDER_KEY: Record<FolderOrder, MessageKey> = {
   host: 'settings.order.host',
   name: 'settings.order.name',
@@ -69,13 +59,7 @@ export function Settings({
       {workspaces.length > 0 && (
         <div className="settings-folders" role="group" aria-label={t('settings.title')}>
           {workspaces.map((workspace) => (
-            <label
-              className="settings-row"
-              key={workspace.id}
-              // Dos carpetas pueden llamarse igual (mismo último segmento): el
-              // directorio completo es la única forma de distinguirlas.
-              title={workspace.directory}
-            >
+            <label className="settings-row" key={workspace.id} title={workspace.directory}>
               <input
                 type="checkbox"
                 checked={!preferences.hidden.includes(workspace.id)}

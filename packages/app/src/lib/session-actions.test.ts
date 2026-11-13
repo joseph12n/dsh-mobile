@@ -2,13 +2,6 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { ConnectionError } from './connection.js';
 import { answer, connected, flush, lastSent, restoreSocket, stubSocket } from './test-socket.js';
 
-/**
- * Las acciones de la sesión sobre el contrato.
- *
- * Lo que se fija aquí es que el cliente **no dé por bueno cualquier marco**: una
- * confirmación que no llegue, o que llegue con otro tipo, es un fallo, no un éxito.
- */
-
 afterEach(() => {
   restoreSocket();
 });
@@ -38,7 +31,6 @@ describe('crear una sesión', () => {
   });
 
   it('rechaza una confirmación con otro tipo', async () => {
-    // Un host que contesta `workspace.archived` a un `session.create` no ha creado nada.
     stubSocket();
     const { socket, client } = await connected(['session.create']);
 
@@ -75,7 +67,6 @@ describe('archivar una sesión', () => {
   });
 
   it('rechaza cualquier respuesta que no sea la confirmación', async () => {
-    // El fallo silencioso: antes se aceptaba cualquier marco que no fuera `error`.
     stubSocket();
     const { socket, client } = await connected(['workspace.archive']);
 

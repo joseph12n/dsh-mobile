@@ -1,16 +1,3 @@
-/* ---------------------------------------------------------------------------
- * Tokens de diseño.
- *
- * No son inventados: salen del tema oscuro real de DeepSeek Harness
- * (`@deepseek-ai/dsh-client-ui-theme`), donde los alias `--dsw-alias-*` apuntan a
- * primitivos `--dsw-static-*`. Aquí están ya resueltos a su valor final.
- *
- * Para regenerarlos: node scripts/extract-dsh-tokens.mjs <ruta al client.js del tema>
- *
- * La idea es que este cliente no parezca otra app: misma base, mismas capas,
- * mismos bordes y mismo texto que el escritorio.
- * ------------------------------------------------------------------------- */
-
 @font-face {
   font-family: 'Montserrat';
   font-style: normal;
@@ -28,35 +15,30 @@
 }
 
 :root {
-  /* Superficies */
-  --bg: #151517; /* dsw-alias-bg-base */
-  --surface: #232324; /* dsw-alias-bg-layer-1 */
-  --surface-2: #2c2c2e; /* dsw-alias-bg-layer-2 */
-  --surface-3: #353638; /* dsw-alias-bg-layer-3 */
-  --code-bg: #1b1b1c; /* dsw-alias-markdown-code-block */
+  --bg: #151517;
+  --surface: #232324;
+  --surface-2: #2c2c2e;
+  --surface-3: #353638;
+  --code-bg: #1b1b1c;
 
-  /* Bordes */
-  --line: #ffffff0f; /* dsw-alias-border-l1 */
-  --line-strong: #ffffff1f; /* dsw-alias-border-l2 */
-  --line-emphasis: #ffffff29; /* dsw-alias-border-l3 */
+  --line: #ffffff0f;
+  --line-strong: #ffffff1f;
+  --line-emphasis: #ffffff29;
 
-  /* Texto */
-  --text: #f9fafb; /* dsw-alias-label-primary */
-  --text-secondary: #cfd3d6; /* dsw-alias-label-secondary */
-  --muted: #adb2b8; /* dsw-alias-label-tertiary */
+  --text: #f9fafb;
+  --text-secondary: #cfd3d6;
+  --muted: #adb2b8;
 
-  /* Acción. Ojo: en DSH el botón primario es claro, no de color. */
-  --accent: #f9fafb; /* dsw-alias-button-primary-fill */
-  --accent-text: #0f1115; /* dsw-alias-label-primary-foreground */
-  --accent-hover: #ebeef2; /* dsw-alias-button-primary-hover */
-  --hover: #ffffff14; /* dsw-alias-interactive-bg-hover */
-  --link: #7aaaff; /* dsw-alias-link */
+  --accent: #f9fafb;
+  --accent-text: #0f1115;
+  --accent-hover: #ebeef2;
+  --hover: #ffffff14;
+  --link: #7aaaff;
 
-  /* Estado */
-  --warn: #f59e0b; /* dsw-alias-state-warn-primary */
-  --danger: #f25a5a; /* dsw-alias-state-error-primary */
-  --business: #7aaaff; /* dsw-alias-state-business-primary */
-  --done: #a78bfa; /* dsw-alias-state-done-primary */
+  --warn: #f59e0b;
+  --danger: #f25a5a;
+  --business: #7aaaff;
+  --done: #a78bfa;
 
   --radius: 12px;
   --radius-lg: 16px;
@@ -86,7 +68,6 @@ body {
   display: flex;
 }
 
-/* Respeta el notch y la barra inferior del teléfono. */
 .shell {
   flex: 1;
   display: flex;
@@ -138,8 +119,6 @@ body {
   font-weight: 500;
 }
 
-/* :not() para no pisar .error ni .question-text, que tienen menos
-   especificidad y quedaban sin efecto. */
 .card p:not(.error):not(.question-text) {
   margin: 0 0 16px;
   line-height: 1.5;
@@ -179,7 +158,7 @@ body {
   background: var(--surface-2);
   color: var(--text);
   font-family: var(--font);
-  font-size: 16px; /* 16px evita el zoom automático en iOS */
+  font-size: 16px;
 }
 
 .field input::placeholder,
@@ -189,7 +168,6 @@ body {
 }
 
 button {
-  /* Objetivo táctil de 44 px, el mínimo cómodo en móvil. */
   min-height: 44px;
   width: 100%;
   padding: 12px 16px;
@@ -203,8 +181,6 @@ button {
   cursor: pointer;
 }
 
-/* `.session-open` lleva `background: none` y `color: inherit`, así que el relleno
-   de hover lo dejaría con el texto casi invisible: se excluye. */
 button:hover:not(:disabled):not(.option):not(.session-open) {
   background: var(--accent-hover);
 }
@@ -229,8 +205,6 @@ button.ghost:hover:not(:disabled) {
   background: var(--hover);
 }
 
-/* --- Secciones de la lista ------------------------------------------------ */
-
 .group + .group {
   margin-top: 20px;
 }
@@ -251,7 +225,6 @@ button.ghost:hover:not(:disabled) {
   color: var(--muted);
 }
 
-/* La sección que espera respuesta es la única que llama la atención a propósito. */
 .group.waiting .group-head h3 {
   color: var(--warn);
 }
@@ -270,8 +243,6 @@ button.ghost:hover:not(:disabled) {
   margin-left: auto;
 }
 
-/* Foco visible en cualquier control. Sin esto, el navegador dibuja un contorno de
-   1 px casi negro sobre el fondo oscuro y no se ve dónde estás al tabular. */
 button:focus-visible,
 [role='button']:focus-visible,
 a:focus-visible,
@@ -280,8 +251,7 @@ textarea:focus-visible {
   outline: 2px solid var(--link);
   outline-offset: 2px;
 }
-/* Pequeño en apariencia, pero el área táctil sigue siendo de 44 px: en un móvil
-   un botón de 32 px se falla con el pulgar. */
+
 button.ghost.tiny {
   min-height: 44px;
   padding: 4px 12px;
@@ -313,7 +283,7 @@ button.ghost.tiny {
   justify-content: space-between;
   gap: 12px;
   width: 100%;
-  /* Toda la fila abre la sesión, y en un móvil se pulsa con el pulgar. */
+
   min-height: 44px;
   padding: 0;
   border: 0;
@@ -338,8 +308,6 @@ button.ghost.tiny {
   flex-wrap: wrap;
 }
 
-/* --- Modelo de la sesión --------------------------------------------------- */
-
 .model-bar {
   display: flex;
   flex-wrap: wrap;
@@ -356,7 +324,7 @@ button.ghost.tiny {
 
 .model-field select {
   width: 100%;
-  /* Toda la fila se pulsa con el pulgar, y 16px evita el zoom de Safari al enfocar. */
+
   min-height: 44px;
   padding: 6px 10px;
   border-radius: var(--radius);
@@ -396,13 +364,10 @@ button.ghost.tiny {
   border-color: color-mix(in srgb, var(--danger) 40%, transparent);
 }
 
-/* Archivada: se distingue del estado del turno sin gritar. */
 .badge.archived {
   color: var(--muted);
   border-style: dashed;
 }
-
-/* --- Preguntas pendientes ------------------------------------------------- */
 
 .questions {
   border-color: color-mix(in srgb, var(--warn) 45%, var(--line));
@@ -436,7 +401,6 @@ button.ghost.tiny {
   line-height: 1.45;
 }
 
-/* El detalle puede ser un comando o un plan: conserva los saltos. */
 .question-detail {
   margin: 0 0 12px;
   padding: 10px 12px;
@@ -470,8 +434,6 @@ button.ghost.tiny {
   font-weight: 400;
 }
 
-/* Hover propio: el genérico de `button` se excluye a propósito, porque su
-   especificidad ganaba y dejaba la opción con fondo claro y texto gris. */
 .option:not(.chosen):hover:not(:disabled) {
   background: var(--hover);
   border-color: var(--line-emphasis);
@@ -497,8 +459,6 @@ button.ghost.tiny {
   font-size: 16px;
 }
 
-/* --- Ajustes --------------------------------------------------------------- */
-
 .settings {
   margin: 4px 0 12px;
   padding: 0 12px;
@@ -507,8 +467,6 @@ button.ghost.tiny {
 }
 
 .settings > summary {
-  /* Sin `display: flex`, que borraba el triángulo: el panel dejaba de parecer
-     desplegable justo cuando un aviso manda a Ajustes. */
   min-height: 44px;
   padding: 12px 0;
   cursor: pointer;
@@ -526,7 +484,7 @@ button.ghost.tiny {
   display: flex;
   align-items: center;
   gap: 10px;
-  /* Cada opción es una fila de 44 px: una casilla de 20 px se falla. */
+
   min-height: 44px;
   color: var(--text-secondary);
   font-size: 14px;
@@ -554,8 +512,6 @@ button.ghost.tiny {
   font-size: 12px;
 }
 
-/* --- Transcripción -------------------------------------------------------- */
-
 .session-row {
   cursor: default;
 }
@@ -567,9 +523,6 @@ button.ghost.tiny {
 .session-open:hover .session-title {
   text-decoration: underline;
 }
-
-/* Quitar el contorno sin poner otro dejaba el foco invisible: 1,63:1. La regla
-   global de `[role='button']:focus-visible` ya cubre este caso. */
 
 .session-heading {
   margin: 12px 0 4px;
@@ -583,8 +536,6 @@ button.ghost.tiny {
   width: 100%;
   margin-bottom: 14px;
 }
-
-/* --- Turnos del detalle ---------------------------------------------------- */
 
 .turn + .turn {
   margin-top: 18px;
@@ -606,8 +557,6 @@ button.ghost.tiny {
   color: var(--muted);
 }
 
-/* Las herramientas plegadas cuelgan del turno con una guía, para que se vea que
-   pertenecen a él y no a la conversación. */
 .tool-group {
   list-style: none;
 }
@@ -700,8 +649,6 @@ button.ghost.tiny {
   color: var(--muted);
 }
 
-/* --- Composer ------------------------------------------------------------- */
-
 .composer {
   position: sticky;
   bottom: 0;
@@ -723,7 +670,7 @@ button.ghost.tiny {
   background: var(--surface-2);
   color: var(--text);
   font-family: var(--font);
-  /* 16px evita el zoom automático de iOS al enfocar. */
+
   font-size: 16px;
   line-height: 1.4;
   resize: none;
@@ -740,8 +687,6 @@ button.ghost.tiny {
   border-top: 1px solid var(--line);
 }
 
-/* --- Language picker ------------------------------------------------------ */
-
 .locale-picker {
   display: inline-flex;
 }
@@ -757,7 +702,6 @@ button.ghost.tiny {
   font-size: 12px;
 }
 
-/* Visible to screen readers, not on screen. */
 .visually-hidden {
   position: absolute;
   width: 1px;
@@ -768,14 +712,6 @@ button.ghost.tiny {
   clip-path: inset(50%);
   white-space: nowrap;
 }
-
-/* --- Contrast levels ------------------------------------------------------ */
-
-/*
- * `:root` above is the desktop's palette. These override only what changes contrast,
- * never hue or layout: a "high contrast" that also shifts colours stops being the same
- * app, and one that changes spacing breaks the screens it was meant to help.
- */
 
 :root[data-contrast='high'] {
   --bg: #000000;
@@ -791,7 +727,6 @@ button.ghost.tiny {
   --link: #9dc0ff;
 }
 
-/* El foco es lo primero que se pierde de vista: en alto contraste, más grueso. */
 :root[data-contrast='high'] :focus-visible {
   outline-width: 3px;
 }
@@ -810,7 +745,6 @@ button.ghost.tiny {
   --link: #8fb4f0;
 }
 
-/* Menos brillo en las superficies grandes, que es lo que cansa de noche. */
 :root[data-contrast='low'] .card,
 :root[data-contrast='low'] .session-row {
   box-shadow: none;

@@ -2,11 +2,6 @@ import { describe, expect, it } from 'vitest';
 import type { HistoryEntry, TranscriptEvent } from '@dsh-mobile/protocol';
 import { groupTurns, partTurn } from './turns.js';
 
-/**
- * Un turno es lo que pidió el humano y todo lo que provocó. El detalle de la
- * sesión se lee por turnos para no tener que reconstruir qué causó qué.
- */
-
 let seq = 0;
 
 function entry(event: TranscriptEvent): HistoryEntry {
@@ -41,7 +36,6 @@ describe('agrupación en turnos', () => {
   });
 
   it('lo anterior al primer mensaje no se atribuye al primer turno', () => {
-    // Un evento de estado al arrancar la sesión no lo pidió nadie.
     const turns = groupTurns([entry(state('idle')), entry(user('hola'))]);
 
     expect(turns).toHaveLength(2);
@@ -75,8 +69,6 @@ describe('agrupación en turnos', () => {
 
 describe('orden dentro del turno', () => {
   it('una herramienta entre dos mensajes se queda entre ellos', () => {
-    // Antes se sacaban al final: al desplegar, la herramienta aparecía después de
-    // una respuesta que en realidad había llegado más tarde.
     const [turn] = groupTurns([
       entry(user('pregunta')),
       entry(tool('leer')),

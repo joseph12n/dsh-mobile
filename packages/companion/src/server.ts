@@ -35,17 +35,6 @@ import {
 } from './routes/origin.js';
 import { toWireSession, type SessionRecord } from './dsh/session-source.js';
 
-/**
- * Listener propio del plugin.
- *
- * Escucha **solo en loopback**. La exposición por tailnet es un paso posterior y
- * consiste en poner delante un proxy TLS; el servidor no cambia.
- *
- * Autenticación: cada conexión empieza sin dispositivo. `hello` valida el token
- * si lo trae, y `pair.redeem` canjea un código de un solo uso. Cualquier otro
- * mensaje sin dispositivo acreditado se rechaza con `auth-required`.
- */
-
 export const DEFAULT_PORT = 6768;
 const HOST = '127.0.0.1';
 
@@ -53,24 +42,12 @@ export interface ServerDeps {
   pairing: PairingService;
   devices: DeviceRegistry;
   port?: number;
-  /** Origen público donde se sirve la PWA. Se usa para construir el QR. */
   publicUrl?: string;
-  /**
-   * What this host can do. A function is resolved on every `hello`, so a service that
-   * mounts later is not reported missing forever, and one that goes away stops being
-   * promised.
-   */
   capabilities?: Capability[] | (() => Capability[]);
   report?: () => ProbeReport;
-  /** Raíz de la PWA compilada. Sin ella el host sirve solo la API. */
   webRoot?: string;
-  /**
-   * Folders of the desktop. Without it `workspace.list` answers with an empty list,
-   * which is the honest answer for a host that has no workspaces.
-   */
   listWorkspaces?: () => Promise<Workspace[]>;
 
-  /** Crea una sesión en una carpeta existente. Sin ella, `session.create` se rechaza. */
   createSession?: (request: { workspaceId: string }) => Promise<{
     ok: boolean;
     code?: 'no-service' | 'no-folder' | 'failed';
@@ -78,24 +55,20 @@ export interface ServerDeps {
     sessionId?: string;
   }>;
 
-  /** Archiva una sesión. Sin ella, `workspace.archive` se rechaza. */
   archiveSession?: (request: { sessionId: string; stopActivity?: boolean }) => Promise<{
     ok: boolean;
     code?: 'no-service' | 'active' | 'not-found' | 'failed';
     message?: string;
   }>;
 
-  /** Devuelve una sesión archivada a la lista. Sin ella, `workspace.unarchive` se rechaza. */
   unarchiveSession?: (request: { sessionId: string }) => Promise<{
     ok: boolean;
     code?: 'no-service' | 'not-found' | 'failed';
     message?: string;
   }>;
 
-  /** Catálogo de modelos del host. Sin ella, `models.list` se rechaza. */
   listModels?: () => Promise<ModelCatalog>;
 
-  /** Cambia el modelo de una sesión. Sin ella, `model.select` se rechaza. */
   selectModel?: (request: {
     sessionId: string;
     provider: string;
@@ -108,29 +81,22 @@ export interface ServerDeps {
     selection?: ModelSelection;
   }>;
 
-  /** Source of sessions. Without it `sessions.list` returns an empty list. */
   listSessions?: (options: { includeArchived?: boolean }) => Promise<SessionRecord[]>;
-  /** Lotes de preguntas pendientes. Se empujan tras listar sesiones. */
   listQuestions?: () => QuestionBatch[];
-  /** Responde un lote. Sin ella `question.answer` no está disponible. */
   answerQuestion?: (input: {
     callId: string;
     sessionId: string;
     answers: QuestionAnswerItem[];
   }) => { ok: boolean; code?: 'not-found' | 'bad-request' | 'internal'; message?: string };
-  /** Una página de historial de la sesión. */
   readHistory?: (
     sessionId: string,
     options: { before?: number; limit?: number },
   ) => Promise<{ entries: HistoryEntry[]; hasMore: boolean }>;
-  /** Se suscribe a los eventos de una sesión y los empuja al cliente. */
   subscribeSession?: (
     sessionId: string,
     options: { since?: number; onEvent: (entry: HistoryEntry) => void; onEnd?: () => void },
   ) => { stop(): void };
-  /** Cancela el turno en curso. */
   cancelRun?: (sessionId: string) => boolean;
-  /** Envía texto a una sesión. */
   sendReply?: (
     sessionId: string,
     text: string,
@@ -188,7 +154,6 @@ function escapeHtml(value: string): string {
     .replace(/"/g, '&quot;');
 }
 
-/** Página de emparejamiento: muestra el QR y el código por si hay que teclearlo. */
 function pairingPage(
   link: string,
   code: string,
@@ -206,7 +171,6 @@ function pairingPage(
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Pair DSH Mobile</title>
 <style>
-  /* Mismos tokens que la app, sacados del tema oscuro de DSH. */
   @font-face {
     font-family: 'Montserrat';
     font-style: normal;
@@ -248,8 +212,6 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
     typeof deps.capabilities === 'function' ? deps.capabilities() : (deps.capabilities ?? []);
   const requestedPort = deps.port ?? DEFAULT_PORT;
 
-  // Sin capacidades: se resuelven en cada `hello`. Congelarlas al arrancar mentía en
-  // las dos direcciones cuando un servicio se monta o se desmonta después.
   const baseHostInfo: Omit<HostInfo, 'capabilities'> = {
     id: hostname(),
     name: 'DSH Mobile',
@@ -257,10 +219,8 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
     platform: process.platform,
   };
 
-  // Se conoce al escuchar; mientras tanto vale el puerto pedido.
   let listeningPort = requestedPort;
 
-  /** Dirección por la que entró la petición: es la que el teléfono debe usar. */
   const originFor = (req: IncomingMessage): string =>
     publicOriginFor({
       host: req.headers.host,
@@ -269,7 +229,6 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
       configured: deps.publicUrl,
     });
 
-  /** Dirección del listener tal como la conoce el proceso; para logs y arranque. */
   const localOrigin = (): string => deps.publicUrl ?? `http://${HOST}:${listeningPort}`;
 
   const http: Server = createServer((req: IncomingMessage, res: ServerResponse) => {
@@ -288,8 +247,6 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
           proto: PROTOCOL_VERSION,
           capabilities: capabilities(),
           devices: devices.list().length,
-          // Diagnóstico: si abres esto desde la dirección que usará el teléfono,
-          // el aviso tiene que desaparecer.
           origin,
           ...(notice ? { warning: notice.message, warningSeverity: notice.severity } : {}),
         }),
@@ -304,12 +261,7 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
     }
 
     if (url === '/pair') {
-      // `Host` lo controla el cliente y aquí se construye una URL con él: un
-      // valor raro no puede tumbar la petición ni, sin manejador global, el
-      // proceso del host.
       try {
-        // Reutiliza el código vigente si lo hay: recargar la página no debe
-        // invalidar el QR que ya está en pantalla.
         const existing = pairing.pending()[0] ?? pairing.issue();
         const origin = originFor(req);
         const link = buildPairingUrl(origin, existing.code);
@@ -333,7 +285,6 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
       return;
     }
 
-    // La PWA va al final: las rutas de la API mandan sobre los archivos.
     const asset = serveStatic(deps.webRoot, url);
     if (asset.status === 200 && asset.body) {
       res.writeHead(200, asset.headers);
@@ -351,9 +302,6 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
     maxPayload: MAX_FRAME_BYTES,
   });
 
-  // Sin manejador, un `error` del servidor de WebSocket (por ejemplo EADDRINUSE
-  // al compartir el socket HTTP) es una excepción no capturada y se lleva por
-  // delante el proceso del host.
   wss.on('error', (error: Error) => log(`WebSocket server error: ${error.message}`));
 
   wss.on('connection', (socket: WebSocket) => {
@@ -366,12 +314,9 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
 
     log('connection open');
 
-    // Suscripciones vivas de esta conexión, para cortarlas al cerrar el socket.
     const subscriptions = new Map<string, { stop(): void }>();
 
     socket.on('message', (data: Buffer) => {
-      // El manejador es asíncrono porque hay consultas que lo son. Cualquier
-      // fallo se responde como `internal` en vez de cerrar el socket.
       void handleFrame(data).catch((error: unknown) => {
         log(`failed frame: ${String(error)}`);
         if (socket.readyState === socket.OPEN) {
@@ -381,7 +326,6 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
     });
 
     async function handleFrame(data: Buffer): Promise<void> {
-      // Límite por ventana de un minuto, contra un cliente defectuoso.
       const now = Date.now();
       if (now - connection.windowStart > 60_000) {
         connection.windowStart = now;
@@ -486,7 +430,6 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
         return;
       }
 
-      // Todo lo demás exige un dispositivo acreditado.
       if (!connection.device) {
         send(
           socket,
@@ -500,8 +443,6 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
       }
 
       if (message.type === 'workspace.list') {
-        // Una lista vacía es una respuesta válida: significa que este host no tiene
-        // carpetas, y el cliente pinta la lista plana sin tratarlo como error.
         const workspaces = deps.listWorkspaces ? await deps.listWorkspaces() : [];
         if (socket.readyState !== socket.OPEN) return;
 
@@ -553,10 +494,6 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
             socket,
             errorMessage(
               message.id,
-              // Una eleccion que ya no existe es culpa de la peticion, no del host:
-              // `bad-request` deja que la app diga "ese modelo ya no esta" y recargue
-              // el catalogo, en vez de ofrecer reintentar lo mismo. Un host sin el
-              // servicio es una capacidad ausente, no una averia.
               selected.code === 'unavailable' || selected.code === 'no-service'
                 ? 'bad-request'
                 : selected.code === 'not-found'
@@ -596,8 +533,6 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
             socket,
             errorMessage(
               message.id,
-              // "No hay controlador" es lo mismo que "no hay handler": una capacidad
-              // que este host no tiene, no una avería.
               created.code === 'no-service'
                 ? 'bad-request'
                 : created.code === 'no-folder'
@@ -639,10 +574,6 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
             socket,
             errorMessage(
               message.id,
-              // `active` no es un fallo interno: es una negativa que el usuario puede
-              // resolver parando el turno. Con `internal` la app no podía distinguirla
-              // de un error de verdad y acababa diciendo "para el turno" ante cualquier
-              // avería. `no-service` es una capacidad ausente, como el handler ausente.
               archived.code === 'active'
                 ? 'denied'
                 : archived.code === 'not-found'
@@ -720,9 +651,6 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
           sessions: records.map(toWireSession),
         });
 
-        // Las preguntas pendientes viajan justo detrás: el cliente no tiene que
-        // pedirlas aparte y nunca ve una sesión marcada "en espera" sin saber
-        // qué se está esperando.
         for (const batch of deps.listQuestions?.() ?? []) {
           if (socket.readyState !== socket.OPEN) return;
           send(socket, {
@@ -794,7 +722,6 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
           return;
         }
 
-        // Sin `seq`: `prompt` confirma la aceptación, no la posición.
         send(socket, {
           v: PROTOCOL_VERSION,
           id: message.id,
@@ -835,7 +762,6 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
           return;
         }
 
-        // Una suscripción por sesión y conexión: volver a pedirla no acumula.
         subscriptions.get(message.sessionId)?.stop();
 
         const subscription = deps.subscribeSession(message.sessionId, {

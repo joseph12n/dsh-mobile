@@ -2,11 +2,6 @@ import { describe, expect, it } from 'vitest';
 import type { HostContext } from '../host-api.js';
 import { cancelRun, readHistory, subscribeSession, toTranscriptEvent } from './transcript.js';
 
-/**
- * La transcripción es el punto donde DSH tiene más formas distintas. Estas
- * pruebas fijan que **lo que no se reconoce se descarta** en vez de inventarse.
- */
-
 describe('traducción de eventos', () => {
   it('lee un mensaje del usuario con bloques de contenido', () => {
     const event = toTranscriptEvent({

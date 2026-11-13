@@ -60,8 +60,6 @@ describe('mensajes del cliente', () => {
   });
 
   it('acepta un hello.ok con una capacidad que este cliente no conoce', () => {
-    // El enum es del cliente, no del cable: rechazar el frame entero por una capacidad
-    // nueva dejaría al cliente sin conexión y `connect()` moriría por timeout.
     const msg = {
       v: PROTOCOL_VERSION,
       id: 'h',
@@ -112,7 +110,6 @@ describe('mensajes del cliente', () => {
 
     expect(created?.type).toBe('session.created');
     expect(archived?.type).toBe('workspace.archived');
-    // Una confirmación sin id no confirma nada: se descarta.
     expect(
       parseServerMessage(
         JSON.stringify({ v: PROTOCOL_VERSION, id: 'x', at, type: 'session.created' }),
@@ -295,7 +292,6 @@ describe('modelos', () => {
   });
 });
 
-/** Un `sessions.ok` con la sesión dada, para no repetir el sobre. */
 function sessionsOk(session: Record<string, unknown>): Record<string, unknown> {
   return {
     v: PROTOCOL_VERSION,
@@ -356,7 +352,6 @@ describe('sesiones archivadas', () => {
   });
 
   it('descarta campos que no conoce en vez de rechazar el mensaje', () => {
-    // Es lo que permite que una app nueva hable con un host viejo y al revés.
     const message = { v: PROTOCOL_VERSION, id: 'l', at, type: 'sessions.list', algo: 'nuevo' };
     expect(ClientMessage.safeParse(message).success).toBe(true);
   });

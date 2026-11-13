@@ -2,21 +2,12 @@ import { useState } from 'react';
 import { useI18n } from '../i18n/index.js';
 import type { QuestionAnswerItem, QuestionBatch } from '@dsh-mobile/protocol';
 
-/**
- * Tarjeta de preguntas pendientes.
- *
- * DSH valida la respuesta por **lote**: cada pregunta del lote tiene que
- * aparecer exactamente una vez. Por eso se envían todas juntas, y una pregunta
- * sin tocar se manda como omitida (`selected: []`), que es una respuesta
- * legítima y distinta de no responder.
- */
 export function QuestionsCard({
   questions,
   titleFor,
   onSubmit,
 }: {
   questions: QuestionBatch[];
-  /** Título legible de la sesión; el id crudo no le dice nada a nadie. */
   titleFor?: (sessionId: string) => string;
   onSubmit: (callId: string, sessionId: string, answers: QuestionAnswerItem[]) => void;
 }) {
@@ -45,7 +36,6 @@ export function QuestionsCard({
       const chosen = selected[key] ?? [];
       const text = (custom[key] ?? '').trim();
 
-      // Omitida: el contrato la distingue de "sin contestar".
       if (chosen.length === 0 && !text) return { id: item.id, selected: [] };
       return { id: item.id, selected: chosen, ...(text ? { custom: text } : {}) };
     });

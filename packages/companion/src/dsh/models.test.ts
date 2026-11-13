@@ -2,15 +2,6 @@ import { describe, expect, it } from 'vitest';
 import type { HostContext } from '../host-api.js';
 import { canListModels, canSelectModel, listModels, selectModel, toCatalog } from './models.js';
 
-/**
- * Model selection, against the host shapes read from
- * `@deepseek-ai/dsh-api-session-controller` 0.2.2-rc.1.
- *
- * The catalog is not rebuilt here from `ctx.llm`: a copy would drift from what the
- * desktop offers. Everything is delegated to `sessionController.modelCatalog()`.
- */
-
-/** An error the way the host throws it: a stable code plus a message. */
 function coded(code: string, message = 'no'): Error {
   return Object.assign(new Error(message), { code });
 }
@@ -136,7 +127,6 @@ describe('selecting a model', () => {
       ok: true,
       selection: { provider: 'deepseek', model: 'chat', reasoningEffort: 'high' },
     });
-    // Sin `requestId` ni envoltorios: la firma real es plana.
     expect(seen).toEqual([
       { sessionId: 's1', provider: 'deepseek', model: 'chat', reasoningEffort: 'high' },
     ]);
@@ -158,8 +148,6 @@ describe('selecting a model', () => {
   });
 
   it('reports a model that is no longer available, keeping the host message', async () => {
-    // El código cubre "modelo borrado" y "esfuerzo no soportado": el texto del host es
-    // lo único que distingue los dos casos.
     const ctx = ctxWith({
       sessionController: {
         selectModel: async () => {

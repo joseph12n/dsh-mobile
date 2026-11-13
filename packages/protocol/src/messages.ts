@@ -16,12 +16,10 @@ import {
   TranscriptEvent,
 } from './domain.js';
 
-/** Compone un mensaje: sobre + `type` literal + campos propios. */
 function message<T extends string, S extends z.ZodRawShape>(type: T, shape: S) {
   return z.object({ ...envelopeFields, type: z.literal(type), ...shape });
 }
 
-/** Entrada de historial: el evento más el cursor que lo sitúa. */
 export const HistoryEntry = z.object({
   seq: z.number().int().nonnegative(),
   at: z.number().int().nonnegative(),
@@ -29,56 +27,26 @@ export const HistoryEntry = z.object({
 });
 export type HistoryEntry = z.infer<typeof HistoryEntry>;
 
-// ---------------------------------------------------------------------------
-// Cliente → Host
-// ---------------------------------------------------------------------------
-
-/**
- * Debe ser el primer mensaje. Sin él, cualquier otra petición se rechaza con
- * `auth-required`.
- */
 export const HelloMessage = message('hello', {
   proto: z.number().int().positive(),
-  /** Ausente durante el emparejamiento. */
   deviceToken: z.string().min(1).optional(),
   clientName: z.string().optional(),
 });
 
-/** Canjea un código de un solo uso por un token de dispositivo. */
 export const PairRedeemMessage = message('pair.redeem', {
   code: z.string().min(1),
   deviceName: z.string().min(1).max(64),
   platform: z.string().max(64),
 });
 
-/**
- * Pide las sesiones.
- *
- * `includeArchived` trae también las archivadas, marcadas con `archived: true`: sin él
- * la lista es la de siempre, la que se usa a diario.
- */
 export const SessionsListMessage = message('sessions.list', {
   includeArchived: z.boolean().optional(),
 });
 
-/**
- * Pide las carpetas del escritorio.
- *
- * Tres respuestas posibles, y el cliente tiene que tratar las tres:
- *
- * - `workspace.ok` con la lista, que puede estar vacía porque no hay carpetas.
- * - `error` `bad-request` de un host que aún no lo implementa. Se trata como "sin
- *   carpetas", no como fallo: es lo que hacía este servidor antes de soportarlo.
- * - `error` de otro tipo, que sí es un fallo y se propaga.
- *
- * El cliente no debe distinguir "no hay carpetas" de "este host no las tiene"
- * mirando el error: en los dos casos la lista plana es la respuesta correcta.
- */
 export const WorkspaceListMessage = message('workspace.list', {});
 
 export const SessionSubscribeMessage = message('session.subscribe', {
   sessionId: SessionId,
-  /** Cursor: el cliente pide lo posterior a este `seq`. */
   since: z.number().int().nonnegative().optional(),
 });
 
@@ -93,10 +61,6 @@ export const ReplySendMessage = message('reply.send', {
   text: z.string().min(1).max(32_000),
 });
 
-/**
- * Responde un lote completo. DSH valida que cada pregunta del lote aparezca
- * **exactamente una vez**, así que no se puede contestar de una en una.
- */
 export const QuestionAnswerMessage = message('question.answer', {
   callId: z.string().min(1),
   sessionId: SessionId,
@@ -112,15 +76,8 @@ export const RunCancelMessage = message('run.cancel', {
   sessionId: SessionId,
 });
 
-/** Pide el catálogo de modelos del host, con sus proveedores y esfuerzos. */
 export const ModelListMessage = message('models.list', {});
 
-/**
- * Elige el modelo de una sesión.
- *
- * `reasoningEffort` omitido limpia el nivel explícito y deja que el adaptador use
- * el suyo, que es exactamente lo que hace el escritorio.
- */
 export const ModelSelectMessage = message('model.select', {
   sessionId: SessionId,
   provider: z.string().min(1),
@@ -130,24 +87,15 @@ export const ModelSelectMessage = message('model.select', {
 
 export const PingMessage = message('ping', {});
 
-/**
- * Creates a session inside an existing folder.
- *
- * A session needs a directory, so it is always born in one: the phone cannot pick a
- * directory on the desktop's filesystem, and inventing one would be worse.
- */
 export const SessionCreateMessage = message('session.create', {
   workspaceId: z.string().min(1),
 });
 
-/** Archives a session: it leaves the list and can be recovered on the desktop. */
 export const WorkspaceArchiveMessage = message('workspace.archive', {
   sessionId: SessionId,
-  /** Stop whatever is running before archiving, instead of refusing. */
   stopActivity: z.boolean().optional(),
 });
 
-/** Devuelve una sesión archivada a la lista. */
 export const WorkspaceUnarchiveMessage = message('workspace.unarchive', {
   sessionId: SessionId,
 });
@@ -174,15 +122,10 @@ export const ClientMessage = z.discriminatedUnion('type', [
 export type ClientMessage = z.infer<typeof ClientMessage>;
 export type ClientMessageType = ClientMessage['type'];
 
-// ---------------------------------------------------------------------------
-// Host → Cliente
-// ---------------------------------------------------------------------------
-
 export const PongMessage = message('pong', {});
 
 export const HelloOkMessage = message('hello.ok', {
   host: HostInfo,
-  /** Ausente mientras el cliente no está emparejado: `pair.ok` lo entrega. */
   device: DeviceInfo.optional(),
 });
 
@@ -208,23 +151,14 @@ export const SessionsOkMessage = message('sessions.ok', {
   sessions: z.array(SessionSummary),
 });
 
-/** Folders of the desktop. A host without workspaces answers with an empty list. */
 export const WorkspaceOkMessage = message('workspace.ok', {
   workspaces: z.array(Workspace),
 });
 
-/** Catálogo de modelos. Puede venir vacío: `failures` dice por qué. */
 export const ModelsOkMessage = message('models.ok', {
   catalog: ModelCatalog,
 });
 
-/**
- * El host aceptó el cambio de modelo.
- *
- * Devuelve la selección **normalizada** por el host, no la pedida: si recorta un
- * esfuerzo que ese modelo no admite, la app se entera aquí y no en el siguiente
- * turno.
- */
 export const ModelSelectedMessage = message('model.selected', {
   sessionId: SessionId,
   selection: ModelSelection,
@@ -238,17 +172,11 @@ export const SessionOkMessage = message('session.ok', {
 export const HistoryOkMessage = message('history.ok', {
   sessionId: SessionId,
   entries: z.array(HistoryEntry),
-  /** `true` si hay más hacia atrás. */
   hasMore: z.boolean(),
 });
 
 export const ReplyOkMessage = message('reply.ok', {
   sessionId: SessionId,
-  /**
-   * Cursor tras aceptar el mensaje, si el host lo conoce. El `prompt` de DSH
-   * confirma la aceptación pero no devuelve la posición en el registro: el
-   * cliente se queda con lo que llegue por el flujo de eventos.
-   */
   seq: z.number().int().nonnegative().optional(),
 });
 
@@ -261,7 +189,6 @@ export const RunOkMessage = message('run.ok', {
   state: SessionState,
 });
 
-/** Evento de transcripción empujado por el host. */
 export const SessionEventMessage = message('session.event', {
   sessionId: SessionId,
   seq: z.number().int().nonnegative(),
@@ -278,10 +205,6 @@ export const QuestionPendingMessage = message('question.pending', {
   question: QuestionBatch,
 });
 
-/**
- * El lote dejó de estar pendiente. O lo respondió este cliente, o lo resolvió el
- * escritorio: en ambos casos el móvil deja de ofrecerlo.
- */
 export const QuestionSettledMessage = message('question.settled', {
   callId: z.string().min(1),
   sessionId: SessionId,
@@ -292,11 +215,6 @@ export const DevicesChangedMessage = message('devices.changed', {
   devices: z.array(DeviceInfo),
 });
 
-/**
- * Error de una petición. Reusa el `id` de la petición que falló. Lleva
- * `capabilities` cuando lo que falla es la negociación, para que el cliente
- * pueda decir qué versión soporta el host.
- */
 export const ErrorMessage = message('error', {
   code: ErrorCode,
   message: z.string(),

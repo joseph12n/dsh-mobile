@@ -7,16 +7,6 @@ import {
   publicOriginFor,
 } from './origin.js';
 
-/**
- * El QR tiene que llevar una dirección que el teléfono alcance.
- *
- * Este módulo nació de un fallo real: el enlace apuntaba siempre a `127.0.0.1`,
- * y escaneado desde un móvil eso es el propio móvil.
- *
- * La cabecera `Host` la controla el cliente, así que `publicOriginFor` **no puede
- * lanzar nunca**: un valor inválido llegaba a `new URL()` y tumbaba la petición.
- */
-
 describe('detección de loopback', () => {
   it('reconoce las formas de loopback', () => {
     for (const host of [
@@ -96,8 +86,6 @@ describe('origen público', () => {
   });
 
   it('respeta un proxy que declara http sobre un host no loopback', () => {
-    // Sin esta rama, el caso se confundiría con el fallback de https y la prueba
-    // anterior pasaría sin probar nada.
     expect(
       publicOriginFor({
         host: 'maquina.tailnet.ts.net',

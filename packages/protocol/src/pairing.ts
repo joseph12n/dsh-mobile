@@ -1,21 +1,6 @@
 import { z } from 'zod';
 import { PROTOCOL_VERSION } from './version.js';
 
-/**
- * Enlace directo de emparejamiento.
- *
- * El QR no lleva un código suelto: lleva una URL que abre la PWA y la deja
- * emparejando sola. Un solo escaneo resuelve **a dónde** conectarse y **quién**
- * eres.
- *
- * Forma:
- *   https://<host>/#/pair?v=1&c=<codigo>&e=<endpoint>
- *
- * El código viaja en el **fragmento** (`#`), no en la query, para que el
- * navegador no lo mande al servidor, no quede en logs de acceso y no se filtre
- * por `Referer` si la página carga recursos externos.
- */
-
 export const PairingParams = z.object({
   v: z.number().int().positive(),
   c: z.string().min(1),
@@ -23,16 +8,8 @@ export const PairingParams = z.object({
 });
 export type PairingParams = z.infer<typeof PairingParams>;
 
-/** Ruta del fragmento donde vive el emparejamiento. */
 export const PAIRING_HASH_PREFIX = '#/pair';
 
-/**
- * Construye el enlace que va dentro del QR.
- *
- * @param baseUrl origen donde se sirve la PWA (p. ej. `https://maquina.tailnet.ts.net`)
- * @param code código de un solo uso
- * @param endpoint endpoint del WebSocket, útil si difiere del origen de la PWA
- */
 export function buildPairingUrl(baseUrl: string, code: string, endpoint?: string): string {
   const url = new URL(baseUrl);
   url.hash = '';
@@ -46,7 +23,6 @@ export function buildPairingUrl(baseUrl: string, code: string, endpoint?: string
   return url.toString();
 }
 
-/** Lee los parámetros de un enlace de emparejamiento. `undefined` si no lo es. */
 export function parsePairingUrl(raw: string): PairingParams | undefined {
   let url: URL;
   try {

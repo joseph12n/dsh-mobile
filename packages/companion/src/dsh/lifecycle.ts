@@ -1,24 +1,7 @@
-/**
- * Session lifecycle from the phone: create inside a folder, archive.
- *
- * Every shape here was read from the packaged app after a review proved my first version
- * was wrong on all of them. Written down so the next reader does not repeat it:
- *
- *  - `ctx.sessionController` exposes **`create(request)`**, not `createSession`. The name
- *    `createSession` exists, but it is private on an internal controller.
- *  - `create` returns **`{ sessionId, agentPreset? }`**, flat — there is no `session` field.
- *  - `create` accepts **`workspaceId` XOR `cwd`**, and only the `workspaceId` form calls
- *    `workspace.attachSession()`. With `cwd` the session is created but **not** a member of
- *    the folder, which would silently defeat the whole feature.
- *  - `archiveSession` takes **one request object**, not `(id, options)`.
- *  - the refusal for running work carries its code on **`error.code`** as
- *    `workspace/session-active`; the message text does not contain it.
- */
 import { service, type HostContext } from '../host-api.js';
 import type { WorkspaceController } from './workspaces.js';
 import { codeOf, messageOf } from './errors.js';
 
-/** The part of the session controller we use. */
 interface SessionLifecycleController {
   create?: (request: {
     workspaceId?: string;
@@ -28,7 +11,6 @@ interface SessionLifecycleController {
   }) => Promise<{ sessionId?: unknown; agentPreset?: unknown }>;
 }
 
-/** `true` if a session can be created on this host. */
 export function canCreateSession(ctx: HostContext): boolean {
   try {
     const controller = service<SessionLifecycleController>(ctx, 'sessionController');
@@ -38,7 +20,6 @@ export function canCreateSession(ctx: HostContext): boolean {
   }
 }
 
-/** `true` if sessions can be archived on this host. */
 export function canArchiveSession(ctx: HostContext): boolean {
   try {
     const controller = service<WorkspaceController>(ctx, 'workspaceController');
@@ -48,7 +29,6 @@ export function canArchiveSession(ctx: HostContext): boolean {
   }
 }
 
-/** `true` if an archived session can be brought back on this host. */
 export function canUnarchiveSession(ctx: HostContext): boolean {
   try {
     const controller = service<WorkspaceController>(ctx, 'workspaceController');
@@ -62,13 +42,6 @@ export type CreateResult =
   | { ok: true; sessionId: string }
   | { ok: false; code: 'no-service' | 'no-folder' | 'failed'; message: string };
 
-/**
- * Creates a session inside an existing folder.
- *
- * `workspaceId` is passed, **not** `cwd`: only that form makes the session a member of the
- * folder. The host validates the id, so a folder that no longer exists comes back as its
- * own error instead of being guessed at here.
- */
 export async function createSession(
   ctx: HostContext,
   request: { workspaceId: string },
@@ -97,12 +70,6 @@ export async function createSession(
 export type UnarchiveResult =
   { ok: true } | { ok: false; code: 'no-service' | 'not-found' | 'failed'; message: string };
 
-/**
- * Brings an archived session back into the list.
- *
- * The same controller method the desktop uses, so a restored session reappears in both
- * places with no extra step.
- */
 export async function unarchiveSession(
   ctx: HostContext,
   request: { sessionId: string },
@@ -128,13 +95,6 @@ export type ArchiveResult =
   | { ok: true }
   | { ok: false; code: 'no-service' | 'active' | 'not-found' | 'failed'; message: string };
 
-/**
- * Archives a session.
- *
- * `stopActivity` matters: the host refuses to archive a session with a running turn, and
- * that refusal is surfaced as `active` so the phone can say "stop it first" instead of
- * killing work behind the user's back.
- */
 export async function archiveSession(
   ctx: HostContext,
   request: { sessionId: string; stopActivity?: boolean },
@@ -145,14 +105,12 @@ export async function archiveSession(
   }
 
   try {
-    // Un solo objeto: la firma real es `archiveSession(request)`.
     await controller.archiveSession({
       sessionId: request.sessionId,
       ...(request.stopActivity === true ? { stopActivity: true } : {}),
     });
     return { ok: true };
   } catch (error) {
-    // El código va en `error.code`, no en el texto: buscar en el mensaje no acertaba nunca.
     const code = codeOf(error);
     if (code === 'workspace/session-active') {
       return {

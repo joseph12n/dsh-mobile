@@ -1,4 +1,3 @@
-// Configuración plana de ESLint (ESLint 10).
 import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 
@@ -8,8 +7,8 @@ export default tseslint.config(
       '**/node_modules/**',
       '**/dist/**',
       '**/coverage/**',
+      '**/.agents/**',
       '**/*.d.ts',
-      // Documentos internos: no forman parte del repositorio público.
       'MEMORIA.md',
       'AGENTS.md',
       'PLAN.md',
@@ -26,6 +25,7 @@ export default tseslint.config(
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
       ],
       'no-console': 'off',
+      'no-empty': ['error', { allowEmptyCatch: true }],
     },
   },
   {
@@ -35,7 +35,6 @@ export default tseslint.config(
     },
   },
   {
-    // Scripts sueltos en Node: necesitan los globales del runtime.
     files: ['scripts/**/*.mjs', '**/scripts/**/*.mjs'],
     languageOptions: {
       globals: {

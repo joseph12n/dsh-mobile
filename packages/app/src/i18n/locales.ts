@@ -1,20 +1,7 @@
-/**
- * Message catalogue.
- *
- * Four languages: English (default), Spanish, Brazilian Portuguese and Simplified
- * Chinese. Chinese is not decoration: DSH serves Chinese models, so someone working
- * with them is likely to read it.
- *
- * Keys are flat and typed. A `Record<Key, string>` per locale means the compiler
- * refuses a catalogue that is missing a key, and `catalogues.test.ts` checks the same
- * thing at runtime for every locale.
- */
-
 export const LOCALES = ['en', 'es', 'pt-BR', 'zh-Hans'] as const;
 
 export type Locale = (typeof LOCALES)[number];
 
-/** Language names, each written in its own language: that is what a picker wants. */
 export const LOCALE_LABELS: Record<Locale, string> = {
   en: 'English',
   es: 'Español',
@@ -116,7 +103,6 @@ const en = {
   'time.days': '{count} d ago',
 };
 
-/** Every key the app can ask for. */
 export type MessageKey = keyof typeof en;
 
 export type Catalogue = Record<MessageKey, string>;

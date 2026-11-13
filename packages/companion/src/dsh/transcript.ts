@@ -1,19 +1,6 @@
-/**
- * Transcripción: historial paginado y eventos en vivo.
- *
- * Se delega en `ctx.sessionController`, que es lo que usa la interfaz del
- * escritorio: `page()` devuelve una página del registro y `observeEvent()` un
- * flujo de eventos según se confirman. No se lee el log por nuestra cuenta.
- *
- * La traducción es **tolerante a propósito**: los eventos de DSH son muchos y
- * cambian; aquí solo se reconocen los que el móvil sabe pintar y el resto se
- * descarta sin ruido. Adivinar la forma exacta de cada uno sería peor que
- * ignorarlo.
- */
 import type { HistoryEntry, SessionState, TranscriptEvent } from '@dsh-mobile/protocol';
 import { service, type HostContext } from '../host-api.js';
 
-/** Envoltura del registro tal como viaja por el controlador. */
 interface WireEvent {
   type?: unknown;
   seq?: unknown;
@@ -24,7 +11,6 @@ interface WireEvent {
 interface WireRecord {
   type?: unknown;
   event?: WireEvent;
-  /** Los cambios de estado del turno pueden viajar como estado, no como evento. */
   state?: unknown;
 }
 
@@ -57,7 +43,6 @@ function address(sessionId: string): { kind: 'session'; sessionId: string } {
   return { kind: 'session', sessionId };
 }
 
-/** Primer texto que aparezca en una estructura desconocida. */
 function firstText(value: unknown, depth = 0): string | undefined {
   if (depth > 4 || value === undefined || value === null) return undefined;
   if (typeof value === 'string') return value;
@@ -69,7 +54,6 @@ function firstText(value: unknown, depth = 0): string | undefined {
 
   if (typeof value === 'object') {
     const record = value as Record<string, unknown>;
-    // Los bloques de contenido son la forma habitual: { type: 'text', text }.
     if (typeof record['text'] === 'string') return record['text'];
     for (const key of ['content', 'message', 'delta', 'value']) {
       const found = firstText(record[key], depth + 1);
@@ -80,7 +64,6 @@ function firstText(value: unknown, depth = 0): string | undefined {
   return undefined;
 }
 
-/** Estado del móvil a partir del nombre del evento. */
 function stateOf(type: string): SessionState | undefined {
   switch (type) {
     case 'turn/start':
@@ -93,12 +76,6 @@ function stateOf(type: string): SessionState | undefined {
   }
 }
 
-/**
- * Traduce un evento del registro al vocabulario del móvil.
- *
- * Devuelve `undefined` para todo lo que el móvil no pinta: preferimos un hueco a
- * un renglón inventado.
- */
 export function toTranscriptEvent(wire: WireEvent): TranscriptEvent | undefined {
   const type = typeof wire.type === 'string' ? wire.type : '';
   const data = wire.data;
@@ -153,11 +130,6 @@ export interface HistoryPage {
   hasMore: boolean;
 }
 
-/**
- * Una página de historial.
- *
- * `before` pagina hacia atrás; sin él devuelve lo más reciente.
- */
 export async function readHistory(
   ctx: HostContext,
   sessionId: string,
@@ -193,13 +165,6 @@ export interface Subscription {
   stop(): void;
 }
 
-/**
- * Se suscribe a los eventos de una sesión.
- *
- * El bucle vive en el host y empuja hacia el cliente; se corta abortando la
- * señal o cerrando el socket. Los errores del flujo terminan la suscripción sin
- * tumbar la conexión.
- */
 export function subscribeSession(
   ctx: HostContext,
   sessionId: string,
@@ -222,12 +187,10 @@ export function subscribeSession(
         const entry = toEntry(frame);
         if (!entry) continue;
 
-        // `since` descarta lo que el cliente ya tiene.
         if (options.since !== undefined && entry.seq <= options.since) continue;
         options.onEvent(entry);
       }
     } catch {
-      // Flujo cortado o sesión cerrada.
     } finally {
       options.onEnd?.();
     }
@@ -240,7 +203,6 @@ export function subscribeSession(
   };
 }
 
-/** Cancela el turno en curso de una sesión. */
 export function cancelRun(ctx: HostContext, sessionId: string): boolean {
   const api = controller(ctx);
   if (!api) return false;
