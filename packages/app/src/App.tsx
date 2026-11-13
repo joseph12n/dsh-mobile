@@ -879,15 +879,13 @@ export function App() {
 
         {view.kind === 'sessions' && (
           <>
-            <QuestionsCard
-              questions={
-                openSession
-                  ? questions.filter((batch) => batch.sessionId === openSession.id)
-                  : questions
-              }
-              titleFor={(id) => view.sessions.find((item) => item.id === id)?.title ?? id}
-              onSubmit={(callId, sessionId, answers) => void answer(callId, sessionId, answers)}
-            />
+            {!openSession && (
+              <QuestionsCard
+                questions={questions}
+                titleFor={(id) => view.sessions.find((item) => item.id === id)?.title ?? id}
+                onSubmit={(callId, sessionId, answers) => void answer(callId, sessionId, answers)}
+              />
+            )}
 
             {openSession ? (
               <SessionView
@@ -895,6 +893,10 @@ export function App() {
                 entries={entries}
                 hasMore={hasMore}
                 loading={loadingHistory}
+                questions={questions.filter((batch) => batch.sessionId === openSession.id)}
+                onAnswerQuestion={(callId, sessionId, answers) =>
+                  void answer(callId, sessionId, answers)
+                }
                 onBack={() => {
                   if (backFrom(globalThis.history, { view: 'session', id: openSession.id })) return;
                   leaveSession();

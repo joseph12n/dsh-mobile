@@ -3,11 +3,14 @@ import type {
   HistoryEntry,
   ModelCatalog,
   ModelSelection,
+  QuestionAnswerItem,
+  QuestionBatch,
   SessionSummary,
   TranscriptEvent,
 } from '@dsh-mobile/protocol';
 import { groupTurns, partTurn, type Turn } from '../lib/turns.js';
 import { plural, useI18n } from '../i18n/index.js';
+import { QuestionsCard } from './Questions.js';
 import {
   ChevronDownIcon,
   ChevronLeftIcon,
@@ -331,6 +334,8 @@ export function SessionView({
   catalogStatus,
   error,
   sendError,
+  questions,
+  onAnswerQuestion,
   onBack,
   onLoadMore,
   onCancel,
@@ -347,6 +352,8 @@ export function SessionView({
   catalogStatus?: CatalogStatus;
   error?: string;
   sendError?: string;
+  questions: QuestionBatch[];
+  onAnswerQuestion: (callId: string, sessionId: string, answers: QuestionAnswerItem[]) => void;
   onBack: () => void;
   onLoadMore: () => void;
   onCancel: () => void;
@@ -383,6 +390,13 @@ export function SessionView({
     const area = scrollRef.current;
     if (area && atBottom.current) area.scrollTop = area.scrollHeight;
   }, [entries]);
+
+  const questionKey = questions.map((batch) => batch.callId).join('|');
+
+  useEffect(() => {
+    const area = scrollRef.current;
+    if (area && atBottom.current) area.scrollTop = area.scrollHeight;
+  }, [questionKey]);
 
   const trackScroll = (): void => {
     const area = scrollRef.current;
@@ -480,6 +494,10 @@ export function SessionView({
               <TurnBlock key={turn.id} turn={turn} number={index + 1} />
             ))}
           </div>
+        )}
+
+        {questions.length > 0 && (
+          <QuestionsCard inline questions={questions} onSubmit={onAnswerQuestion} />
         )}
       </div>
 
