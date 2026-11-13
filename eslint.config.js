@@ -8,6 +8,7 @@ export default tseslint.config(
       '**/dist/**',
       '**/coverage/**',
       '**/.agents/**',
+      '**/.preview/**',
       '**/*.d.ts',
       'MEMORIA.md',
       'AGENTS.md',
