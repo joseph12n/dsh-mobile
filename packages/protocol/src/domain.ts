@@ -25,6 +25,8 @@ export const Capability = z.enum([
   'run.cancel',
   /** El host expone las carpetas del escritorio y responde `workspace.list`. */
   'workspace.list',
+  /** El host sabe devolver una sesión archivada a la lista. */
+  'workspace.unarchive',
   /**
    * El host expone el catálogo de modelos y acepta cambiarlos.
    *
@@ -124,6 +126,13 @@ export const SessionSummary = z.object({
   pendingQuestions: z.number().int().nonnegative(),
   /** Modelo con el que seguirá la sesión, si el host lo conoce. */
   model: ModelSelection.optional(),
+  /**
+   * `true` si la sesión está archivada.
+   *
+   * Solo viaja cuando el cliente pidió incluir las archivadas; en el resto de listas la
+   * sesión ni siquiera aparece, así que el campo ausente significa "no archivada".
+   */
+  archived: z.boolean().optional(),
   /**
    * Carpeta (Workspace) a la que pertenece.
    *

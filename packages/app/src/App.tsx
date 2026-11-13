@@ -78,6 +78,10 @@ export function App() {
   const [creatingIn, setCreatingIn] = useState<string | undefined>(undefined);
   /** Session whose archive is in flight: a second tap would answer not-found. */
   const [archiving, setArchiving] = useState<string | undefined>(undefined);
+  /** Session whose restore is in flight, for the same reason. */
+  const [restoring, setRestoring] = useState<string | undefined>(undefined);
+  /** Whether the list shows the archived sessions too. */
+  const [showArchived, setShowArchived] = useState(false);
   const [endpointInput, setEndpointInput] = useState('');
   /** Catalog the host offers, when it announced `model.select`. */
   const [catalog, setCatalog] = useState<ModelCatalog | undefined>(undefined);
@@ -99,6 +103,15 @@ export function App() {
 
   /** Marca de la recarga más reciente: una respuesta vieja no puede pisar la nueva. */
   const refreshSeq = useRef(0);
+
+  /**
+   * La preferencia de archivadas, para quien no la tiene en el render.
+   *
+   * `start` se ejecuta al reconectar y no puede depender de `showArchived` sin
+   * reconstruir el socket en cada toque; `refresh` la lanza una acción que empezó antes
+   * del último cambio. En los dos casos lo correcto es el valor **vigente**.
+   */
+  const showArchivedRef = useRef(false);
 
   /** `start` calls itself to retry; the ref breaks the dependency cycle. */
   const startRef = useRef<((endpoint: string, pairingCode?: string) => Promise<void>) | undefined>(
@@ -250,7 +263,7 @@ export function App() {
           storage.saveEndpoint(endpoint);
         }
 
-        const sessions = await connection.listSessions();
+        const sessions = await connection.listSessions(showArchivedRef.current);
 
         // Las carpetas son un extra: si fallan, la lista plana sigue siendo correcta.
         // Antes iban en un `Promise.all` con las sesiones, así que un fallo de carpetas
@@ -608,7 +621,9 @@ export function App() {
     if (!connection) return [];
 
     const generation = ++refreshSeq.current;
-    const sessions = await connection.listSessions();
+    // Se lee el ref, no el estado del render: una acción lenta que termina después del
+    // toque de «archivadas» tiene que traer la lista con la preferencia nueva.
+    const sessions = await connection.listSessions(showArchivedRef.current);
     const admiteCarpetas = connection.capabilities().includes('workspace.list');
     const workspaces = admiteCarpetas ? await connection.listWorkspaces().catch(() => []) : [];
 
@@ -626,6 +641,42 @@ export function App() {
       setActionError(undefined);
     } catch (error) {
       setActionError({ text: messageOf(error) });
+    }
+  };
+
+  /** Enseña u oculta las archivadas, y recarga con la elección nueva. */
+  const toggleArchived = async () => {
+    const next = !showArchived;
+    // El ref primero: la recarga que sigue lee de ahí, no del estado del render.
+    showArchivedRef.current = next;
+    setShowArchived(next);
+    await reload();
+  };
+
+  /**
+   * Devuelve una sesión archivada a la lista.
+   *
+   * No se quita la fila antes: si el host la rechaza, la sesión sigue archivada y la
+   * lista tiene que decirlo tal cual.
+   */
+  const restore = async (session: SessionSummary) => {
+    const connection = client.current;
+    if (!connection || restoring) return;
+
+    setRestoring(session.id);
+    try {
+      await connection.unarchive(session.id);
+      setActionError(undefined);
+    } catch (error) {
+      setActionError({ text: messageOf(error) });
+    } finally {
+      try {
+        await refresh();
+      } catch (error) {
+        setActionError({ text: messageOf(error) });
+      } finally {
+        setRestoring(undefined);
+      }
     }
   };
 
@@ -776,6 +827,21 @@ export function App() {
                 </button>
               </div>
 
+              {/* Sin capacidad para restaurar, el interruptor no haría nada: un host
+                  viejo descarta `includeArchived` y la lista sería la misma. */}
+              {view.host.capabilities.includes('workspace.unarchive') && (
+                <div className="row">
+                  <button
+                    type="button"
+                    className="ghost tiny"
+                    aria-pressed={showArchived}
+                    onClick={() => void toggleArchived()}
+                  >
+                    {t('sessions.archived')}
+                  </button>
+                </div>
+              )}
+
               {actionError && (
                 <p className="error" role="alert">
                   {'key' in actionError ? t(actionError.key) : actionError.text}
@@ -796,10 +862,13 @@ export function App() {
                 onOpen={(session) => void open(session)}
                 onCreate={(workspaceId) => void createInFolder(workspaceId)}
                 onArchive={(session) => void archive(session)}
+                onUnarchive={(session) => void restore(session)}
                 canCreate={view.host.capabilities.includes('session.create')}
                 canArchive={view.host.capabilities.includes('workspace.archive')}
+                canUnarchive={view.host.capabilities.includes('workspace.unarchive')}
                 {...(creatingIn ? { createPending: creatingIn } : {})}
                 {...(archiving ? { archivePending: archiving } : {})}
+                {...(restoring ? { restorePending: restoring } : {})}
                 preferences={preferences}
               />
 

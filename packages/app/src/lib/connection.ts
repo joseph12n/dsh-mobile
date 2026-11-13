@@ -247,10 +247,28 @@ export class CompanionClient {
     }
   }
 
-  async listSessions(): Promise<SessionSummary[]> {
-    const response = await this.#request({ type: 'sessions.list' });
+  /**
+   * Lists the sessions.
+   *
+   * `includeArchived` brings the archived ones back, marked with `archived: true`: without
+   * it the list is the everyday one, where an archived session has no business.
+   */
+  async listSessions(includeArchived = false): Promise<SessionSummary[]> {
+    const response = await this.#request({
+      type: 'sessions.list',
+      ...(includeArchived ? { includeArchived: true } : {}),
+    });
     if (response.type === 'error') throw new ConnectionError(response.message, response.code);
     return response.type === 'sessions.ok' ? response.sessions : [];
+  }
+
+  /** Brings an archived session back into the list. */
+  async unarchive(sessionId: string): Promise<void> {
+    const response = await this.#request({ type: 'workspace.unarchive', sessionId });
+    if (response.type === 'error') throw new ConnectionError(response.message, response.code);
+    if (response.type !== 'workspace.unarchived') {
+      throw new ConnectionError('The host did not confirm the restore.', 'internal');
+    }
   }
 
   /**

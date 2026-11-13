@@ -25,6 +25,7 @@ export const LOCALE_LABELS: Record<Locale, string> = {
 const en = {
   'action.newSession': 'New session',
   'action.archive': 'Archive',
+  'action.restore': 'Restore',
   'action.stopFirst': 'Stop the turn before archiving',
   'action.archived': 'Archived',
   'app.subtitle': 'Remote control for DeepSeek Harness',
@@ -56,6 +57,7 @@ const en = {
   'error.forget': 'Forget this device',
 
   'sessions.title': 'Sessions',
+  'sessions.archived': 'Archived',
   'sessions.refresh': 'Refresh',
   'sessions.empty': 'No live sessions on the host.',
 
@@ -83,6 +85,7 @@ const en = {
   'session.error': 'error',
   'session.back': '← Back',
   'session.stop': 'Stop',
+  'session.archivedNote': 'This session is archived. Restore it to continue.',
   'session.loadMore': 'Load earlier',
   'session.loading': 'Loading…',
   'session.empty': 'Nothing to show yet.',
@@ -121,6 +124,7 @@ export type Catalogue = Record<MessageKey, string>;
 const es: Catalogue = {
   'action.newSession': 'Nueva sesión',
   'action.archive': 'Archivar',
+  'action.restore': 'Restaurar',
   'action.stopFirst': 'Detén el turno antes de archivar',
   'action.archived': 'Archivada',
   'app.subtitle': 'Control remoto de DeepSeek Harness',
@@ -152,6 +156,7 @@ const es: Catalogue = {
   'error.forget': 'Olvidar este dispositivo',
 
   'sessions.title': 'Sesiones',
+  'sessions.archived': 'Archivadas',
   'sessions.refresh': 'Actualizar',
   'sessions.empty': 'No hay sesiones vivas en el host.',
 
@@ -179,6 +184,7 @@ const es: Catalogue = {
   'session.error': 'error',
   'session.back': '← Volver',
   'session.stop': 'Detener',
+  'session.archivedNote': 'Esta sesión está archivada. Restáurala para continuar.',
   'session.loadMore': 'Cargar anteriores',
   'session.loading': 'Cargando…',
   'session.empty': 'Todavía no hay nada que mostrar.',
@@ -212,6 +218,7 @@ const es: Catalogue = {
 const ptBR: Catalogue = {
   'action.newSession': 'Nova sessão',
   'action.archive': 'Arquivar',
+  'action.restore': 'Restaurar',
   'action.stopFirst': 'Pare o turno antes de arquivar',
   'action.archived': 'Arquivada',
   'app.subtitle': 'Controle remoto do DeepSeek Harness',
@@ -243,6 +250,7 @@ const ptBR: Catalogue = {
   'error.forget': 'Esquecer este dispositivo',
 
   'sessions.title': 'Sessões',
+  'sessions.archived': 'Arquivadas',
   'sessions.refresh': 'Atualizar',
   'sessions.empty': 'Nenhuma sessão ativa no host.',
 
@@ -270,6 +278,7 @@ const ptBR: Catalogue = {
   'session.error': 'erro',
   'session.back': '← Voltar',
   'session.stop': 'Parar',
+  'session.archivedNote': 'Esta sessão está arquivada. Restaure para continuar.',
   'session.loadMore': 'Carregar anteriores',
   'session.loading': 'Carregando…',
   'session.empty': 'Ainda não há nada para mostrar.',
@@ -303,6 +312,7 @@ const ptBR: Catalogue = {
 const zhHans: Catalogue = {
   'action.newSession': '新建会话',
   'action.archive': '归档',
+  'action.restore': '恢复',
   'action.stopFirst': '请先停止当前轮次',
   'action.archived': '已归档',
   'app.subtitle': 'DeepSeek Harness 远程控制',
@@ -333,6 +343,7 @@ const zhHans: Catalogue = {
   'error.forget': '忘记此设备',
 
   'sessions.title': '会话',
+  'sessions.archived': '已归档',
   'sessions.refresh': '刷新',
   'sessions.empty': '主机上没有活跃会话。',
 
@@ -360,6 +371,7 @@ const zhHans: Catalogue = {
   'session.error': '错误',
   'session.back': '← 返回',
   'session.stop': '停止',
+  'session.archivedNote': '此会话已归档。恢复后才能继续。',
   'session.loadMore': '加载更早的',
   'session.loading': '加载中…',
   'session.empty': '还没有可显示的内容。',

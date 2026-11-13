@@ -38,6 +38,8 @@ export interface SessionRecord {
   workspaceId?: string;
   /** Modelo con el que seguirá la sesión, si el host lo proyecta. */
   model?: ModelSelection;
+  /** `true` cuando la lista se pidió con las archivadas y esta lo está. */
+  archived?: boolean;
 }
 
 /** Resumen que devuelve `sessionController.list()`. Subconjunto de lo que usamos. */
@@ -111,7 +113,10 @@ function wireState(record: SessionRecord): WireState {
  * Devuelve `[]` si el host no expone `sessionController`: un móvil sin lista es
  * un problema, pero un plugin que revienta es peor.
  */
-export async function listSessions(ctx: HostContext): Promise<SessionRecord[]> {
+export async function listSessions(
+  ctx: HostContext,
+  options: { includeArchived?: boolean } = {},
+): Promise<SessionRecord[]> {
   const controller = service<SessionListController>(ctx, 'sessionController');
   if (!controller || typeof controller.list !== 'function') return [];
 
@@ -165,12 +170,21 @@ export async function listSessions(ctx: HostContext): Promise<SessionRecord[]> {
 
   // Archivadas: el host mantiene la fila y solo marca el id, así que sin esto archivar
   // desde el teléfono parecía no hacer nada. Se piden aparte y un fallo no esconde nada.
+  //
+  // Ojo con la degradación: si esta lectura falla y se pidieron las archivadas, las
+  // filas viajan **sin marcar**, o sea como vivas. Es preferible a perder la lista, y
+  // se recupera sola en la siguiente recarga.
   const archived = await listArchivedSessions(ctx).catch(() => new Set<string>());
 
+  // Con `includeArchived` se devuelven marcadas en vez de quitarlas: la vista de
+  // archivadas necesita saber cuáles lo están para ofrecer restaurarlas.
+  const visible =
+    options.includeArchived === true
+      ? records.map((record) => (archived.has(record.id) ? { ...record, archived: true } : record))
+      : records.filter((record) => !archived.has(record.id));
+
   // Lo más reciente primero: es lo que uno mira al coger el teléfono.
-  return records
-    .filter((record) => !archived.has(record.id))
-    .sort((a, b) => b.updatedAt - a.updatedAt);
+  return visible.sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
 /** Convierte un registro interno en el mensaje del contrato. */
@@ -185,5 +199,6 @@ export function toWireSession(record: SessionRecord): WireSession {
     // Se omite, never empty: el contrato acepta cualquier cadena, pero un `''` no es un id.
     ...(record.workspaceId ? { workspaceId: record.workspaceId } : {}),
     ...(record.model ? { model: record.model } : {}),
+    ...(record.archived ? { archived: true } : {}),
   };
 }

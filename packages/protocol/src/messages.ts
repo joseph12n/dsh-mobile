@@ -51,7 +51,15 @@ export const PairRedeemMessage = message('pair.redeem', {
   platform: z.string().max(64),
 });
 
-export const SessionsListMessage = message('sessions.list', {});
+/**
+ * Pide las sesiones.
+ *
+ * `includeArchived` trae también las archivadas, marcadas con `archived: true`: sin él
+ * la lista es la de siempre, la que se usa a diario.
+ */
+export const SessionsListMessage = message('sessions.list', {
+  includeArchived: z.boolean().optional(),
+});
 
 /**
  * Pide las carpetas del escritorio.
@@ -139,12 +147,18 @@ export const WorkspaceArchiveMessage = message('workspace.archive', {
   stopActivity: z.boolean().optional(),
 });
 
+/** Devuelve una sesión archivada a la lista. */
+export const WorkspaceUnarchiveMessage = message('workspace.unarchive', {
+  sessionId: SessionId,
+});
+
 export const ClientMessage = z.discriminatedUnion('type', [
   HelloMessage,
   PairRedeemMessage,
   SessionsListMessage,
   SessionCreateMessage,
   WorkspaceArchiveMessage,
+  WorkspaceUnarchiveMessage,
   WorkspaceListMessage,
   ModelListMessage,
   ModelSelectMessage,
@@ -183,6 +197,10 @@ export const SessionCreatedMessage = message('session.created', {
 });
 
 export const WorkspaceArchivedMessage = message('workspace.archived', {
+  sessionId: SessionId,
+});
+
+export const WorkspaceUnarchivedMessage = message('workspace.unarchived', {
   sessionId: SessionId,
 });
 
@@ -294,6 +312,7 @@ export const ServerMessage = z.discriminatedUnion('type', [
   SessionOkMessage,
   SessionCreatedMessage,
   WorkspaceArchivedMessage,
+  WorkspaceUnarchivedMessage,
   ModelsOkMessage,
   ModelSelectedMessage,
   HistoryOkMessage,

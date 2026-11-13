@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { HostContext } from '../host-api.js';
-import { archiveSession, canArchiveSession, canCreateSession, createSession } from './lifecycle.js';
+import {
+  archiveSession,
+  canArchiveSession,
+  canCreateSession,
+  canUnarchiveSession,
+  createSession,
+  unarchiveSession,
+} from './lifecycle.js';
 
 /**
  * Session lifecycle, against the **real** host shapes.
@@ -99,6 +106,67 @@ describe('creating a session', () => {
       canCreateSession(ctxWith({ sessionController: { createSession: async () => ({}) } })),
     ).toBe(false);
     expect(canCreateSession(ctxWith({}))).toBe(false);
+  });
+});
+
+describe('unarchiving a session', () => {
+  it('calls the controller with one object', async () => {
+    const seen: unknown[] = [];
+    const ctx = ctxWith({
+      workspaceController: {
+        unarchiveSession: async (request: unknown) => {
+          seen.push(request);
+        },
+      },
+    });
+
+    expect(await unarchiveSession(ctx, { sessionId: 's1' })).toEqual({ ok: true });
+    expect(seen).toEqual([{ sessionId: 's1' }]);
+  });
+
+  it('reports a session that no longer exists', async () => {
+    const ctx = ctxWith({
+      workspaceController: {
+        unarchiveSession: async () => {
+          throw coded('session/not-found');
+        },
+      },
+    });
+
+    expect(await unarchiveSession(ctx, { sessionId: 'gone' })).toMatchObject({
+      ok: false,
+      code: 'not-found',
+    });
+  });
+
+  it('refuses when the host cannot unarchive', async () => {
+    expect(await unarchiveSession(ctxWith({}), { sessionId: 's1' })).toMatchObject({
+      ok: false,
+      code: 'no-service',
+    });
+    expect(canUnarchiveSession(ctxWith({}))).toBe(false);
+  });
+
+  it('keeps an unknown host code as failed', async () => {
+    const ctx = ctxWith({
+      workspaceController: {
+        unarchiveSession: async () => {
+          throw Object.assign(new Error('weird'), { code: 'workspace/something-else' });
+        },
+      },
+    });
+
+    expect(await unarchiveSession(ctx, { sessionId: 's1' })).toMatchObject({
+      ok: false,
+      code: 'failed',
+      message: 'weird',
+    });
+  });
+
+  it('is advertised only when the controller has the method', () => {
+    expect(
+      canUnarchiveSession(ctxWith({ workspaceController: { unarchiveSession: async () => 1 } })),
+    ).toBe(true);
   });
 });
 

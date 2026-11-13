@@ -321,9 +321,11 @@ export function SessionView({
         <button type="button" className="ghost" onClick={onBack}>
           {t('session.back')}
         </button>
-        <button type="button" className="ghost" onClick={onCancel}>
-          {t('session.stop')}
-        </button>
+        {!session.archived && (
+          <button type="button" className="ghost" onClick={onCancel}>
+            {t('session.stop')}
+          </button>
+        )}
       </div>
 
       <h2 className="session-heading">{session.title}</h2>
@@ -355,26 +357,34 @@ export function SessionView({
         </div>
       )}
 
-      {/* Composer fijo al final: se escribe sin perder de vista la conversación. */}
-      <div className="composer">
-        <textarea
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-          onKeyDown={(event) => {
-            // Enter envía; Shift+Enter hace salto de línea.
-            if (event.key === 'Enter' && !event.shiftKey) {
-              event.preventDefault();
-              send();
-            }
-          }}
-          placeholder={t('session.placeholder')}
-          rows={2}
-          autoCapitalize="sentences"
-        />
-        <button type="button" onClick={send} disabled={!draft.trim()}>
-          {t('session.send')}
-        </button>
-      </div>
+      {/*
+        Una sesión archivada se puede leer, pero no continuar: el host rechaza el turno.
+        Escribir aquí acababa en una pantalla de error por algo que la app podía impedir.
+      */}
+      {session.archived ? (
+        <p className="muted">{t('session.archivedNote')}</p>
+      ) : (
+        /* Composer fijo al final: se escribe sin perder de vista la conversación. */
+        <div className="composer">
+          <textarea
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={(event) => {
+              // Enter envía; Shift+Enter hace salto de línea.
+              if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                send();
+              }
+            }}
+            placeholder={t('session.placeholder')}
+            rows={2}
+            autoCapitalize="sentences"
+          />
+          <button type="button" onClick={send} disabled={!draft.trim()}>
+            {t('session.send')}
+          </button>
+        </div>
+      )}
     </section>
   );
 }

@@ -1098,6 +1098,11 @@ describe('session actions over the WebSocket', () => {
       sessionId?: string;
     }>;
     archiveSession?: () => Promise<{ ok: boolean; code?: string; message?: string }>;
+    unarchiveSession?: (request?: unknown) => Promise<{
+      ok: boolean;
+      code?: string;
+      message?: string;
+    }>;
   }
 
   /** A server whose session actions are whatever the test needs. */
@@ -1115,6 +1120,7 @@ describe('session actions over the WebSocket', () => {
       listSessions: () => Promise.resolve([]),
       ...(deps.createSession ? { createSession: deps.createSession as never } : {}),
       ...(deps.archiveSession ? { archiveSession: deps.archiveSession as never } : {}),
+      ...(deps.unarchiveSession ? { unarchiveSession: deps.unarchiveSession as never } : {}),
     });
 
     try {
@@ -1241,6 +1247,87 @@ describe('session actions over the WebSocket', () => {
   function archiveResult(code: string): { ok: boolean; code: string; message: string } {
     return { ok: false, code, message: code };
   }
+
+  it('restores an archived session', async () => {
+    const seen: unknown[] = [];
+    const response = await exchange(
+      {
+        unarchiveSession: async (request) => {
+          seen.push(request);
+          return { ok: true };
+        },
+      },
+      {
+        type: 'workspace.unarchive',
+        sessionId: 's1',
+      },
+    );
+    expect(response).toMatchObject({ type: 'workspace.unarchived', sessionId: 's1' });
+    // La firma es un objeto: con `(id)` el adaptador real no la reconocería.
+    expect(seen).toEqual([{ sessionId: 's1' }]);
+  });
+
+  // Igual que archivar: cada negativa tiene su código y `no-service` no es una avería.
+  it.each([
+    ['not-found', 'not-found'],
+    ['no-service', 'bad-request'],
+    ['failed', 'internal'],
+  ])('maps a %s restore fault to %s', async (code, expected) => {
+    const response = await exchange(
+      { unarchiveSession: async () => ({ ok: false, code, message: code }) },
+      { type: 'workspace.unarchive', sessionId: 's1' },
+    );
+    expect(response).toMatchObject({ type: 'error', code: expected });
+  });
+
+  it('refuses to restore when the host has no handler wired', async () => {
+    const response = await exchange({}, { type: 'workspace.unarchive', sessionId: 's1' });
+    expect(response).toMatchObject({ type: 'error', code: 'bad-request' });
+  });
+
+  it('passes includeArchived to the session source', async () => {
+    const seen: unknown[] = [];
+    const registry = new DeviceRegistry({ persistence: new MemoryPersistence() });
+    const { token } = registry.enroll('Pixel', 'android');
+
+    const server = await startCompanionServer({
+      pairing: new PairingService(),
+      devices: registry,
+      port: 0,
+      listSessions: (options) => {
+        seen.push(options);
+        return Promise.resolve([]);
+      },
+    });
+
+    try {
+      const client = await openClient(server.port);
+      client.send(hello({ deviceToken: token }));
+      expect((await client.next())['type']).toBe('hello.ok');
+
+      client.send({
+        v: PROTOCOL_VERSION,
+        id: 'l1',
+        at: Date.now(),
+        type: 'sessions.list',
+        includeArchived: true,
+      } as never);
+      expect((await client.next())['type']).toBe('sessions.ok');
+
+      client.send({
+        v: PROTOCOL_VERSION,
+        id: 'l2',
+        at: Date.now(),
+        type: 'sessions.list',
+      } as never);
+      expect((await client.next())['type']).toBe('sessions.ok');
+      client.close();
+    } finally {
+      await server.close();
+    }
+
+    expect(seen).toEqual([{ includeArchived: true }, {}]);
+  });
 
   /**
    * Empareja, manda un marco y devuelve la respuesta.

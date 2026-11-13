@@ -306,6 +306,84 @@ function sessionsOk(session: Record<string, unknown>): Record<string, unknown> {
   };
 }
 
+describe('sesiones archivadas', () => {
+  it('acepta pedir la lista con las archivadas', () => {
+    const base = { v: PROTOCOL_VERSION, id: 'l', at, type: 'sessions.list' };
+    expect(ClientMessage.safeParse(base).success).toBe(true);
+    expect(ClientMessage.safeParse({ ...base, includeArchived: true }).success).toBe(true);
+    expect(ClientMessage.safeParse({ ...base, includeArchived: 'sí' }).success).toBe(false);
+  });
+
+  it('marca la sesión archivada dentro de la lista', () => {
+    const message = sessionsOk({
+      id: 's1',
+      title: 't',
+      state: 'idle',
+      updatedAt: at,
+      seq: 1,
+      pendingQuestions: 0,
+      archived: true,
+    });
+    const parsed = ServerMessage.safeParse(message);
+    expect(parsed.success).toBe(true);
+  });
+
+  it('acepta una lista de un host viejo, sin el campo archived', () => {
+    const message = sessionsOk({
+      id: 's1',
+      title: 't',
+      state: 'idle',
+      updatedAt: at,
+      seq: 1,
+      pendingQuestions: 0,
+    });
+    expect(ServerMessage.safeParse(message).success).toBe(true);
+  });
+
+  it('rechaza una marca de archivada que no es booleana', () => {
+    for (const archived of ['true', 1, null]) {
+      const message = sessionsOk({
+        id: 's1',
+        title: 't',
+        state: 'idle',
+        updatedAt: at,
+        seq: 1,
+        pendingQuestions: 0,
+        archived,
+      });
+      expect(ServerMessage.safeParse(message).success).toBe(false);
+    }
+  });
+
+  it('descarta campos que no conoce en vez de rechazar el mensaje', () => {
+    // Es lo que permite que una app nueva hable con un host viejo y al revés.
+    const message = { v: PROTOCOL_VERSION, id: 'l', at, type: 'sessions.list', algo: 'nuevo' };
+    expect(ClientMessage.safeParse(message).success).toBe(true);
+  });
+
+  it('restaurar es su propio par de mensajes', () => {
+    const request = {
+      v: PROTOCOL_VERSION,
+      id: 'u',
+      at,
+      type: 'workspace.unarchive',
+      sessionId: 's1',
+    };
+    expect(ClientMessage.safeParse(request).success).toBe(true);
+
+    const response = parseServerMessage(
+      JSON.stringify({
+        v: PROTOCOL_VERSION,
+        id: 'u',
+        at,
+        type: 'workspace.unarchived',
+        sessionId: 's1',
+      }),
+    );
+    expect(response?.type).toBe('workspace.unarchived');
+  });
+});
+
 describe('lectura de marcos', () => {
   it('devuelve undefined ante JSON roto y no lanza', () => {
     expect(parseClientMessage('{no json')).toBeUndefined();
