@@ -9,6 +9,9 @@ import {
   HostInfo,
   ModelCatalog,
   ModelSelection,
+  ProviderConnection,
+  ProviderTestResult,
+  ProviderView,
   QuestionAnswerItem,
   QuestionBatch,
   SessionActivity,
@@ -89,6 +92,22 @@ export const DeviceRevokeMessage = message('devices.revoke', {
   deviceId: z.string().min(1),
 });
 
+export const ProvidersListMessage = message('providers.list', {});
+
+export const ProviderTestMessage = message('provider.test', {
+  provider: z.string().min(1),
+  apiKey: z.string().min(1).max(8_192),
+});
+
+export const ProviderConnectMessage = message('provider.connect', {
+  provider: z.string().min(1),
+  apiKey: z.string().min(1).max(8_192),
+});
+
+export const ProviderDisconnectMessage = message('provider.disconnect', {
+  provider: z.string().min(1),
+});
+
 export const RunStartMessage = message('run.start', {
   sessionId: SessionId,
   prompt: z.string().min(1).max(32_000),
@@ -141,6 +160,10 @@ export const ClientMessage = z.discriminatedUnion('type', [
   SessionActivityMessage,
   DevicesListMessage,
   DeviceRevokeMessage,
+  ProvidersListMessage,
+  ProviderTestMessage,
+  ProviderConnectMessage,
+  ProviderDisconnectMessage,
   RunStartMessage,
   RunCancelMessage,
   PingMessage,
@@ -261,6 +284,19 @@ export const DeviceRevokedMessage = message('devices.revoked', {
   deviceId: z.string().min(1),
 });
 
+export const ProvidersOkMessage = message('providers.ok', {
+  providers: z.array(ProviderView),
+});
+
+export const ProviderTestedMessage = message('provider.tested', ProviderTestResult.shape);
+
+export const ProviderConnectedMessage = message('provider.connected', ProviderConnection.shape);
+
+export const ProviderDisconnectedMessage = message(
+  'provider.disconnected',
+  ProviderConnection.shape,
+);
+
 export const ErrorMessage = message('error', {
   code: ErrorCode,
   message: z.string(),
@@ -292,6 +328,10 @@ export const ServerMessage = z.discriminatedUnion('type', [
   QuestionSettledMessage,
   DevicesOkMessage,
   DeviceRevokedMessage,
+  ProvidersOkMessage,
+  ProviderTestedMessage,
+  ProviderConnectedMessage,
+  ProviderDisconnectedMessage,
   DevicesChangedMessage,
   ErrorMessage,
 ]);

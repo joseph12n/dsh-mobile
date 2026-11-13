@@ -20,6 +20,9 @@ import {
   type HostInfo,
   type ModelCatalog,
   type ModelSelection,
+  type ProviderConnection,
+  type ProviderTestResult,
+  type ProviderView,
   type QuestionAnswerItem,
   type QuestionBatch,
   type ServerMessage,
@@ -130,6 +133,20 @@ export interface ServerDeps {
     result?: CommandResult;
   }>;
   readActivity?: (sessionId: string) => SessionActivity | Promise<SessionActivity>;
+  listProviders?: () => ProviderView[] | Promise<ProviderView[]>;
+  testProvider?: (input: { provider: string; apiKey: string }) => Promise<ProviderTestResult>;
+  connectProvider?: (input: { provider: string; apiKey: string }) => Promise<{
+    ok: boolean;
+    code?: CommandFailureCode;
+    message?: string;
+    connection?: ProviderConnection;
+  }>;
+  disconnectProvider?: (input: { provider: string }) => Promise<{
+    ok: boolean;
+    code?: CommandFailureCode;
+    message?: string;
+    connection?: ProviderConnection;
+  }>;
   answerQuestion?: (input: {
     callId: string;
     sessionId: string;
@@ -595,6 +612,118 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
           at: Date.now(),
           type: 'devices.changed',
           devices: updated,
+        });
+        return;
+      }
+
+      if (message.type === 'providers.list') {
+        if (!deps.listProviders) {
+          send(socket, errorMessage(message.id, 'bad-request', 'This host cannot list providers.'));
+          return;
+        }
+
+        const providers = await deps.listProviders();
+        if (socket.readyState !== socket.OPEN) return;
+
+        send(socket, {
+          v: PROTOCOL_VERSION,
+          id: message.id,
+          at: Date.now(),
+          type: 'providers.ok',
+          providers,
+        });
+        return;
+      }
+
+      if (message.type === 'provider.test') {
+        if (!deps.testProvider) {
+          send(socket, errorMessage(message.id, 'bad-request', 'This host cannot test providers.'));
+          return;
+        }
+
+        const result = await deps.testProvider({
+          provider: message.provider,
+          apiKey: message.apiKey,
+        });
+        if (socket.readyState !== socket.OPEN) return;
+
+        send(socket, {
+          v: PROTOCOL_VERSION,
+          id: message.id,
+          at: Date.now(),
+          type: 'provider.tested',
+          ...result,
+        });
+        return;
+      }
+
+      if (message.type === 'provider.connect') {
+        if (!deps.connectProvider) {
+          send(
+            socket,
+            errorMessage(message.id, 'bad-request', 'This host cannot connect providers.'),
+          );
+          return;
+        }
+
+        const outcome = await deps.connectProvider({
+          provider: message.provider,
+          apiKey: message.apiKey,
+        });
+        if (socket.readyState !== socket.OPEN) return;
+
+        if (!outcome.ok) {
+          send(
+            socket,
+            errorMessage(
+              message.id,
+              outcome.code ?? 'internal',
+              outcome.message ?? 'The provider could not be connected.',
+            ),
+          );
+          return;
+        }
+
+        send(socket, {
+          v: PROTOCOL_VERSION,
+          id: message.id,
+          at: Date.now(),
+          type: 'provider.connected',
+          ...(outcome.connection ?? { provider: message.provider, credential: 'set' }),
+        });
+        return;
+      }
+
+      if (message.type === 'provider.disconnect') {
+        if (!deps.disconnectProvider) {
+          send(
+            socket,
+            errorMessage(message.id, 'bad-request', 'This host cannot disconnect providers.'),
+          );
+          return;
+        }
+
+        const outcome = await deps.disconnectProvider({ provider: message.provider });
+        if (socket.readyState !== socket.OPEN) return;
+
+        if (!outcome.ok) {
+          send(
+            socket,
+            errorMessage(
+              message.id,
+              outcome.code ?? 'internal',
+              outcome.message ?? 'The provider could not be disconnected.',
+            ),
+          );
+          return;
+        }
+
+        send(socket, {
+          v: PROTOCOL_VERSION,
+          id: message.id,
+          at: Date.now(),
+          type: 'provider.disconnected',
+          ...(outcome.connection ?? { provider: message.provider, credential: 'unknown' }),
         });
         return;
       }

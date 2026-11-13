@@ -147,7 +147,17 @@ async function pairClient(
 }
 
 async function hostWith(
-  deps: Pick<ServerDeps, 'listCommands' | 'runCommand' | 'readActivity' | 'limits'>,
+  deps: Pick<
+    ServerDeps,
+    | 'listCommands'
+    | 'runCommand'
+    | 'readActivity'
+    | 'limits'
+    | 'listProviders'
+    | 'testProvider'
+    | 'connectProvider'
+    | 'disconnectProvider'
+  >,
 ): Promise<{ server: TestServer; pairing: PairingService }> {
   const pairing = new PairingService();
   const server = await startCompanionServer({
@@ -672,6 +682,109 @@ describe('límites del servidor', () => {
     expect(live.terminate).not.toHaveBeenCalled();
     expect(alive.has(live)).toBe(false);
     expect(dead.terminate).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('proveedores sobre el WebSocket', () => {
+  it('lista, prueba, conecta y desconecta sin devolver la clave', async () => {
+    const key = 'sk-test-12345';
+    const { server, pairing } = await hostWith({
+      listProviders: async () => [
+        {
+          id: 'opencode',
+          name: 'OpenCode',
+          configured: true,
+          credential: 'missing',
+          action: 'add-key',
+        },
+      ],
+      testProvider: async ({ provider }) => ({ provider, ok: true, code: 'ok' }),
+      connectProvider: async ({ provider }) => ({
+        ok: true,
+        connection: { provider, credential: 'set' },
+      }),
+      disconnectProvider: async ({ provider }) => ({
+        ok: true,
+        connection: { provider, credential: 'missing' },
+      }),
+    });
+    const { client } = await pairClient(server, pairing.issue().code, 'Providers');
+
+    client.send({
+      v: PROTOCOL_VERSION,
+      id: 'providers-list',
+      at: Date.now(),
+      type: 'providers.list',
+    });
+    const listed = await client.next();
+    expect(listed['type']).toBe('providers.ok');
+    expect((listed['providers'] as Array<{ id: string }>)[0]?.id).toBe('opencode');
+
+    client.send({
+      v: PROTOCOL_VERSION,
+      id: 'provider-test',
+      at: Date.now(),
+      type: 'provider.test',
+      provider: 'opencode',
+      apiKey: key,
+    });
+    const tested = await client.next();
+    expect(tested['type']).toBe('provider.tested');
+    expect(tested['code']).toBe('ok');
+    expect(JSON.stringify(tested)).not.toContain(key);
+
+    client.send({
+      v: PROTOCOL_VERSION,
+      id: 'provider-connect',
+      at: Date.now(),
+      type: 'provider.connect',
+      provider: 'opencode',
+      apiKey: key,
+    });
+    const connected = await client.next();
+    expect(connected['type']).toBe('provider.connected');
+    expect(connected['credential']).toBe('set');
+    expect(JSON.stringify(connected)).not.toContain(key);
+
+    client.send({
+      v: PROTOCOL_VERSION,
+      id: 'provider-disconnect',
+      at: Date.now(),
+      type: 'provider.disconnect',
+      provider: 'opencode',
+    });
+    const disconnected = await client.next();
+    expect(disconnected['type']).toBe('provider.disconnected');
+    expect(disconnected['credential']).toBe('missing');
+
+    client.close();
+    await server.close();
+  });
+
+  it('traduce el rechazo del host a un error de contrato', async () => {
+    const { server, pairing } = await hostWith({
+      connectProvider: async () => ({
+        ok: false,
+        code: 'bad-request',
+        message: 'This provider signs in on the desktop.',
+      }),
+    });
+    const { client } = await pairClient(server, pairing.issue().code, 'Providers');
+
+    client.send({
+      v: PROTOCOL_VERSION,
+      id: 'provider-denied',
+      at: Date.now(),
+      type: 'provider.connect',
+      provider: 'native',
+      apiKey: 'sk-x',
+    });
+    const response = await client.next();
+    expect(response['type']).toBe('error');
+    expect(response['code']).toBe('bad-request');
+
+    client.close();
+    await server.close();
   });
 });
 

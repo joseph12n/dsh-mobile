@@ -137,6 +137,95 @@ describe('dispositivos', () => {
   });
 });
 
+describe('proveedores', () => {
+  const base = { v: PROTOCOL_VERSION, id: 'provider-1', at: 1_760_000_000_000 };
+
+  it('acepta listar, probar, conectar y desconectar', () => {
+    expect(ClientMessage.safeParse({ ...base, type: 'providers.list' }).success).toBe(true);
+    expect(
+      ClientMessage.safeParse({
+        ...base,
+        type: 'provider.test',
+        provider: 'opencode',
+        apiKey: 'sk-x',
+      }).success,
+    ).toBe(true);
+    expect(
+      ClientMessage.safeParse({
+        ...base,
+        type: 'provider.connect',
+        provider: 'opencode',
+        apiKey: 'sk-x',
+      }).success,
+    ).toBe(true);
+    expect(
+      ClientMessage.safeParse({ ...base, type: 'provider.disconnect', provider: 'opencode' })
+        .success,
+    ).toBe(true);
+  });
+
+  it('rechaza una clave vacía o un nombre ausente', () => {
+    expect(
+      ClientMessage.safeParse({
+        ...base,
+        type: 'provider.connect',
+        provider: 'opencode',
+        apiKey: '',
+      }).success,
+    ).toBe(false);
+    expect(
+      ClientMessage.safeParse({ ...base, type: 'provider.disconnect', provider: '' }).success,
+    ).toBe(false);
+  });
+
+  it('acepta las respuestas sin claves', () => {
+    const view = {
+      id: 'opencode',
+      name: 'OpenCode',
+      configured: true,
+      credential: 'missing',
+      action: 'add-key',
+    };
+    expect(
+      ServerMessage.safeParse({ ...base, type: 'providers.ok', providers: [view] }).success,
+    ).toBe(true);
+    expect(
+      ServerMessage.safeParse({
+        ...base,
+        type: 'provider.tested',
+        provider: 'opencode',
+        ok: true,
+        code: 'ok',
+      }).success,
+    ).toBe(true);
+    expect(
+      ServerMessage.safeParse({
+        ...base,
+        type: 'provider.connected',
+        provider: 'opencode',
+        credential: 'set',
+      }).success,
+    ).toBe(true);
+    expect(
+      ServerMessage.safeParse({
+        ...base,
+        type: 'provider.disconnected',
+        provider: 'opencode',
+        credential: 'missing',
+      }).success,
+    ).toBe(true);
+    expect(
+      ServerMessage.safeParse({
+        ...base,
+        type: 'provider.tested',
+        provider: 'opencode',
+        ok: false,
+        code: 'nope',
+      }).success,
+    ).toBe(false);
+  });
+});
+
 describe('eventos de transcripción', () => {
   it('acepta el razonamiento opcional de una respuesta', () => {
     const event = { kind: 'message', role: 'assistant', text: 'hola', reasoning: 'pienso' };
