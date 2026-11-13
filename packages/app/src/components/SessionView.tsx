@@ -8,7 +8,7 @@ import type {
 } from '@dsh-mobile/protocol';
 import { groupTurns, partTurn, type Turn } from '../lib/turns.js';
 import { plural, useI18n } from '../i18n/index.js';
-import { ChevronDownIcon, ChevronLeftIcon, SendIcon, StopIcon } from './icons.js';
+import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, SendIcon, StopIcon } from './icons.js';
 
 const STATE_KEY = {
   working: 'session.working',
@@ -65,13 +65,13 @@ function ToolRun({ entries }: { entries: HistoryEntry[] }) {
     <li className="tool-group">
       <button
         type="button"
-        className="ghost tiny"
+        className="tool-toggle"
         onClick={() => setOpen((previous) => !previous)}
         aria-expanded={open}
         aria-controls={open ? id : undefined}
       >
+        <ChevronRightIcon />
         {plural(t, 'session.tools', entries.length)}
-        {open ? ` · ${t('session.hideTools')}` : ''}
       </button>
 
       {open && (
@@ -85,9 +85,15 @@ function ToolRun({ entries }: { entries: HistoryEntry[] }) {
   );
 }
 
+function keepsState(entry: HistoryEntry): boolean {
+  return (
+    entry.event.kind !== 'state' || entry.event.state === 'done' || entry.event.state === 'error'
+  );
+}
+
 function TurnBlock({ turn, number }: { turn: Turn; number: number }) {
   const { t } = useI18n();
-  const parts = partTurn(turn.entries);
+  const parts = partTurn(turn.entries.filter(keepsState));
   const label = turn.prompt
     ? `${t('session.turn', { number })}: ${turn.prompt}`
     : t('session.turn', { number });
