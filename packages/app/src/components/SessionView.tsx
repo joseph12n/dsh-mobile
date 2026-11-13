@@ -265,7 +265,12 @@ export function SessionView({
   const { t } = useI18n();
   const [draft, setDraft] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
   const atBottom = useRef(true);
+
+  useEffect(() => {
+    headingRef.current?.focus({ preventScroll: true });
+  }, [session.id]);
 
   useEffect(() => {
     atBottom.current = true;
@@ -305,7 +310,9 @@ export function SessionView({
         </button>
 
         <div className="session-ident">
-          <h2 className="session-heading">{session.title}</h2>
+          <h2 className="session-heading" tabIndex={-1} ref={headingRef}>
+            {session.title}
+          </h2>
           <span className="session-state">
             <span className={`dot ${session.state}`} aria-hidden="true" />
             {t(STATE_KEY[session.state] ?? 'session.idle')}
@@ -352,7 +359,13 @@ export function SessionView({
         {entries.length === 0 ? (
           <p className="muted">{loading ? t('session.loading') : t('session.empty')}</p>
         ) : (
-          <div className="transcript">
+          <div
+            className="transcript"
+            role="log"
+            aria-live="polite"
+            aria-relevant="additions"
+            aria-label={t('session.transcript')}
+          >
             {groupTurns(entries).map((turn, index) => (
               <TurnBlock key={turn.id} turn={turn} number={index + 1} />
             ))}
@@ -374,6 +387,7 @@ export function SessionView({
               }
             }}
             placeholder={t('session.placeholder')}
+            aria-label={t('session.placeholder')}
             rows={1}
             autoCapitalize="sentences"
             enterKeyHint="send"
