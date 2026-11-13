@@ -132,10 +132,16 @@ tool use so they do not dirty your log.
 
 ### What you can do from the phone
 
-- See live sessions with their state and how many questions are waiting.
+- See live sessions with their state, how many questions are waiting, and the folder they
+  belong to. Folders carry their own icon and colour, keep their heading on screen while the
+  list scrolls, and collapse.
 - Open a session and read the transcript, with paged history and live events.
+- **Choose the model and reasoning effort** from the top of the conversation, without
+  scrolling back through it.
 - **Answer questions and approvals**, with the full text and the options.
 - **Write** to the agent and **cancel** the running turn.
+- Open the gear for language, contrast, folder preferences and the paired device. The phone's
+  back gesture closes the sheet or the conversation before it leaves the app.
 
 ---
 
@@ -174,10 +180,10 @@ The app targets WCAG 2.2 AA:
 - **Language.** The document language follows the interface, and the four locales are
   complete.
 
-The last audit ran axe-core against the session list, a conversation, the pairing screen and
-a pending question card: **0 violations** across the WCAG 2.0, 2.1 and 2.2 A and AA rules,
-plus the best-practice rules on the question and conversation screens. The audit is a local
-CDP harness; it is not part of CI because it needs a browser.
+The audit covers the session list (with folders), a conversation, the pairing screen, the
+settings sheet and a pending question card: **0 violations** across the WCAG 2.0, 2.1 and 2.2
+A and AA rules, plus the best-practice rules on the question and conversation screens. The
+audit is a local CDP harness; it is not part of CI because it needs a browser.
 
 ---
 
