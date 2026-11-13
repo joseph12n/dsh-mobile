@@ -18,6 +18,8 @@ const host = {
     'command.run',
     'session.activity',
     'devices.manage',
+    'providers.list',
+    'provider.connect',
     'session.history',
     'reply.send',
     'run.cancel',
@@ -45,6 +47,30 @@ let devices = [
     name: 'iPad viejo',
     createdAt: now - 30 * 86_400_000,
     lastSeenAt: now - 20 * 86_400_000,
+  },
+];
+
+let providers = [
+  {
+    id: 'opencode',
+    name: 'OpenCode',
+    configured: true,
+    credential: 'missing',
+    action: 'add-key',
+  },
+  {
+    id: 'anthropic',
+    name: 'Anthropic',
+    configured: false,
+    credential: 'unknown',
+    action: 'add-provider',
+  },
+  {
+    id: 'native',
+    name: 'Native Auth',
+    configured: false,
+    credential: 'unknown',
+    action: 'desktop',
   },
 ];
 
@@ -378,6 +404,43 @@ wss.on('connection', (socket) => {
       devices = devices.filter((item) => item.id !== target.id);
       reply({ type: 'devices.revoked', deviceId: target.id });
       send({ id: `devices-${Date.now()}`, type: 'devices.changed', devices });
+      return;
+    }
+
+    if (message.type === 'providers.list') {
+      reply({ type: 'providers.ok', providers });
+      return;
+    }
+
+    if (message.type === 'provider.test') {
+      const rejected = message.apiKey.includes('bad');
+      reply({
+        type: 'provider.tested',
+        provider: message.provider,
+        ok: !rejected,
+        code: rejected ? 'rejected' : 'ok',
+        ...(rejected ? { detail: 'The key was rejected.' } : {}),
+      });
+      return;
+    }
+
+    if (message.type === 'provider.connect') {
+      providers = providers.map((provider) =>
+        provider.id === message.provider
+          ? { ...provider, configured: true, credential: 'set', action: 'none' }
+          : provider,
+      );
+      reply({ type: 'provider.connected', provider: message.provider, credential: 'set' });
+      return;
+    }
+
+    if (message.type === 'provider.disconnect') {
+      providers = providers.map((provider) =>
+        provider.id === message.provider
+          ? { ...provider, credential: 'missing', action: 'add-key' }
+          : provider,
+      );
+      reply({ type: 'provider.disconnected', provider: message.provider, credential: 'missing' });
       return;
     }
 

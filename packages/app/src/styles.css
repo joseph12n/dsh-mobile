@@ -950,6 +950,94 @@ button.ghost.tiny {
   flex: 0 0 auto;
 }
 
+.providers {
+  display: grid;
+  gap: 8px;
+}
+
+.provider-list {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.provider-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+}
+
+.provider-ident {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.provider-name {
+  overflow: hidden;
+  color: var(--text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.provider-form {
+  display: grid;
+  flex: 1 0 100%;
+  gap: 8px;
+  padding: 8px 0 4px;
+}
+
+.provider-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.provider-field input {
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 16px;
+}
+
+.provider-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.provider-test {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.provider-test.ok {
+  color: var(--done);
+}
+
+.provider-test.bad {
+  color: var(--danger);
+}
+
+.provider-detail {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.provider-error {
+  margin: 8px 0 0;
+}
+
 .settings-folders {
   margin: 4px 0 0;
   padding: 6px 0 8px;
