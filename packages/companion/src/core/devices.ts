@@ -39,6 +39,7 @@ export class DeviceRegistry {
   readonly #generateToken: () => string;
   readonly #generateId: () => string;
   #devices: StoredDevice[];
+  #dirty = false;
 
   constructor(options: DeviceRegistryOptions) {
     this.#persistence = options.persistence;
@@ -81,10 +82,12 @@ export class DeviceRegistry {
     if (!found) return undefined;
 
     found.lastSeenAt = this.#now();
+    this.#dirty = true;
     return toPublic(found);
   }
 
   flush(): void {
+    if (!this.#dirty) return;
     this.#persist();
   }
 
@@ -103,6 +106,7 @@ export class DeviceRegistry {
   #persist(): void {
     try {
       this.#persistence.save(this.#devices);
+      this.#dirty = false;
     } catch {}
   }
 }

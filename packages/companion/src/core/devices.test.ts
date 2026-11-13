@@ -77,6 +77,21 @@ describe('registro de dispositivos', () => {
     expect(persistence.saves).toBe(savesBefore);
   });
 
+  it('flush persiste el lastSeen acumulado y solo cuando cambió', () => {
+    const { registry, persistence, advance } = makeRegistry();
+    const { token } = registry.enroll('Pixel', 'android');
+    const saves = persistence.saves;
+
+    advance(5_000);
+    registry.authenticate(token);
+    expect(persistence.saves).toBe(saves);
+
+    registry.flush();
+    expect(persistence.saves).toBe(saves + 1);
+    registry.flush();
+    expect(persistence.saves).toBe(saves + 1);
+  });
+
   it('revoca un dispositivo y su token deja de valer', () => {
     const { registry } = makeRegistry();
     const { token, device } = registry.enroll('Pixel', 'android');
