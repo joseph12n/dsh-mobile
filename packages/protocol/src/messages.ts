@@ -11,6 +11,7 @@ import {
   ModelSelection,
   QuestionAnswerItem,
   QuestionBatch,
+  SessionActivity,
   SessionId,
   SessionState,
   SessionSummary,
@@ -78,6 +79,10 @@ export const CommandRunMessage = message('command.run', {
   line: z.string().min(2).max(4_000),
 });
 
+export const SessionActivityMessage = message('session.activity', {
+  sessionId: SessionId,
+});
+
 export const RunStartMessage = message('run.start', {
   sessionId: SessionId,
   prompt: z.string().min(1).max(32_000),
@@ -127,6 +132,7 @@ export const ClientMessage = z.discriminatedUnion('type', [
   QuestionAnswerMessage,
   CommandsListMessage,
   CommandRunMessage,
+  SessionActivityMessage,
   RunStartMessage,
   RunCancelMessage,
   PingMessage,
@@ -203,6 +209,11 @@ export const CommandsOkMessage = message('commands.ok', {
 
 export const CommandOkMessage = message('command.ok', CommandResult.shape);
 
+export const ActivityOkMessage = message('activity.ok', {
+  sessionId: SessionId,
+  activity: SessionActivity,
+});
+
 export const RunOkMessage = message('run.ok', {
   sessionId: SessionId,
   state: SessionState,
@@ -257,6 +268,7 @@ export const ServerMessage = z.discriminatedUnion('type', [
   AnswerOkMessage,
   CommandsOkMessage,
   CommandOkMessage,
+  ActivityOkMessage,
   RunOkMessage,
   SessionEventMessage,
   SessionStateMessage,

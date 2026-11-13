@@ -9,6 +9,7 @@ import {
   type ModelSelection,
   type QuestionAnswerItem,
   type QuestionBatch,
+  type SessionActivity,
   type SessionSummary,
   type Workspace,
 } from '@dsh-mobile/protocol';
@@ -71,6 +72,7 @@ export function App() {
   const [questions, setQuestions] = useState<QuestionBatch[]>([]);
   const [openSession, setOpenSession] = useState<SessionSummary | undefined>(undefined);
   const [commands, setCommands] = useState<CommandInfo[]>([]);
+  const [activity, setActivity] = useState<SessionActivity | undefined>(undefined);
   const listHeadingRef = useRef<HTMLHeadingElement>(null);
   const wasOpen = useRef(false);
   const questionsRef = useRef<QuestionBatch[]>([]);
@@ -472,6 +474,8 @@ export function App() {
   }, []);
 
   const commandCapable = view.kind === 'sessions' && view.host.capabilities.includes('command.run');
+  const activityCapable =
+    view.kind === 'sessions' && view.host.capabilities.includes('session.activity');
 
   useEffect(() => {
     const connection = client.current;
@@ -512,6 +516,33 @@ export function App() {
   );
 
   const commandProps = commandCapable ? { commands, onRunCommand: runOpenCommand } : {};
+
+  useEffect(() => {
+    const connection = client.current;
+    const sessionId = openSession?.id;
+    if (!connection || !sessionId || !activityCapable) {
+      setActivity(undefined);
+      return;
+    }
+
+    let cancelled = false;
+    const load = async (): Promise<void> => {
+      try {
+        const next = await connection.activity(sessionId);
+        if (!cancelled) setActivity(next);
+      } catch {}
+    };
+
+    void load();
+    const timer = setInterval(() => {
+      if (document.visibilityState === 'visible') void load();
+    }, QUESTIONS_POLL_MS);
+
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [activityCapable, client, openSession?.id]);
 
   const loadMore = useCallback(async () => {
     const connection = client.current;
@@ -939,6 +970,7 @@ export function App() {
                 hasMore={hasMore}
                 loading={loadingHistory}
                 {...commandProps}
+                {...(activity ? { activity } : {})}
                 questions={questions.filter((batch) => batch.sessionId === openSession.id)}
                 onAnswerQuestion={(callId, sessionId, answers) =>
                   void answer(callId, sessionId, answers)

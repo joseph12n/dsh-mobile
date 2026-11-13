@@ -143,6 +143,8 @@ tool use so they do not dirty your log.
 - **Run the host's slash commands** from the composer: `/plan`, `/goal`, `/mobile` and the
   commands your plugins register. The result appears above the composer and does not enter the
   model transcript.
+- **See what the agent is doing**: a compact strip with the current goal and its round, the
+  running subagents and the open tasks, with the details one tap away.
 - **Write** to the agent and **cancel** the running turn.
 - Open the gear for language, contrast, folder preferences and the paired device. The phone's
   back gesture closes the sheet or the conversation before it leaves the app.

@@ -18,6 +18,7 @@ export const Capability = z.enum([
   'workspace.unarchive',
   'model.select',
   'command.run',
+  'session.activity',
 ]);
 export type Capability = z.infer<typeof Capability>;
 
@@ -150,6 +151,43 @@ export const CommandResult = z.object({
   text: z.string().optional(),
 });
 export type CommandResult = z.infer<typeof CommandResult>;
+
+export const ActivityGoal = z.object({
+  objective: z.string(),
+  phase: z.string(),
+  roundsStarted: z.number().int().nonnegative(),
+  maxRounds: z.number().int().positive().optional(),
+});
+export type ActivityGoal = z.infer<typeof ActivityGoal>;
+
+export const ActivitySubagent = z.object({
+  id: z.string().min(1),
+  label: z.string().optional(),
+  activity: z.enum(['running', 'inactive']),
+  depth: z.number().int().positive(),
+  hasChildren: z.boolean().optional(),
+});
+export type ActivitySubagent = z.infer<typeof ActivitySubagent>;
+
+export const ActivityTodo = z.object({
+  content: z.string(),
+  status: z.enum(['pending', 'in_progress', 'completed']),
+});
+export type ActivityTodo = z.infer<typeof ActivityTodo>;
+
+export const SessionActivity = z.object({
+  goal: ActivityGoal.optional(),
+  subagents: z.array(ActivitySubagent).max(50),
+  todos: z
+    .object({
+      open: z.number().int().nonnegative(),
+      total: z.number().int().nonnegative(),
+      items: z.array(ActivityTodo).max(10),
+    })
+    .optional(),
+  planActive: z.boolean().optional(),
+});
+export type SessionActivity = z.infer<typeof SessionActivity>;
 
 export const QuestionAnswerItem = z.object({
   id: z.string().min(1),

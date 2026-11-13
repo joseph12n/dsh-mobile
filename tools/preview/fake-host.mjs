@@ -16,6 +16,7 @@ const host = {
     'workspace.unarchive',
     'model.select',
     'command.run',
+    'session.activity',
     'session.history',
     'reply.send',
     'run.cancel',
@@ -311,6 +312,37 @@ wss.on('connection', (socket) => {
       } else {
         reply({ type: 'command.ok', kind: 'error', text: 'Comando desconocido.' });
       }
+      return;
+    }
+
+    if (message.type === 'session.activity') {
+      reply({
+        type: 'activity.ok',
+        sessionId: message.sessionId,
+        activity: {
+          goal: {
+            objective: 'Ordenar el repositorio y cerrar el chat',
+            phase: 'active',
+            roundsStarted: 6,
+            maxRounds: 256,
+          },
+          subagents: [
+            { id: 'child-1', label: 'Inspector de tests', activity: 'running', depth: 1 },
+            { id: 'child-2', label: 'Revisor de diseño', activity: 'inactive', depth: 1 },
+          ],
+          todos: {
+            open: 2,
+            total: 4,
+            items: [
+              { content: 'Pintar la paleta de comandos', status: 'completed' },
+              { content: 'Verificar la actividad en el móvil', status: 'in_progress' },
+              { content: 'Cerrar el PR', status: 'pending' },
+              { content: 'Probar en el teléfono', status: 'pending' },
+            ],
+          },
+          planActive: true,
+        },
+      });
       return;
     }
 

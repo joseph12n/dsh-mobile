@@ -60,6 +60,21 @@ export interface AgentRegistry {
   get(sessionId: string): unknown;
 }
 
+export interface SubagentEntry {
+  id: string;
+  kind: 'child' | 'diagnostic';
+  label?: string;
+  mode?: string;
+  activity?: 'running' | 'inactive';
+  depth?: number;
+  hasChildren?: boolean;
+  reason?: string;
+}
+
+export interface SubagentsService {
+  listDescendants(rootSessionId: string, signal?: AbortSignal): Promise<readonly SubagentEntry[]>;
+}
+
 export interface SessionPromptRequest {
   requestId: string;
   sessionId: string;
@@ -75,6 +90,7 @@ export interface HostContext {
   sessions?: SessionsService;
   sessionProjections?: ProjectionsService;
   commands?: CommandsService;
+  subagents?: SubagentsService;
   effect?(factory: () => Generator<unknown, void, unknown>, label?: string): void;
   get?(name: string): unknown;
   reflect?: { store?: Record<string, unknown> };
