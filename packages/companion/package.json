@@ -1,11 +1,33 @@
 {
   "name": "@dsh-mobile/companion",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.1.0",
   "description": "DSH host plugin: WebSocket bridge, QR pairing and device tokens for DSH Mobile",
   "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/joseph12n/dsh-mobile.git",
+    "directory": "packages/companion"
+  },
+  "homepage": "https://github.com/joseph12n/dsh-mobile/tree/main/packages/companion#readme",
+  "bugs": {
+    "url": "https://github.com/joseph12n/dsh-mobile/issues"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "plugin",
+    "pwa",
+    "remote-control",
+    "dsh-mobile"
+  ],
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
