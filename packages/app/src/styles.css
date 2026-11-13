@@ -672,7 +672,7 @@ button.ghost.tiny {
 
 .options {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 8px;
   margin-bottom: 10px;
 }
@@ -682,7 +682,7 @@ button.ghost.tiny {
   flex-direction: column;
   align-items: flex-start;
   gap: 2px;
-  width: auto;
+  width: 100%;
   min-height: 44px;
   padding: 10px 16px;
   background: transparent;
@@ -728,6 +728,16 @@ button.ghost.tiny {
   color: var(--text);
   font-family: var(--font);
   font-size: 16px;
+}
+
+.question-batch > button {
+  margin-top: 12px;
+}
+
+.panel-foot {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
 }
 
 .settings {
