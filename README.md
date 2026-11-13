@@ -157,6 +157,30 @@ tailnet name — a secure context, its own certificate, and one URL for home and
 
 ---
 
+## Accessibility
+
+The app targets WCAG 2.2 AA:
+
+- **Focus and keyboard.** Opening a conversation moves focus to its title; coming back moves
+  it to the session list heading, and both show a visible ring. The transcript is a polite
+  live log with its own name, and every control has an accessible name.
+- **Touch targets.** Interactive controls are at least 44×44 CSS pixels, including the
+  icon-only buttons and the action at the end of each session row.
+- **Motion.** What moves is transition-based. Under `prefers-reduced-motion` the movement is
+  dropped while an opacity change keeps the state change legible; press feedback does not
+  scale either.
+- **Contrast.** Text is measured against the background it actually renders on; nothing
+  falls below 4.5:1.
+- **Language.** The document language follows the interface, and the four locales are
+  complete.
+
+The last audit ran axe-core against the session list, a conversation, the pairing screen and
+a pending question card: **0 violations** across the WCAG 2.0, 2.1 and 2.2 A and AA rules,
+plus the best-practice rules on the question and conversation screens. The audit is a local
+CDP harness; it is not part of CI because it needs a browser.
+
+---
+
 ## Documentation
 
 - [`docs/phone-setup.md`](docs/phone-setup.md) — **how to use it from the phone**, step by
