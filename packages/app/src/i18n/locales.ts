@@ -98,6 +98,7 @@ const en = {
   'session.tools': '{count} tool',
   'session.tools_plural': '{count} tools',
   'session.hideTools': 'hide',
+  'session.reasoning': 'Reasoning',
   'session.questionCount': '{count} question',
   'session.questionCount_plural': '{count} questions',
 
@@ -214,6 +215,7 @@ const es: Catalogue = {
   'session.tools': '{count} herramienta',
   'session.tools_plural': '{count} herramientas',
   'session.hideTools': 'ocultar',
+  'session.reasoning': 'Razonamiento',
   'session.questionCount': '{count} pregunta',
   'session.questionCount_plural': '{count} preguntas',
 
@@ -325,6 +327,7 @@ const ptBR: Catalogue = {
   'session.tools': '{count} ferramenta',
   'session.tools_plural': '{count} ferramentas',
   'session.hideTools': 'ocultar',
+  'session.reasoning': 'Raciocínio',
   'session.questionCount': '{count} pergunta',
   'session.questionCount_plural': '{count} perguntas',
 
@@ -435,6 +438,7 @@ const zhHans: Catalogue = {
   'session.tools': '{count} 个工具',
   'session.tools_plural': '{count} 个工具',
   'session.hideTools': '隐藏',
+  'session.reasoning': '推理',
   'session.questionCount': '{count} 个问题',
   'session.questionCount_plural': '{count} 个问题',
 

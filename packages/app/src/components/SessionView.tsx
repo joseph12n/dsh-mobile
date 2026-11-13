@@ -43,6 +43,15 @@ function EventRow({ entry }: { entry: HistoryEntry }) {
         <span className="msg-role">
           {event.role === 'user' ? t('session.you') : t('session.agent')}
         </span>
+        {event.role === 'assistant' && event.reasoning && (
+          <details className="msg-reasoning">
+            <summary>
+              <ChevronRightIcon />
+              {t('session.reasoning')}
+            </summary>
+            <p>{event.reasoning}</p>
+          </details>
+        )}
         <p>{event.text}</p>
       </li>
     );

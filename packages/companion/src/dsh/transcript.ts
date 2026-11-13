@@ -64,6 +64,72 @@ function firstText(value: unknown, depth = 0): string | undefined {
   return undefined;
 }
 
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  return typeof value === 'object' && value !== null
+    ? (value as Record<string, unknown>)
+    : undefined;
+}
+
+function partsOf(data: unknown): Record<string, unknown>[] {
+  const record = asRecord(data);
+  if (!record) return [];
+
+  const message = asRecord(record['message']);
+  const content = message ? message['content'] : record['content'];
+  if (!Array.isArray(content)) return [];
+
+  return content
+    .map(asRecord)
+    .filter((part): part is Record<string, unknown> => part !== undefined);
+}
+
+function textOf(part: Record<string, unknown>): string {
+  return typeof part['text'] === 'string' ? part['text'] : '';
+}
+
+function bodyOf(data: unknown): { text: string; reasoning?: string } {
+  const parts = partsOf(data);
+
+  if (parts.length === 0) {
+    return { text: firstText(data)?.trim() ?? '' };
+  }
+
+  const text = parts
+    .filter((part) => part['type'] === 'text')
+    .map(textOf)
+    .join('')
+    .trim();
+
+  const reasoning = parts
+    .filter((part) => part['type'] === 'reasoning' || part['type'] === 'thinking')
+    .map(textOf)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join('\n\n');
+
+  return { text, ...(reasoning ? { reasoning } : {}) };
+}
+
+const INTERNAL_USER_SOURCES = new Set([
+  'time-context',
+  'runtime-context',
+  'agent-instructions',
+  'skill-catalog',
+  'tool-jobs',
+  'user-approval',
+  'session-title',
+  'compaction',
+  'goal',
+  'job',
+  'jobs',
+]);
+
+function isInternalUserMessage(data: unknown): boolean {
+  const source = asRecord(asRecord(data)?.['source']);
+  const kind = source?.['kind'];
+  return typeof kind === 'string' && INTERNAL_USER_SOURCES.has(kind);
+}
+
 function stateOf(type: string): SessionState | undefined {
   switch (type) {
     case 'turn/start':
@@ -81,13 +147,22 @@ export function toTranscriptEvent(wire: WireEvent): TranscriptEvent | undefined 
   const data = wire.data;
 
   if (type === 'user/message' || type === 'user-rpc') {
-    const text = firstText(data);
+    if (type === 'user/message' && isInternalUserMessage(data)) return undefined;
+
+    const { text } = bodyOf(data);
     return text ? { kind: 'message', role: 'user', text } : undefined;
   }
 
   if (type === 'assistant/message') {
-    const text = firstText(data);
-    return text ? { kind: 'message', role: 'assistant', text } : undefined;
+    const { text, reasoning } = bodyOf(data);
+    if (!text) return undefined;
+
+    return {
+      kind: 'message',
+      role: 'assistant',
+      text,
+      ...(reasoning ? { reasoning } : {}),
+    };
   }
 
   if (type === 'tool/call') {

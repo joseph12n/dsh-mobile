@@ -3,6 +3,7 @@ import {
   ClientMessage,
   PROTOCOL_VERSION,
   ServerMessage,
+  TranscriptEvent,
   isSupportedVersion,
   newMessageId,
   parseClientMessage,
@@ -10,6 +11,20 @@ import {
 } from './index.js';
 
 const at = 1_760_000_000_000;
+
+describe('eventos de transcripción', () => {
+  it('acepta el razonamiento opcional de una respuesta', () => {
+    const event = { kind: 'message', role: 'assistant', text: 'hola', reasoning: 'pienso' };
+    expect(TranscriptEvent.safeParse(event).success).toBe(true);
+    expect(TranscriptEvent.safeParse({ ...event, reasoning: 3 }).success).toBe(false);
+  });
+
+  it('sigue aceptando un mensaje sin razonamiento', () => {
+    expect(TranscriptEvent.safeParse({ kind: 'message', role: 'user', text: 'hola' }).success).toBe(
+      true,
+    );
+  });
+});
 
 describe('negociación de versión', () => {
   it('acepta la versión que emite y rechaza el resto', () => {

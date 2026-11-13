@@ -1335,6 +1335,49 @@ button.ghost.tiny {
   overflow-wrap: anywhere;
 }
 
+.msg-reasoning {
+  margin: 2px 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--code-bg);
+}
+
+.msg-reasoning > summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 12px;
+  list-style: none;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.msg-reasoning > summary::-webkit-details-marker {
+  display: none;
+}
+
+.msg-reasoning > summary svg {
+  width: 14px;
+  height: 14px;
+  transition: transform 140ms var(--ease-out);
+}
+
+.msg-reasoning[open] > summary svg {
+  transform: rotate(90deg);
+}
+
+.msg-reasoning p {
+  margin: 0;
+  padding: 0 12px 12px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .tool {
   display: flex;
   gap: 8px;
@@ -1381,7 +1424,8 @@ button.ghost.tiny {
 
   .tool-toggle svg,
   .session-model > summary svg,
-  .folder-toggle > svg:first-child {
+  .folder-toggle > svg:first-child,
+  .msg-reasoning > summary svg {
     transition: none;
   }
 

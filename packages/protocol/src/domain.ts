@@ -93,6 +93,7 @@ export const TranscriptEvent = z.discriminatedUnion('kind', [
     kind: z.literal('message'),
     role: z.enum(['user', 'assistant']),
     text: z.string(),
+    reasoning: z.string().optional(),
   }),
   z.object({
     kind: z.literal('tool'),
