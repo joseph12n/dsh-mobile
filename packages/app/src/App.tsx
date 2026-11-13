@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  PROTOCOL_NAME,
-  PROTOCOL_VERSION,
   parsePairingUrl,
   type HistoryEntry,
   type HostInfo,
@@ -24,14 +22,12 @@ import { storage } from './lib/storage.js';
 import { QuestionsCard } from './components/Questions.js';
 import { SessionView, type CatalogStatus } from './components/SessionView.js';
 import { SessionList } from './components/SessionList.js';
-import { Settings } from './components/Settings.js';
+import { SettingsSheet } from './components/SettingsSheet.js';
 import { ForgetDeviceButton } from './components/ForgetDeviceButton.js';
-import { RefreshIcon } from './components/icons.js';
+import { GearIcon, RefreshIcon } from './components/icons.js';
 import { useI18n } from './i18n/index.js';
-import { LOCALES, LOCALE_LABELS, type Locale, type MessageKey } from './i18n/locales.js';
-import { CONTRASTS, useContrast, type Contrast } from './lib/contrast.js';
+import type { MessageKey } from './i18n/locales.js';
 import { useFolderPreferences } from './lib/preferences.js';
-import { usesFolders } from './lib/folders.js';
 
 type View =
   | { kind: 'checking' }
@@ -55,8 +51,7 @@ type View =
 type ActionNotice = { key: MessageKey } | { text: string };
 
 export function App() {
-  const { t, locale, setLocale } = useI18n();
-  const { contrast, setContrast } = useContrast();
+  const { t } = useI18n();
   const { preferences, setPreferences } = useFolderPreferences();
   const [view, setView] = useState<View>({ kind: 'checking' });
   const [code, setCode] = useState('');
@@ -65,6 +60,7 @@ export function App() {
   const [archiving, setArchiving] = useState<string | undefined>(undefined);
   const [restoring, setRestoring] = useState<string | undefined>(undefined);
   const [showArchived, setShowArchived] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [endpointInput, setEndpointInput] = useState('');
   const [catalog, setCatalog] = useState<ModelCatalog | undefined>(undefined);
   const [catalogStatus, setCatalogStatus] = useState<CatalogStatus>('idle');
@@ -428,13 +424,33 @@ export function App() {
 
   useEffect(() => {
     const onPopState = (): void => {
-      if (topEntry(globalThis.history)?.view === 'session') return;
+      const entry = topEntry(globalThis.history);
+
+      if (entry?.view === 'settings') {
+        setSettingsOpen(true);
+        return;
+      }
+
+      setSettingsOpen(false);
+      if (entry?.view === 'session') return;
       leaveSession();
     };
 
     globalThis.addEventListener('popstate', onPopState);
     return () => globalThis.removeEventListener('popstate', onPopState);
   }, [leaveSession]);
+
+  const openSettings = useCallback(() => {
+    if (topEntry(globalThis.history)?.view !== 'settings') {
+      pushEntry(globalThis.history, { view: 'settings' });
+    }
+    setSettingsOpen(true);
+  }, []);
+
+  const closeSettings = useCallback(() => {
+    if (backFrom(globalThis.history, { view: 'settings' })) return;
+    setSettingsOpen(false);
+  }, []);
 
   const loadMore = useCallback(async () => {
     const connection = client.current;
@@ -677,18 +693,36 @@ export function App() {
     openSessionId.current = undefined;
     storage.saveToken(undefined);
     storage.saveEndpoint(undefined);
+    setSettingsOpen(false);
+    if (topEntry(globalThis.history)?.view === 'settings') globalThis.history.back();
     setView({ kind: 'pairing', endpoint: endpointFromLocation() });
   };
 
   const inConversation = view.kind === 'sessions' && openSession !== undefined;
+  const connected = view.kind === 'sessions';
+  const shownEndpoint = view.kind === 'checking' ? endpointFromLocation() : view.endpoint;
 
   return (
     <main
       className={`shell${inConversation ? ' is-conversation' : ''}${view.kind === 'pairing' ? ' is-pairing' : ''}`}
     >
       <header className="head">
-        <h1>DSH Mobile</h1>
-        <p className="muted">{t('app.subtitle')}</p>
+        <div className="head-ident">
+          <h1>DSH Mobile</h1>
+          <p className="muted">{t('app.subtitle')}</p>
+        </div>
+        {!inConversation && (
+          <button
+            type="button"
+            className="ghost icon-button head-action"
+            aria-label={t('settings.open')}
+            aria-haspopup="dialog"
+            aria-expanded={settingsOpen}
+            onClick={openSettings}
+          >
+            <GearIcon />
+          </button>
+        )}
       </header>
 
       <div className="shell-body">
@@ -858,14 +892,6 @@ export function App() {
                   </p>
                 )}
 
-                {usesFolders(view.workspaces) && (
-                  <Settings
-                    workspaces={view.workspaces}
-                    preferences={preferences}
-                    onChange={setPreferences}
-                  />
-                )}
-
                 <SessionList
                   sessions={view.sessions}
                   workspaces={view.workspaces}
@@ -881,51 +907,23 @@ export function App() {
                   {...(restoring ? { restorePending: restoring } : {})}
                   preferences={preferences}
                 />
-
-                <div className="panel-foot">
-                  <ForgetDeviceButton onForget={forget} />
-                </div>
               </section>
             )}
           </>
         )}
       </div>
 
-      <footer className="foot">
-        <label className="locale-picker">
-          <span className="visually-hidden">{t('settings.language')}</span>
-          <select
-            className="locale"
-            value={locale}
-            onChange={(event) => setLocale(event.target.value as Locale)}
-          >
-            {LOCALES.map((code) => (
-              <option key={code} value={code}>
-                {LOCALE_LABELS[code]}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="locale-picker">
-          <span className="visually-hidden">{t('settings.contrast')}</span>
-          <select
-            className="locale"
-            value={contrast}
-            onChange={(event) => setContrast(event.target.value as Contrast)}
-          >
-            {CONTRASTS.map((level) => (
-              <option key={level} value={level}>
-                {t(`contrast.${level}`)}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <span className="muted">
-          {PROTOCOL_NAME} v{PROTOCOL_VERSION}
-        </span>
-      </footer>
+      <SettingsSheet
+        open={settingsOpen}
+        onClose={closeSettings}
+        connected={connected}
+        workspaces={view.kind === 'sessions' ? view.workspaces : []}
+        preferences={preferences}
+        onPreferencesChange={setPreferences}
+        hostName={view.kind === 'sessions' ? view.host.name : ''}
+        endpoint={shownEndpoint}
+        onForget={forget}
+      />
     </main>
   );
 }
