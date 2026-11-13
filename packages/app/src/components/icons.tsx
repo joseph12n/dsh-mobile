@@ -59,3 +59,34 @@ export function SendIcon() {
     </Icon>
   );
 }
+
+export function ArchiveIcon() {
+  return (
+    <Icon>
+      <path d="M4 8h16" />
+      <path d="M6 8v10a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V8" />
+      <path d="M12 11v5" />
+      <path d="m9 13 3 3 3-3" />
+    </Icon>
+  );
+}
+
+export function RestoreIcon() {
+  return (
+    <Icon>
+      <path d="M4 8h16" />
+      <path d="M6 8v10a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V8" />
+      <path d="M12 16v-5" />
+      <path d="m9 14 3-3 3 3" />
+    </Icon>
+  );
+}
+
+export function RefreshIcon() {
+  return (
+    <Icon>
+      <path d="M21 12a9 9 0 1 1-2.6-6.4" />
+      <path d="M21 3v6h-6" />
+    </Icon>
+  );
+}

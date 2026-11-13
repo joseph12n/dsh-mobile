@@ -24,6 +24,7 @@ import { QuestionsCard } from './components/Questions.js';
 import { SessionView } from './components/SessionView.js';
 import { SessionList } from './components/SessionList.js';
 import { Settings } from './components/Settings.js';
+import { RefreshIcon } from './components/icons.js';
 import { useI18n } from './i18n/index.js';
 import { LOCALES, LOCALE_LABELS, type Locale, type MessageKey } from './i18n/locales.js';
 import { CONTRASTS, useContrast, type Contrast } from './lib/contrast.js';
@@ -679,26 +680,30 @@ export function App() {
                 {...(modelError ? { error: modelError } : {})}
               />
             ) : (
-              <section className="card">
+              <section className="card sessions-panel">
                 <div className="row">
                   <h2>{t('sessions.title')}</h2>
-                  <button type="button" className="ghost" onClick={() => void reload()}>
-                    {t('sessions.refresh')}
-                  </button>
-                </div>
-
-                {view.host.capabilities.includes('workspace.unarchive') && (
-                  <div className="row">
+                  <div className="row-actions">
+                    {view.host.capabilities.includes('workspace.unarchive') && (
+                      <button
+                        type="button"
+                        className="ghost tiny"
+                        aria-pressed={showArchived}
+                        onClick={() => void toggleArchived()}
+                      >
+                        {t('sessions.archived')}
+                      </button>
+                    )}
                     <button
                       type="button"
-                      className="ghost tiny"
-                      aria-pressed={showArchived}
-                      onClick={() => void toggleArchived()}
+                      className="ghost icon-button"
+                      aria-label={t('sessions.refresh')}
+                      onClick={() => void reload()}
                     >
-                      {t('sessions.archived')}
+                      <RefreshIcon />
                     </button>
                   </div>
-                )}
+                </div>
 
                 {actionError && (
                   <p className="error" role="alert">
