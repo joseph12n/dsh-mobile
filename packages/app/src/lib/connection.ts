@@ -14,6 +14,7 @@ import {
   type ProviderConnection,
   type ProviderTestResult,
   type ProviderView,
+  type PushSubscription,
   type QuestionAnswerItem,
   type ServerMessage,
   type SessionActivity,
@@ -338,6 +339,23 @@ export class CompanionClient {
       credential: response.credential,
       ...(response.credentialSource ? { credentialSource: response.credentialSource } : {}),
     };
+  }
+
+  async pushKey(): Promise<string> {
+    const response = await this.#request({ type: 'push.key' });
+    if (response.type === 'error') throw new ConnectionError(response.message, response.code);
+    return response.type === 'push.key.ok' ? response.publicKey : '';
+  }
+
+  async subscribePush(subscription: PushSubscription): Promise<string> {
+    const response = await this.#request({ type: 'push.subscribe', subscription });
+    if (response.type === 'error') throw new ConnectionError(response.message, response.code);
+    return response.type === 'push.subscribed' ? response.deviceId : '';
+  }
+
+  async unsubscribePush(): Promise<void> {
+    const response = await this.#request({ type: 'push.unsubscribe' });
+    if (response.type === 'error') throw new ConnectionError(response.message, response.code);
   }
 
   async history(

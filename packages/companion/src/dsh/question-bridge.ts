@@ -107,7 +107,11 @@ function completeAnswer(
 
 export function createQuestionBridge(
   ctx: HostContext,
-  deps: { push: (message: ServerMessage) => void; clients: () => number },
+  deps: {
+    push: (message: ServerMessage) => void;
+    clients: () => number;
+    notify?: (batch: QuestionBatch) => void;
+  },
 ): QuestionBridge {
   const pending = new Map<string, PendingQuestion>();
   let off: (() => boolean) | undefined;
@@ -117,7 +121,7 @@ export function createQuestionBridge(
     next: () => Promise<BridgeAnswer>,
   ): Promise<BridgeAnswer> => {
     const raw = recordOf(request);
-    if (!raw || deps.clients() === 0 || recordOf(raw['wait'])) return next();
+    if (!raw || recordOf(raw['wait'])) return next();
 
     const sessionId = sessionIdOf(raw);
     const items = itemsOf(raw);
@@ -133,6 +137,9 @@ export function createQuestionBridge(
       createdAt: Date.now(),
     };
     const signal = raw['signal'] as AbortSignal | undefined;
+
+    deps.notify?.(batch);
+    if (deps.clients() === 0) return next();
 
     return new Promise<BridgeAnswer>((resolve, reject) => {
       let finished = false;

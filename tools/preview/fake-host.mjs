@@ -20,6 +20,7 @@ const host = {
     'devices.manage',
     'providers.list',
     'provider.connect',
+    'push.notifications',
     'session.history',
     'reply.send',
     'run.cancel',
@@ -73,6 +74,11 @@ let providers = [
     action: 'desktop',
   },
 ];
+
+const VAPID_PUBLIC_KEY =
+  'BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDzkrxZJjSgSnfckjBJuBkr3qBUYIHBQFLXYp5Nksh8';
+
+let pushSubscriptions = [];
 
 const workspaces = [
   {
@@ -441,6 +447,26 @@ wss.on('connection', (socket) => {
           : provider,
       );
       reply({ type: 'provider.disconnected', provider: message.provider, credential: 'missing' });
+      return;
+    }
+
+    if (message.type === 'push.key') {
+      reply({ type: 'push.key.ok', publicKey: VAPID_PUBLIC_KEY });
+      return;
+    }
+
+    if (message.type === 'push.subscribe') {
+      pushSubscriptions = pushSubscriptions.filter(
+        (item) => item.endpoint !== message.subscription.endpoint,
+      );
+      pushSubscriptions.push({ ...message.subscription, deviceId: device.id });
+      reply({ type: 'push.subscribed', deviceId: device.id });
+      return;
+    }
+
+    if (message.type === 'push.unsubscribe') {
+      pushSubscriptions = [];
+      reply({ type: 'push.unsubscribed' });
       return;
     }
 

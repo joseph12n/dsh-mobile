@@ -226,6 +226,49 @@ describe('proveedores', () => {
   });
 });
 
+describe('notificaciones push', () => {
+  const base = { v: PROTOCOL_VERSION, id: 'push-1', at: 1_760_000_000_000 };
+  const subscription = {
+    endpoint: 'https://push.example/abc',
+    keys: { p256dh: 'p256dh-key', auth: 'auth-key' },
+  };
+
+  it('acepta la clave, la suscripción y la baja', () => {
+    expect(ClientMessage.safeParse({ ...base, type: 'push.key' }).success).toBe(true);
+    expect(ClientMessage.safeParse({ ...base, type: 'push.subscribe', subscription }).success).toBe(
+      true,
+    );
+    expect(ClientMessage.safeParse({ ...base, type: 'push.unsubscribe' }).success).toBe(true);
+  });
+
+  it('rechaza una suscripción inválida', () => {
+    expect(
+      ClientMessage.safeParse({
+        ...base,
+        type: 'push.subscribe',
+        subscription: { ...subscription, endpoint: 'not-a-url' },
+      }).success,
+    ).toBe(false);
+    expect(
+      ClientMessage.safeParse({
+        ...base,
+        type: 'push.subscribe',
+        subscription: { ...subscription, keys: { p256dh: '', auth: 'auth' } },
+      }).success,
+    ).toBe(false);
+  });
+
+  it('acepta las respuestas', () => {
+    expect(
+      ServerMessage.safeParse({ ...base, type: 'push.key.ok', publicKey: 'BEl' }).success,
+    ).toBe(true);
+    expect(
+      ServerMessage.safeParse({ ...base, type: 'push.subscribed', deviceId: 'dev-1' }).success,
+    ).toBe(true);
+    expect(ServerMessage.safeParse({ ...base, type: 'push.unsubscribed' }).success).toBe(true);
+  });
+});
+
 describe('eventos de transcripción', () => {
   it('acepta el razonamiento opcional de una respuesta', () => {
     const event = { kind: 'message', role: 'assistant', text: 'hola', reasoning: 'pienso' };

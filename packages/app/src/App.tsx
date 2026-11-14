@@ -34,6 +34,11 @@ import { GearIcon, RefreshIcon } from './components/icons.js';
 import { useI18n } from './i18n/index.js';
 import type { MessageKey } from './i18n/locales.js';
 import { useFolderPreferences, toggleCollapsed } from './lib/preferences.js';
+import {
+  currentPushSubscription,
+  disablePush as disableBrowserPush,
+  subscribePush as subscribeBrowserPush,
+} from './lib/push.js';
 
 type View =
   | { kind: 'checking' }
@@ -307,6 +312,14 @@ export function App() {
           setCatalogStatus('idle');
         }
 
+        if (hello.host.capabilities.includes('push.notifications')) {
+          void currentPushSubscription()
+            .then((subscription) =>
+              subscription ? connection.subscribePush(subscription) : undefined,
+            )
+            .catch(() => undefined);
+        }
+
         const stillOpen = openSessionId.current;
         if (stillOpen) void reopenRef.current?.(stillOpen);
       } catch (error) {
@@ -464,6 +477,23 @@ export function App() {
   );
 
   useEffect(() => {
+    const match = /^#\/session\/([^/?]+)$/.exec(globalThis.location.hash);
+    if (!match || view.kind !== 'sessions') return;
+
+    const rawId = match[1];
+    if (!rawId) return;
+    const sessionId = decodeURIComponent(rawId);
+    globalThis.history.replaceState(
+      null,
+      '',
+      `${globalThis.location.pathname}${globalThis.location.search}`,
+    );
+
+    const session = view.sessions.find((item) => item.id === sessionId);
+    if (session) void open(session);
+  }, [view, open]);
+
+  useEffect(() => {
     const onPopState = (): void => {
       const entry = topEntry(globalThis.history);
 
@@ -488,6 +518,9 @@ export function App() {
     view.kind === 'sessions' && view.host.capabilities.includes('providers.list');
   const providersConnectable =
     view.kind === 'sessions' && view.host.capabilities.includes('provider.connect');
+
+  const pushCapable =
+    view.kind === 'sessions' && view.host.capabilities.includes('push.notifications');
 
   const loadProviders = useCallback(async () => {
     const connection = client.current;
@@ -555,6 +588,35 @@ export function App() {
     },
     [client, loadProviders],
   );
+
+  const enablePush = useCallback(async (): Promise<{ ok: boolean; message?: string }> => {
+    const connection = client.current;
+    if (!connection) return { ok: false };
+
+    try {
+      const key = await connection.pushKey();
+      const subscription = await subscribeBrowserPush(key);
+      await connection.subscribePush(subscription);
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, message: messageOf(error) };
+    }
+  }, [client]);
+
+  const disablePushNotifications = useCallback(async (): Promise<{
+    ok: boolean;
+    message?: string;
+  }> => {
+    const connection = client.current;
+
+    try {
+      await disableBrowserPush();
+      if (connection) await connection.unsubscribePush();
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, message: messageOf(error) };
+    }
+  }, [client]);
 
   const loadDevices = useCallback(async () => {
     const connection = client.current;
@@ -1216,6 +1278,9 @@ export function App() {
         onTestProvider={testProvider}
         onConnectProvider={connectProvider}
         onDisconnectProvider={disconnectProvider}
+        canPushNotifications={pushCapable}
+        onEnablePush={enablePush}
+        onDisablePush={disablePushNotifications}
         onForget={forget}
       />
     </main>

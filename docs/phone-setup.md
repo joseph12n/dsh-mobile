@@ -127,6 +127,22 @@ keeps the previous environment and will not see the variable.
 `$env:DSH_MOBILE_PUBLIC_URL = ...` only affects the current PowerShell session and a DSH that
 is already running will not see it.
 
+## Notifications
+
+On the phone, open Settings → Notifications and turn the switch on. The browser asks for the
+notification permission; accept it. The subscription is stored for that device and survives a
+reload; turning it off unsubscribes and removes it from the host.
+
+- **Android/Chrome**: works in the browser and in the installed PWA.
+- **iOS 16.4+**: only for the PWA added to the Home Screen, and background delivery is not
+  guaranteed. Add it to the Home Screen, enable notifications, and keep the app open when you
+  can.
+- The host needs internet access to reach the push service, and the PWA must be served over
+  HTTPS: use the tailnet address, not the loopback IP.
+
+Alerts: one when the agent is waiting for an answer, one when the turn finishes. Tap either to
+open that session.
+
 ## Out of scope
 
 - **Direct LAN access**: the plugin does not listen outside loopback, so it does not work. It

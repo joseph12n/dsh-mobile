@@ -17,14 +17,17 @@ function harness(clients = 1) {
     },
   } as unknown as HostContext;
 
+  const notified: string[] = [];
   const bridge = createQuestionBridge(ctx, {
     push: (message) => frames.push(message),
     clients: () => clients,
+    notify: (batch) => notified.push(batch.sessionId),
   });
 
   return {
     bridge,
     frames,
+    notified,
     listener(): Listener {
       if (!listener) throw new Error('the bridge did not register a listener');
       return listener;
@@ -58,6 +61,15 @@ function pendingCall(
 }
 
 describe('puente de preguntas bloqueantes', () => {
+  it('notifica la pregunta aunque no haya clientes conectados', async () => {
+    const h = harness(0);
+
+    await h.listener()(request, () => Promise.resolve(desktopAnswer));
+
+    expect(h.notified).toEqual(['session-1']);
+    expect(h.frames.some((frame) => frame.type === 'question.pending')).toBe(false);
+  });
+
   it('anuncia el lote y resuelve con la respuesta del móvil', async () => {
     const h = harness();
     let asked = 0;

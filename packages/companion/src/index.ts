@@ -11,7 +11,7 @@ import { cancelRun, readHistory, subscribeSession } from './dsh/transcript.js';
 import { injectText } from './dsh/prompt.js';
 import { buildPairingMessage } from './pairing-message.js';
 import { qrText } from './qr-text.js';
-import { buildPairingUrl } from '@deepseekharness-mobile/protocol';
+import { buildPairingUrl, type PushSubscription } from '@deepseekharness-mobile/protocol';
 import { openInBrowser } from './open-browser.js';
 import { resolveSessionId } from './dsh/sessions.js';
 import { hasWorkspaces, listWorkspaces } from './dsh/workspaces.js';
@@ -35,6 +35,7 @@ import {
   testProvider,
 } from './dsh/providers.js';
 import { createQuestionBridge } from './dsh/question-bridge.js';
+import { createPushService, type PushService } from './dsh/push.js';
 import type { HostContext } from './host-api.js';
 import { reportToLog, reportToText, runProbe, type ProbeReport } from './probe.js';
 import { DEFAULT_PORT, startCompanionServer, type RunningServer } from './server.js';
@@ -62,9 +63,14 @@ export function apply(ctx: HostContext): void {
   let listenerError: string | undefined;
   let runningServer: RunningServer | undefined;
 
+  let pushService: PushService | undefined;
+
   const questionBridge = createQuestionBridge(ctx, {
     push: (message) => runningServer?.broadcast(message),
     clients: () => runningServer?.clientCount() ?? 0,
+    notify: (batch) => {
+      void pushService?.notifyQuestion(batch);
+    },
   });
   disposers.push(() => questionBridge.dispose());
 
@@ -197,6 +203,18 @@ export function apply(ctx: HostContext): void {
     persistence: new DevicesFile(join(COMPANION_DIR, 'devices.json')),
   });
 
+  try {
+    pushService = createPushService(ctx, { dir: COMPANION_DIR });
+    pushService.start();
+    disposers.push(() => {
+      pushService?.dispose();
+      pushService = undefined;
+    });
+    log('push notifications ready');
+  } catch (error) {
+    log(`push notifications unavailable: ${String(error)}`);
+  }
+
   const portFromEnv = Number(process.env.DSH_MOBILE_PORT ?? '');
   const options = Number.isInteger(portFromEnv) && portFromEnv > 0 ? { port: portFromEnv } : {};
   const publicUrl = process.env.DSH_MOBILE_PUBLIC_URL?.trim();
@@ -214,6 +232,7 @@ export function apply(ctx: HostContext): void {
     if (activityAvailable(ctx)) list.push('session.activity');
     if (providersAvailable(ctx)) list.push('providers.list');
     if (providerConnectAvailable(ctx)) list.push('provider.connect');
+    if (pushService) list.push('push.notifications');
     list.push('devices.manage');
     return list;
   };
@@ -225,6 +244,15 @@ export function apply(ctx: HostContext): void {
     ...options,
     ...(publicUrl ? { publicUrl } : {}),
     ...(webRoot ? { webRoot } : {}),
+    ...(pushService
+      ? {
+          pushPublicKey: () => pushService!.publicKey(),
+          subscribePush: (deviceId: string, subscription: PushSubscription) =>
+            pushService!.subscribe(deviceId, subscription),
+          unsubscribePush: (deviceId: string) => pushService!.unsubscribe(deviceId),
+          removePushForDevice: (deviceId: string) => pushService!.removeDevice(deviceId),
+        }
+      : {}),
     listSessions: async (options) => {
       const records = await listSessions(ctx, options);
       const counts = questionBridge.counts();

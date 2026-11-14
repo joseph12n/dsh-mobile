@@ -45,6 +45,7 @@
   "dependencies": {
     "@deepseekharness-mobile/protocol": "workspace:*",
     "qrcode": "^1.5.4",
+    "web-push": "^4.0.0",
     "ws": "^8.18.3"
   },
   "devDependencies": {
@@ -55,6 +56,7 @@
     "@deepseek-ai/dsh-tools": "0.2.2-rc.1",
     "@deepseek-ai/dsh-user-questions": "0.2.2-rc.1",
     "@types/qrcode": "^1.5.5",
+    "@types/web-push": "^3.6.4",
     "@types/ws": "^8.18.1"
   },
   "peerDependencies": {
