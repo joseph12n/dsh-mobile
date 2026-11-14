@@ -1071,6 +1071,77 @@ button.ghost.tiny {
   transform: rotate(180deg);
 }
 
+.notifications {
+  display: grid;
+  gap: 8px;
+}
+
+.notification-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+}
+
+.notification-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.notification-title {
+  color: var(--text);
+}
+
+.switch {
+  position: relative;
+  flex: 0 0 auto;
+  width: 52px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.switch::before {
+  content: '';
+  position: absolute;
+  inset: 7px 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--surface-2);
+}
+
+.switch-thumb {
+  position: absolute;
+  top: 11px;
+  left: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition:
+    transform 160ms ease,
+    background 160ms ease;
+}
+
+.switch.on::before {
+  border-color: #5686fe;
+  background: rgba(86, 134, 254, 0.22);
+}
+
+.switch.on .switch-thumb {
+  transform: translateX(22px);
+  background: #5686fe;
+}
+
+.switch:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 .settings-folders {
   margin: 4px 0 0;
   padding: 6px 0 8px;

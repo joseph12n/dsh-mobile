@@ -19,6 +19,7 @@ import { useI18n } from '../i18n/index.js';
 import { LOCALES, LOCALE_LABELS, type Locale, type MessageKey } from '../i18n/locales.js';
 import { ForgetDeviceButton } from './ForgetDeviceButton.js';
 import { ChevronDownIcon } from './icons.js';
+import { NotificationsSection } from './NotificationsSection.js';
 import { PairedDevices } from './PairedDevices.js';
 import { ProvidersSection } from './ProvidersSection.js';
 import { Sheet } from './Sheet.js';
@@ -51,6 +52,9 @@ export function SettingsSheet({
   onTestProvider,
   onConnectProvider,
   onDisconnectProvider,
+  canPushNotifications,
+  onEnablePush,
+  onDisablePush,
   onForget,
 }: {
   open: boolean;
@@ -77,6 +81,9 @@ export function SettingsSheet({
     apiKey: string,
   ) => Promise<{ ok: boolean; message?: string }>;
   onDisconnectProvider: (provider: string) => Promise<{ ok: boolean; message?: string }>;
+  canPushNotifications: boolean;
+  onEnablePush: () => Promise<{ ok: boolean; message?: string }>;
+  onDisablePush: () => Promise<{ ok: boolean; message?: string }>;
   onForget: () => void;
 }) {
   const { t, locale, setLocale } = useI18n();
@@ -188,6 +195,13 @@ export function SettingsSheet({
             onDisconnect={onDisconnectProvider}
           />
         </details>
+      )}
+
+      {connected && canPushNotifications && (
+        <section className="sheet-section" aria-labelledby={`${id}-notifications`}>
+          <h3 id={`${id}-notifications`}>{t('settings.notifications')}</h3>
+          <NotificationsSection onEnable={onEnablePush} onDisable={onDisablePush} />
+        </section>
       )}
 
       {connected && (

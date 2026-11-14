@@ -253,7 +253,21 @@ it. `session.activity` is a read-only request for the open session:
 - **The host decides.** Capabilities are announced in `hello.ok` and the server does not send
   what the client cannot do.
 
-## 14. Status
+## 14. Push notifications
+
+The phone can subscribe to web push from Settings. The plugin generates and persists a VAPID
+key pair in `~/.dsh/companion/vapid.json` (private key, mode 0600) and exposes only the public
+key through `push.key`. The browser creates the push subscription; the phone sends it with
+`push.subscribe` and the host stores it per device in `push.json`, removing it when the device
+is revoked or the push service answers 404/410.
+
+Two triggers notify the stored subscriptions: a new blocking question from the question bridge
+(also when no client is connected) and the `running: true → false` transition of a session,
+detected by a five-second poll. The payload carries the kind and the session id only; the
+service worker opens `/#/session/<id>` on click. iOS delivers only to an installed PWA, so the
+phone shows an in-app notice and the session list keeps its pending badge.
+
+## 15. Status
 
 Phases 0 and 1 closed with evidence; phase 2 works end to end: pair, list sessions, read the
 transcript, answer questions, write, cancel, run the host's commands and follow the session's

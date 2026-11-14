@@ -22,6 +22,7 @@ export const Capability = z.enum([
   'devices.manage',
   'providers.list',
   'provider.connect',
+  'push.notifications',
 ]);
 export type Capability = z.infer<typeof Capability>;
 
@@ -228,6 +229,16 @@ export const ProviderConnection = z.object({
   credentialSource: ProviderCredentialSource.optional(),
 });
 export type ProviderConnection = z.infer<typeof ProviderConnection>;
+
+export const PushSubscription = z.object({
+  endpoint: z.string().url().max(4_096),
+  keys: z.object({
+    p256dh: z.string().min(1).max(255),
+    auth: z.string().min(1).max(255),
+  }),
+  expirationTime: z.number().int().nonnegative().nullable().optional(),
+});
+export type PushSubscription = z.infer<typeof PushSubscription>;
 
 export const QuestionAnswerItem = z.object({
   id: z.string().min(1),

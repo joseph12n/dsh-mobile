@@ -67,9 +67,11 @@ goes through a third-party server.
   the open tasks; one tap floats the details over the conversation without shrinking it.
 - **Slash commands** — `/plan`, `/goal`, `/mobile` and the commands your plugins register. The
   result appears above the composer and never enters the model transcript.
-- **Model providers** — list the host catalog, test a key and connect it. The key is stored on
+- **Connect model providers** — list the host catalog, test a key and connect it. The key is stored on
   the host and never comes back; custom endpoints, headers, model overrides and OAuth stay on
   the desktop.
+- **Notifications** — opt-in push alerts from Settings when the agent finishes or a question is
+  waiting; the subscription is stored per device and removed when the device is revoked.
 - **Paired devices** — see when each was last seen, revoke one, and forget this phone (which
   revokes it on the host first).
 - **Compose and cancel** — send a message to the agent or stop the running turn.

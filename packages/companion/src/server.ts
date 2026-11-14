@@ -23,6 +23,7 @@ import {
   type ProviderConnection,
   type ProviderTestResult,
   type ProviderView,
+  type PushSubscription,
   type QuestionAnswerItem,
   type QuestionBatch,
   type ServerMessage,
@@ -131,6 +132,10 @@ export interface ServerDeps {
   publicUrl?: string;
   capabilities?: Capability[] | (() => Capability[]);
   report?: () => ProbeReport;
+  pushPublicKey?: () => string;
+  subscribePush?: (deviceId: string, subscription: PushSubscription) => void;
+  unsubscribePush?: (deviceId: string) => void;
+  removePushForDevice?: (deviceId: string) => void;
   webRoot?: string;
   listWorkspaces?: () => Promise<Workspace[]>;
 
@@ -606,6 +611,64 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
         return;
       }
 
+      if (message.type === 'push.key') {
+        if (!deps.pushPublicKey) {
+          send(
+            socket,
+            errorMessage(message.id, 'bad-request', 'This host cannot send push notifications.'),
+          );
+          return;
+        }
+
+        send(socket, {
+          v: PROTOCOL_VERSION,
+          id: message.id,
+          at: Date.now(),
+          type: 'push.key.ok',
+          publicKey: deps.pushPublicKey(),
+        });
+        return;
+      }
+
+      if (message.type === 'push.subscribe') {
+        if (!deps.subscribePush) {
+          send(
+            socket,
+            errorMessage(message.id, 'bad-request', 'This host cannot store push subscriptions.'),
+          );
+          return;
+        }
+
+        deps.subscribePush(connection.device.id, message.subscription);
+        send(socket, {
+          v: PROTOCOL_VERSION,
+          id: message.id,
+          at: Date.now(),
+          type: 'push.subscribed',
+          deviceId: connection.device.id,
+        });
+        return;
+      }
+
+      if (message.type === 'push.unsubscribe') {
+        if (!deps.unsubscribePush) {
+          send(
+            socket,
+            errorMessage(message.id, 'bad-request', 'This host cannot remove push subscriptions.'),
+          );
+          return;
+        }
+
+        deps.unsubscribePush(connection.device.id);
+        send(socket, {
+          v: PROTOCOL_VERSION,
+          id: message.id,
+          at: Date.now(),
+          type: 'push.unsubscribed',
+        });
+        return;
+      }
+
       if (message.type === 'devices.list') {
         send(socket, {
           v: PROTOCOL_VERSION,
@@ -625,6 +688,7 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
         }
 
         devices.revoke(target.id);
+        deps.removePushForDevice?.(target.id);
         const updated = devices.list().map(toDeviceInfo);
         const peers = [...(deviceSockets.get(target.id) ?? [])];
 

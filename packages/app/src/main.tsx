@@ -7,6 +7,12 @@ import './styles.css';
 const container = document.getElementById('root');
 if (!container) throw new Error('Missing the #root element in index.html');
 
+if ('serviceWorker' in navigator) {
+  globalThis.addEventListener('load', () => {
+    void navigator.serviceWorker.register('/sw.js').catch(() => undefined);
+  });
+}
+
 createRoot(container).render(
   <StrictMode>
     <I18nProvider>

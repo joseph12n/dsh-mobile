@@ -12,6 +12,7 @@ import {
   ProviderConnection,
   ProviderTestResult,
   ProviderView,
+  PushSubscription,
   QuestionAnswerItem,
   QuestionBatch,
   SessionActivity,
@@ -108,6 +109,14 @@ export const ProviderDisconnectMessage = message('provider.disconnect', {
   provider: z.string().min(1),
 });
 
+export const PushKeyMessage = message('push.key', {});
+
+export const PushSubscribeMessage = message('push.subscribe', {
+  subscription: PushSubscription,
+});
+
+export const PushUnsubscribeMessage = message('push.unsubscribe', {});
+
 export const RunStartMessage = message('run.start', {
   sessionId: SessionId,
   prompt: z.string().min(1).max(32_000),
@@ -164,6 +173,9 @@ export const ClientMessage = z.discriminatedUnion('type', [
   ProviderTestMessage,
   ProviderConnectMessage,
   ProviderDisconnectMessage,
+  PushKeyMessage,
+  PushSubscribeMessage,
+  PushUnsubscribeMessage,
   RunStartMessage,
   RunCancelMessage,
   PingMessage,
@@ -297,6 +309,16 @@ export const ProviderDisconnectedMessage = message(
   ProviderConnection.shape,
 );
 
+export const PushKeyOkMessage = message('push.key.ok', {
+  publicKey: z.string().min(1).max(255),
+});
+
+export const PushSubscribedMessage = message('push.subscribed', {
+  deviceId: z.string().min(1),
+});
+
+export const PushUnsubscribedMessage = message('push.unsubscribed', {});
+
 export const ErrorMessage = message('error', {
   code: ErrorCode,
   message: z.string(),
@@ -332,6 +354,9 @@ export const ServerMessage = z.discriminatedUnion('type', [
   ProviderTestedMessage,
   ProviderConnectedMessage,
   ProviderDisconnectedMessage,
+  PushKeyOkMessage,
+  PushSubscribedMessage,
+  PushUnsubscribedMessage,
   DevicesChangedMessage,
   ErrorMessage,
 ]);

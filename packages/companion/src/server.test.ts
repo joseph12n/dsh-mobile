@@ -161,6 +161,10 @@ async function hostWith(
     | 'testProvider'
     | 'connectProvider'
     | 'disconnectProvider'
+    | 'pushPublicKey'
+    | 'subscribePush'
+    | 'unsubscribePush'
+    | 'removePushForDevice'
   >,
 ): Promise<{ server: TestServer; pairing: PairingService }> {
   const pairing = new PairingService();
@@ -786,6 +790,75 @@ describe('proveedores sobre el WebSocket', () => {
     const response = await client.next();
     expect(response['type']).toBe('error');
     expect(response['code']).toBe('bad-request');
+
+    client.close();
+    await server.close();
+  });
+});
+
+describe('notificaciones push sobre el WebSocket', () => {
+  it('entrega la clave, registra y borra la suscripción', async () => {
+    const subscribed: string[] = [];
+    const unsubscribed: string[] = [];
+    const { server, pairing } = await hostWith({
+      pushPublicKey: () => 'BEl-test-key',
+      subscribePush: (_deviceId, subscription) => subscribed.push(subscription.endpoint),
+      unsubscribePush: (deviceId) => unsubscribed.push(deviceId),
+    });
+    const { client } = await pairClient(server, pairing.issue().code, 'Push');
+
+    client.send({ v: PROTOCOL_VERSION, id: 'push-key', at: Date.now(), type: 'push.key' });
+    const key = await client.next();
+    expect(key['type']).toBe('push.key.ok');
+    expect(key['publicKey']).toBe('BEl-test-key');
+
+    client.send({
+      v: PROTOCOL_VERSION,
+      id: 'push-subscribe',
+      at: Date.now(),
+      type: 'push.subscribe',
+      subscription: {
+        endpoint: 'https://push.example/a',
+        keys: { p256dh: 'p256dh', auth: 'auth' },
+      },
+    });
+    const subscribedFrame = await client.next();
+    expect(subscribedFrame['type']).toBe('push.subscribed');
+    expect(subscribed).toEqual(['https://push.example/a']);
+
+    client.send({
+      v: PROTOCOL_VERSION,
+      id: 'push-unsubscribe',
+      at: Date.now(),
+      type: 'push.unsubscribe',
+    });
+    const unsubscribedFrame = await client.next();
+    expect(unsubscribedFrame['type']).toBe('push.unsubscribed');
+    expect(unsubscribed).toHaveLength(1);
+
+    client.close();
+    await server.close();
+  });
+
+  it('borra la suscripción al revocar el dispositivo', async () => {
+    const removed: string[] = [];
+    const { server, pairing } = await hostWith({
+      removePushForDevice: (deviceId) => removed.push(deviceId),
+    });
+    const { client, paired } = await pairClient(server, pairing.issue().code, 'Push');
+    const device = paired['device'] as { id?: string } | undefined;
+    expect(typeof device?.id).toBe('string');
+
+    client.send({
+      v: PROTOCOL_VERSION,
+      id: 'revoke',
+      at: Date.now(),
+      type: 'devices.revoke',
+      deviceId: device?.id ?? '',
+    });
+    const reply = await client.next();
+    expect(reply['type']).toBe('devices.revoked');
+    expect(removed).toEqual([device?.id]);
 
     client.close();
     await server.close();
