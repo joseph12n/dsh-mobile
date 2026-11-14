@@ -15,7 +15,7 @@ import {
   type SessionActivity,
   type SessionSummary,
   type Workspace,
-} from '@dsh-mobile/protocol';
+} from '@deepseekharness-mobile/protocol';
 import {
   CompanionClient,
   ConnectionError,

@@ -28,7 +28,7 @@ import {
   type ServerMessage,
   type SessionActivity,
   type Workspace,
-} from '@dsh-mobile/protocol';
+} from '@deepseekharness-mobile/protocol';
 import type { Device, DeviceRegistry } from './core/devices.js';
 import type { PairingService } from './core/pairing.js';
 import { log } from './log.js';

@@ -11,7 +11,7 @@ import { cancelRun, readHistory, subscribeSession } from './dsh/transcript.js';
 import { injectText } from './dsh/prompt.js';
 import { buildPairingMessage } from './pairing-message.js';
 import { qrText } from './qr-text.js';
-import { buildPairingUrl } from '@dsh-mobile/protocol';
+import { buildPairingUrl } from '@deepseekharness-mobile/protocol';
 import { openInBrowser } from './open-browser.js';
 import { resolveSessionId } from './dsh/sessions.js';
 import { hasWorkspaces, listWorkspaces } from './dsh/workspaces.js';
@@ -38,7 +38,7 @@ import { createQuestionBridge } from './dsh/question-bridge.js';
 import type { HostContext } from './host-api.js';
 import { reportToLog, reportToText, runProbe, type ProbeReport } from './probe.js';
 import { DEFAULT_PORT, startCompanionServer, type RunningServer } from './server.js';
-import type { Capability } from '@dsh-mobile/protocol';
+import type { Capability } from '@deepseekharness-mobile/protocol';
 
 export const name = 'dsh-mobile-companion';
 

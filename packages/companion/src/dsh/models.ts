@@ -5,7 +5,7 @@ import type {
   ModelGroup,
   ModelOption,
   ModelSelection,
-} from '@dsh-mobile/protocol';
+} from '@deepseekharness-mobile/protocol';
 import { codeOf, messageOf } from './errors.js';
 
 interface CatalogGroup {

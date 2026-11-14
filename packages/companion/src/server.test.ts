@@ -5,8 +5,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { WebSocket } from 'ws';
-import { PROTOCOL_VERSION, WEBSOCKET_PATH, parseServerMessage } from '@dsh-mobile/protocol';
-import type { ServerMessage } from '@dsh-mobile/protocol';
+import {
+  PROTOCOL_VERSION,
+  WEBSOCKET_PATH,
+  parseServerMessage,
+} from '@deepseekharness-mobile/protocol';
+import type { ServerMessage } from '@deepseekharness-mobile/protocol';
 import { DeviceRegistry, type DevicePersistence, type StoredDevice } from './core/devices.js';
 import { PairingService } from './core/pairing.js';
 import {

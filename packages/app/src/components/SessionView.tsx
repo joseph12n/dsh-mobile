@@ -10,7 +10,7 @@ import type {
   SessionActivity,
   SessionSummary,
   TranscriptEvent,
-} from '@dsh-mobile/protocol';
+} from '@deepseekharness-mobile/protocol';
 import { groupTurns, partTurn, type Turn } from '../lib/turns.js';
 import { plural, useI18n } from '../i18n/index.js';
 import { QuestionsCard } from './Questions.js';

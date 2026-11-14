@@ -13,7 +13,7 @@ speaks a **contract of its own, versioned**, to a plugin running inside DSH.
 ```
 PC (runs DSH)                                      Phone
 ┌──────────────────────────────────────┐   ┌──────────────────────────┐
-│ plugin @dsh-mobile/companion         │   │ PWA @dsh-mobile/app      │
+│ plugin @deepseekharness-mobile/companion         │   │ PWA @deepseekharness-mobile/app      │
 │  · its own listener :6768            │◄─►│  · pairing               │
 │  · serves the built PWA              │WS │  · sessions and state    │
 │  · pairing by QR                     │   │  · transcript            │
@@ -48,7 +48,7 @@ The rules that do not bend:
 2. **Only `dsh/` talks to DSH**, plus `probe.ts`, which reads host services on purpose: it is
    the diagnostic report, and routing it through the adapter would hide what it measures. That
    folder is the bumper: when upstream changes, the damage is confined there.
-3. **`app/` does not know DSH.** Only `@dsh-mobile/protocol`.
+3. **`app/` does not know DSH.** Only `@deepseekharness-mobile/protocol`.
 
 Breaking rule 2 is the fastest way for a DSH update to break the project.
 

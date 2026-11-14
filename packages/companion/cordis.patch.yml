@@ -6,7 +6,7 @@
 #
 #   - insert:
 #       - id: dsh-mobile-companion
-#         name: '@dsh-mobile/companion'
+#         name: '@deepseekharness-mobile/companion'
 #         config: {}
 #
 # El plugin escucha en 127.0.0.1:6768 (loopback fijo: no hay modo de red). La

@@ -1,4 +1,4 @@
-import type { DeviceInfo } from '@dsh-mobile/protocol';
+import type { DeviceInfo } from '@deepseekharness-mobile/protocol';
 import type { Translate } from '../i18n/index.js';
 import type { MessageKey } from '../i18n/locales.js';
 import { elapsed } from './sessions.js';

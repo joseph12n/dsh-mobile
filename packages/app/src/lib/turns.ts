@@ -1,4 +1,4 @@
-import type { HistoryEntry } from '@dsh-mobile/protocol';
+import type { HistoryEntry } from '@deepseekharness-mobile/protocol';
 
 export interface Turn {
   id: number;

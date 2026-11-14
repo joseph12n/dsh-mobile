@@ -7,14 +7,14 @@ published by this change; the account, the scope and the version are your decisi
 
 npm is the public registry where JavaScript packages live. `pnpm publish` uploads a tarball
 built from a package directory; users install it with `dsh` or `pnpm add`. A **scope** is the
-`@name/` prefix: `@dsh-mobile/companion` can only be published by the account or organization
+`@name/` prefix: `@deepseekharness-mobile/companion` can only be published by the account or organization
 that owns the `dsh-mobile` scope.
 
 ## What has to be published
 
-- `@dsh-mobile/companion`: the DSH plugin, including the PWA in `dist/web` and the bundle
+- `@deepseekharness-mobile/companion`: the DSH plugin, including the PWA in `dist/web` and the bundle
   `cordis.patch.yml`. This is the package users install.
-- `@dsh-mobile/protocol`: the companion depends on it through `workspace:*`. `pnpm publish`
+- `@deepseekharness-mobile/protocol`: the companion depends on it through `workspace:*`. `pnpm publish`
   rewrites that to the published version, so the protocol has to be published too (or bundled
   into the companion as a follow-up).
 
@@ -53,8 +53,8 @@ From the repository root, for `packages/protocol` and `packages/companion`:
 
 ```powershell
 pnpm build
-pnpm --filter @dsh-mobile/protocol pack --dry-run
-pnpm --filter @dsh-mobile/companion pack --dry-run
+pnpm --filter @deepseekharness-mobile/protocol pack --dry-run
+pnpm --filter @deepseekharness-mobile/companion pack --dry-run
 ```
 
 The companion tarball must contain `dist/web/index.html` and the rest of the PWA (15 files under
@@ -64,8 +64,8 @@ The companion tarball must contain `dist/web/index.html` and the rest of the PWA
 
 ```powershell
 npm login
-pnpm --filter @dsh-mobile/protocol publish --access public --no-git-checks
-pnpm --filter @dsh-mobile/companion publish --access public --no-git-checks
+pnpm --filter @deepseekharness-mobile/protocol publish --access public --no-git-checks
+pnpm --filter @deepseekharness-mobile/companion publish --access public --no-git-checks
 ```
 
 - `--no-git-checks` lets pnpm publish from this branch; a release should normally be on a clean
@@ -73,7 +73,7 @@ pnpm --filter @dsh-mobile/companion publish --access public --no-git-checks
 - `--access public` is required for a scoped package the first time; otherwise npm treats it as
   private and asks for a paid plan.
 - `pnpm publish` runs the build and rewrites `workspace:*` to the published version.
-- Check the result at `https://www.npmjs.com/package/@dsh-mobile/companion`.
+- Check the result at `https://www.npmjs.com/package/@deepseekharness-mobile/companion`.
 
 To publish a fix, bump the version (`0.1.1`) and repeat. Versions are immutable: you cannot
 overwrite a published version.
@@ -103,8 +103,8 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
-      - run: pnpm --filter @dsh-mobile/protocol publish --access public --no-git-checks
-      - run: pnpm --filter @dsh-mobile/companion publish --access public --no-git-checks
+      - run: pnpm --filter @deepseekharness-mobile/protocol publish --access public --no-git-checks
+      - run: pnpm --filter @deepseekharness-mobile/companion publish --access public --no-git-checks
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 ```
@@ -116,7 +116,7 @@ Keep the tarball smoke test (`pnpm smoke`) in the workflow before publishing.
 ## Step 5 — install it as a user
 
 ```powershell
-dsh profile add @dsh-mobile/companion
+dsh profile add @deepseekharness-mobile/companion
 ```
 
 The profile reads the bundle's `cordis.patch.yml`, mounts the plugin and the embedded PWA. The
