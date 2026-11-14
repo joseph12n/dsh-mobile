@@ -1,6 +1,6 @@
 {
   "name": "@deepseekharness-mobile/companion",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "DSH host plugin: WebSocket bridge, QR pairing and device tokens for DSH Mobile",
   "license": "MIT",
   "type": "module",
