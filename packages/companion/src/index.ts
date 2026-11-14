@@ -237,73 +237,93 @@ export function apply(ctx: HostContext): void {
     return list;
   };
 
-  void startCompanionServer({
-    pairing,
-    devices,
-    capabilities: limits,
-    ...options,
-    ...(publicUrl ? { publicUrl } : {}),
-    ...(webRoot ? { webRoot } : {}),
-    ...(pushService
-      ? {
-          pushPublicKey: () => pushService!.publicKey(),
-          subscribePush: (deviceId: string, subscription: PushSubscription) =>
-            pushService!.subscribe(deviceId, subscription),
-          unsubscribePush: (deviceId: string) => pushService!.unsubscribe(deviceId),
-          removePushForDevice: (deviceId: string) => pushService!.removeDevice(deviceId),
+  let startAttempts = 0;
+  let disposed = false;
+
+  const launch = (): void => {
+    if (disposed) return;
+
+    void startCompanionServer({
+      pairing,
+      devices,
+      capabilities: limits,
+      ...options,
+      ...(publicUrl ? { publicUrl } : {}),
+      ...(webRoot ? { webRoot } : {}),
+      ...(pushService
+        ? {
+            pushPublicKey: () => pushService!.publicKey(),
+            subscribePush: (deviceId: string, subscription: PushSubscription) =>
+              pushService!.subscribe(deviceId, subscription),
+            unsubscribePush: (deviceId: string) => pushService!.unsubscribe(deviceId),
+            removePushForDevice: (deviceId: string) => pushService!.removeDevice(deviceId),
+          }
+        : {}),
+      listSessions: async (options) => {
+        const records = await listSessions(ctx, options);
+        const counts = questionBridge.counts();
+        for (const record of records) {
+          const extra = counts.get(record.id) ?? 0;
+          if (extra > 0) record.pendingQuestions += extra;
         }
-      : {}),
-    listSessions: async (options) => {
-      const records = await listSessions(ctx, options);
-      const counts = questionBridge.counts();
-      for (const record of records) {
-        const extra = counts.get(record.id) ?? 0;
-        if (extra > 0) record.pendingQuestions += extra;
-      }
-      return records;
-    },
-    listWorkspaces: () => listWorkspaces(ctx),
-    createSession: (request) => createSession(ctx, request),
-    archiveSession: (request) => archiveSession(ctx, request),
-    unarchiveSession: (request) => unarchiveSession(ctx, request),
-    listModels: () => listModels(ctx),
-    selectModel: (request) => selectModel(ctx, request),
-    listQuestions: () => [...listPendingQuestions(ctx), ...questionBridge.pendingBatches()],
-    listCommands: (sessionId) => listCommands(ctx, sessionId),
-    runCommand: (input) => runCommand(ctx, input),
-    readActivity: (sessionId) => readSessionActivity(ctx, sessionId),
-    listProviders: () => listProviders(ctx),
-    testProvider: (input) => testProvider(ctx, input),
-    connectProvider: (input) => connectProvider(ctx, input),
-    disconnectProvider: (input) => disconnectProvider(ctx, input),
-    answerQuestion: (input) => questionBridge.answer(input) ?? answerQuestion(ctx, input),
-    readHistory: (sessionId, options) => readHistory(ctx, sessionId, options),
-    subscribeSession: (sessionId, options) => subscribeSession(ctx, sessionId, options),
-    cancelRun: (sessionId) => cancelRun(ctx, sessionId),
-    sendReply: async (sessionId, text) => {
-      const result = await injectText(ctx, sessionId, text);
-      return result.ok
-        ? { ok: true }
-        : { ok: false, code: 'bad-request' as const, message: result.detail };
-    },
-    report: () => probe(),
-  })
-    .then((running) => {
-      runningServer = running;
-      disposers.push(() => {
-        runningServer = undefined;
-        void running.close().catch(() => undefined);
-      });
-
-      listeningPort = running.port;
-      log(`listener ready on port ${running.port} (try: GET /health)`);
-
-      void detectOrigin(running.port);
+        return records;
+      },
+      listWorkspaces: () => listWorkspaces(ctx),
+      createSession: (request) => createSession(ctx, request),
+      archiveSession: (request) => archiveSession(ctx, request),
+      unarchiveSession: (request) => unarchiveSession(ctx, request),
+      listModels: () => listModels(ctx),
+      selectModel: (request) => selectModel(ctx, request),
+      listQuestions: () => [...listPendingQuestions(ctx), ...questionBridge.pendingBatches()],
+      listCommands: (sessionId) => listCommands(ctx, sessionId),
+      runCommand: (input) => runCommand(ctx, input),
+      readActivity: (sessionId) => readSessionActivity(ctx, sessionId),
+      listProviders: () => listProviders(ctx),
+      testProvider: (input) => testProvider(ctx, input),
+      connectProvider: (input) => connectProvider(ctx, input),
+      disconnectProvider: (input) => disconnectProvider(ctx, input),
+      answerQuestion: (input) => questionBridge.answer(input) ?? answerQuestion(ctx, input),
+      readHistory: (sessionId, options) => readHistory(ctx, sessionId, options),
+      subscribeSession: (sessionId, options) => subscribeSession(ctx, sessionId, options),
+      cancelRun: (sessionId) => cancelRun(ctx, sessionId),
+      sendReply: async (sessionId, text) => {
+        const result = await injectText(ctx, sessionId, text);
+        return result.ok
+          ? { ok: true }
+          : { ok: false, code: 'bad-request' as const, message: result.detail };
+      },
+      report: () => probe(),
     })
-    .catch((error: unknown) => {
-      listenerError = String(error);
-      log(`could not open the listener: ${listenerError}`);
-    });
+      .then((running) => {
+        runningServer = running;
+        listenerError = undefined;
+        disposers.push(() => {
+          runningServer = undefined;
+          void running.close().catch(() => undefined);
+        });
+
+        listeningPort = running.port;
+        log(`listener ready on port ${running.port} (try: GET /health)`);
+
+        void detectOrigin(running.port);
+      })
+      .catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : String(error);
+
+        if (!disposed && message.includes('EADDRINUSE') && startAttempts < 5) {
+          startAttempts += 1;
+          const retry = setTimeout(launch, 500 * startAttempts);
+          if (typeof retry.unref === 'function') retry.unref();
+          log(`the listener port is busy; retrying in ${500 * startAttempts} ms`);
+          return;
+        }
+
+        listenerError = message;
+        log(`could not open the listener: ${listenerError}`);
+      });
+  };
+
+  launch();
 
   const timer = setTimeout(() => {
     try {
@@ -316,6 +336,7 @@ export function apply(ctx: HostContext): void {
 
   ctx.effect?.(function* () {
     yield () => {
+      disposed = true;
       clearTimeout(timer);
       for (const dispose of disposers.reverse()) {
         try {
