@@ -1,4 +1,4 @@
-import type { CommandInfo, CommandResult } from '@dsh-mobile/protocol';
+import type { CommandInfo, CommandResult } from '@deepseekharness-mobile/protocol';
 import {
   service,
   type AgentRegistry,

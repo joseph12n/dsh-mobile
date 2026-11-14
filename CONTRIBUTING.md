@@ -80,7 +80,7 @@ scripts/       assembly, smoke and the command-line entry points
    are declared in `src/host-api.ts`, which is a type contract and no runtime.
 3. **`routes` does not know the domain.** It serves static files and computes the public
    origin; the contract is serialised in `server.ts`.
-4. **`app` does not know DSH.** Only `@dsh-mobile/protocol`.
+4. **`app` does not know DSH.** Only `@deepseekharness-mobile/protocol`.
 
 Breaking rule 2 is the fastest way for a DSH update to break the project.
 

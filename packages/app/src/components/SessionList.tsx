@@ -1,5 +1,5 @@
 import { useId, useState, type CSSProperties } from 'react';
-import type { SessionSummary, Workspace } from '@dsh-mobile/protocol';
+import type { SessionSummary, Workspace } from '@deepseekharness-mobile/protocol';
 import { groupSessions, elapsed } from '../lib/sessions.js';
 import {
   compactPath,

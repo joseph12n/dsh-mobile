@@ -1,4 +1,4 @@
-import type { SessionSummary } from '@dsh-mobile/protocol';
+import type { SessionSummary } from '@deepseekharness-mobile/protocol';
 
 export const STALE_AFTER_MS = 7 * 24 * 60 * 60 * 1000;
 

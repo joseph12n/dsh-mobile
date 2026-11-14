@@ -1,4 +1,4 @@
-import type { HistoryEntry, SessionState, TranscriptEvent } from '@dsh-mobile/protocol';
+import type { HistoryEntry, SessionState, TranscriptEvent } from '@deepseekharness-mobile/protocol';
 import { service, type HostContext } from '../host-api.js';
 
 interface WireEvent {

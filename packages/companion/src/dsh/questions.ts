@@ -3,7 +3,7 @@ import type {
   QuestionBatch,
   QuestionItem,
   QuestionState,
-} from '@dsh-mobile/protocol';
+} from '@deepseekharness-mobile/protocol';
 import {
   service,
   type HostContext,

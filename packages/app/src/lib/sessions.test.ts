@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { SessionSummary } from '@dsh-mobile/protocol';
+import type { SessionSummary } from '@deepseekharness-mobile/protocol';
 import { STALE_AFTER_MS, elapsed, groupSessions } from './sessions.js';
 
 const NOW = 1_800_000_000_000;

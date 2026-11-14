@@ -1,4 +1,4 @@
-import { buildPairingUrl } from '@dsh-mobile/protocol';
+import { buildPairingUrl } from '@deepseekharness-mobile/protocol';
 import type { ResolvedOrigin } from './public-origin.js';
 
 const ORIGIN_LABEL: Record<string, string> = {

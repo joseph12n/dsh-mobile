@@ -17,7 +17,7 @@ remote control, not a second agent.
 ```
 PC (runs DSH)                                      Phone
 ┌──────────────────────────────────────┐   ┌──────────────────────────┐
-│ plugin @dsh-mobile/companion         │   │ PWA @dsh-mobile/app      │
+│ plugin @deepseekharness-mobile/companion         │   │ PWA @deepseekharness-mobile/app      │
 │  · its own listener :6768            │◄─►│  · pairing               │
 │  · serves the built PWA              │WS │  · sessions and state    │
 │  · pairing by QR                     │   │  · transcript            │
@@ -60,11 +60,11 @@ loopback only. Direct LAN access is not implemented.
 
 ## Packages
 
-| Package                                       | What it is                                              |
-| --------------------------------------------- | ------------------------------------------------------- |
-| [`@dsh-mobile/protocol`](packages/protocol)   | The contract: Zod schemas, types, constants. Isomorphic |
-| [`@dsh-mobile/companion`](packages/companion) | Host plugin: listener, pairing, PWA, DSH adapter        |
-| [`@dsh-mobile/app`](packages/app)             | PWA: React + Vite                                       |
+| Package                                                   | What it is                                              |
+| --------------------------------------------------------- | ------------------------------------------------------- |
+| [`@deepseekharness-mobile/protocol`](packages/protocol)   | The contract: Zod schemas, types, constants. Isomorphic |
+| [`@deepseekharness-mobile/companion`](packages/companion) | Host plugin: listener, pairing, PWA, DSH adapter        |
+| [`@deepseekharness-mobile/app`](packages/app)             | PWA: React + Vite                                       |
 
 The contract requires **TypeScript** everywhere: one schema, two consumers, and an
 incompatible change breaks the build instead of the user.
@@ -99,8 +99,10 @@ Link it from your DSH profile (`~/.dsh/profiles/<profile>/package.json`):
 
 ```json
 {
-  "dsh": { "profile": { "bundles": ["@dsh-mobile/companion"] } },
-  "dependencies": { "@dsh-mobile/companion": "link:/path/to/dsh-mobile/packages/companion" }
+  "dsh": { "profile": { "bundles": ["@deepseekharness-mobile/companion"] } },
+  "dependencies": {
+    "@deepseekharness-mobile/companion": "link:/path/to/dsh-mobile/packages/companion"
+  }
 }
 ```
 

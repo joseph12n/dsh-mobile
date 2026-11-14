@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Context } from '@deepseek-ai/cordis';
 import { createScope, scopeTarget } from '@deepseek-ai/dsh-scope';
-import type { ServerMessage } from '@dsh-mobile/protocol';
+import type { ServerMessage } from '@deepseekharness-mobile/protocol';
 import type { HostContext } from '../host-api.js';
 import { createQuestionBridge, type BridgeAnswer } from './question-bridge.js';
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { SessionSummary, Workspace } from '@dsh-mobile/protocol';
+import type { SessionSummary, Workspace } from '@deepseekharness-mobile/protocol';
 import {
   byUrgency,
   compactPath,

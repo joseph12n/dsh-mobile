@@ -1,4 +1,4 @@
-# @dsh-mobile/companion
+# @deepseekharness-mobile/companion
 
 The [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) host plugin for **DSH
 Mobile**: a WebSocket bridge on port 6768, QR and device-token pairing, the embedded PWA and the
@@ -8,7 +8,7 @@ session/transcript/question/command/provider/device features described in the
 ## Install
 
 ```sh
-dsh profile add @dsh-mobile/companion
+dsh profile add @deepseekharness-mobile/companion
 ```
 
 The profile reads the bundle's `cordis.patch.yml` and mounts the plugin. Restart DSH after the

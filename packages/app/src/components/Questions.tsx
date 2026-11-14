@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useI18n } from '../i18n/index.js';
-import type { QuestionAnswerItem, QuestionBatch } from '@dsh-mobile/protocol';
+import type { QuestionAnswerItem, QuestionBatch } from '@deepseekharness-mobile/protocol';
 
 export function QuestionsCard({
   questions,

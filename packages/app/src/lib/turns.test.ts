@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { HistoryEntry, TranscriptEvent } from '@dsh-mobile/protocol';
+import type { HistoryEntry, TranscriptEvent } from '@deepseekharness-mobile/protocol';
 import { groupTurns, partTurn } from './turns.js';
 
 let seq = 0;

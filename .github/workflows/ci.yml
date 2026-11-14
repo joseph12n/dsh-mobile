@@ -58,7 +58,7 @@ jobs:
       - name: Lint
         run: pnpm lint
 
-      # Los paquetes consumen los tipos de `@dsh-mobile/protocol` desde su
+      # Los paquetes consumen los tipos de `@deepseekharness-mobile/protocol` desde su
       # `dist/`, así que hay que compilarlo antes de comprobar tipos.
       - name: Typecheck
         run: pnpm typecheck
@@ -70,7 +70,7 @@ jobs:
       # quedan desincronizados y nadie se entera hasta ver el icono viejo en el
       # teléfono.
       - name: Iconos al día
-        run: pnpm --filter @dsh-mobile/app icons --check
+        run: pnpm --filter @deepseekharness-mobile/app icons --check
 
       # Levanta el servidor compilado sirviendo la PWA compilada y recorre el
       # contrato entero. Sin esto, las comprobaciones de integración no protegen

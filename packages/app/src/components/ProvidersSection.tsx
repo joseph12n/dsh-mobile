@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { ProviderTestResult, ProviderView } from '@dsh-mobile/protocol';
+import type { ProviderTestResult, ProviderView } from '@deepseekharness-mobile/protocol';
 import { useI18n } from '../i18n/index.js';
 import type { MessageKey } from '../i18n/locales.js';
 

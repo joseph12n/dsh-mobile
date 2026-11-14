@@ -6,7 +6,7 @@ import {
   type ProviderTestResult,
   type ProviderView,
   type Workspace,
-} from '@dsh-mobile/protocol';
+} from '@deepseekharness-mobile/protocol';
 import { displayTitle } from '../lib/folders.js';
 import {
   FOLDER_ORDERS,

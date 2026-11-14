@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import type { DeviceInfo } from '@dsh-mobile/protocol';
+import type { DeviceInfo } from '@deepseekharness-mobile/protocol';
 import { useI18n } from '../i18n/index.js';
 import { lastSeenLabel, sortDevices } from '../lib/devices.js';
 

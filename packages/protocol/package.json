@@ -1,5 +1,5 @@
 {
-  "name": "@dsh-mobile/protocol",
+  "name": "@deepseekharness-mobile/protocol",
   "version": "0.1.0",
   "description": "Versioned wire contract shared by the DSH Mobile host plugin and PWA",
   "license": "MIT",

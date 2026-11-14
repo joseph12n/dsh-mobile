@@ -1,4 +1,4 @@
-# @dsh-mobile/protocol
+# @deepseekharness-mobile/protocol
 
 The versioned wire contract (`dsh-mobile/1`) shared by the [DSH Mobile](https://github.com/joseph12n/dsh-mobile)
 host plugin and its PWA.
@@ -9,13 +9,13 @@ names and the pairing URL, so both ends validate the same frames.
 ## Install
 
 ```sh
-pnpm add @dsh-mobile/protocol
+pnpm add @deepseekharness-mobile/protocol
 ```
 
 ## Use
 
 ```ts
-import { ClientMessage, PROTOCOL_VERSION, ServerMessage } from '@dsh-mobile/protocol';
+import { ClientMessage, PROTOCOL_VERSION, ServerMessage } from '@deepseekharness-mobile/protocol';
 
 const frame = ClientMessage.safeParse(input);
 ```

@@ -1,5 +1,5 @@
 import { service, type HostContext } from '../host-api.js';
-import type { Workspace } from '@dsh-mobile/protocol';
+import type { Workspace } from '@deepseekharness-mobile/protocol';
 
 interface WorkspaceRow {
   workspaceId?: unknown;

@@ -4,7 +4,7 @@ import type {
   ProviderCredential,
   ProviderTestResult,
   ProviderView,
-} from '@dsh-mobile/protocol';
+} from '@deepseekharness-mobile/protocol';
 import {
   service,
   type ConfigurableProvider,

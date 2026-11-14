@@ -5,7 +5,7 @@ import {
   type QuestionBatch,
   type QuestionItem,
   type ServerMessage,
-} from '@dsh-mobile/protocol';
+} from '@deepseekharness-mobile/protocol';
 import type { HostContext } from '../host-api.js';
 import { toQuestionItem } from './questions.js';
 

@@ -199,7 +199,7 @@ importers:
 
   packages/app:
     dependencies:
-      '@dsh-mobile/protocol':
+      '@deepseekharness-mobile/protocol':
         specifier: workspace:*
         version: link:../protocol
       react:
@@ -227,7 +227,7 @@ importers:
 
   packages/companion:
     dependencies:
-      '@dsh-mobile/protocol':
+      '@deepseekharness-mobile/protocol':
         specifier: workspace:*
         version: link:../protocol
       qrcode:

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { DeviceInfo } from '@dsh-mobile/protocol';
+import type { DeviceInfo } from '@deepseekharness-mobile/protocol';
 import { lastSeenLabel, sortDevices } from './devices.js';
 
 const now = 1_760_000_000_000;

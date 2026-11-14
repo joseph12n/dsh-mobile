@@ -19,7 +19,7 @@ import {
   type SessionActivity,
   type SessionSummary,
   type Workspace,
-} from '@dsh-mobile/protocol';
+} from '@deepseekharness-mobile/protocol';
 
 export type ConnectionState =
   | { kind: 'idle' }

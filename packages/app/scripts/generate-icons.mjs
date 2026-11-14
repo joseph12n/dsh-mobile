@@ -76,7 +76,7 @@ if (check) {
 
   if (stale > 0) {
     console.error(
-      `\n${stale} icono(s) desactualizado(s). Ejecuta: pnpm --filter @dsh-mobile/app icons`,
+      `\n${stale} icono(s) desactualizado(s). Ejecuta: pnpm --filter @deepseekharness-mobile/app icons`,
     );
     process.exit(1);
   }

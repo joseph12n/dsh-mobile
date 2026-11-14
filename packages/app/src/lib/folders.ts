@@ -1,4 +1,4 @@
-import type { SessionSummary, Workspace } from '@dsh-mobile/protocol';
+import type { SessionSummary, Workspace } from '@deepseekharness-mobile/protocol';
 
 function urgency(session: SessionSummary): number {
   if (session.pendingQuestions > 0) return 0;
