@@ -49,7 +49,7 @@ export function FileViewer({
       .then(async (info) => {
         if (cancelled) return;
         setFile(info);
-        if (info.kind === 'image' || info.kind === 'pdf') {
+        if (info.kind === 'image' || info.kind === 'pdf' || info.kind === 'office') {
           const loaded = await readFileBytes(sessionId, path);
           if (!cancelled) setBytes({ mime: loaded.mime, data: loaded.data });
         } else if (info.kind === 'text' || info.kind === 'markdown') {
@@ -125,6 +125,13 @@ export function FileViewer({
           />
         )}
         {!loading && !error && file?.kind === 'pdf' && bytes && (
+          <embed
+            className="file-pdf"
+            type="application/pdf"
+            src={`data:${bytes.mime};base64,${bytes.data}`}
+          />
+        )}
+        {!loading && !error && file?.kind === 'office' && bytes && (
           <embed
             className="file-pdf"
             type="application/pdf"
