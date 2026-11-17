@@ -37,11 +37,17 @@ export function fileKindOf(path: string): FileKind {
 const FILE_PATTERN =
   /((?:[\w.-]+\/)*[\w.-]+\.(?:md|markdown|txt|json|ya?ml|toml|tsx?|jsx?|mjs|css|html|sh|ps1|py|rs|go|sql|csv|pdf|png|jpe?g|webp|gif|avif|docx?|xlsx?|pptx?))/gi;
 
+const LINK_PATTERN = /\[[^\]]*\]\(([^()]*)\)/g;
+
+function withoutLinkLabels(text: string): string {
+  return text.replace(LINK_PATTERN, (_match, href: string) => ` ${href} `);
+}
+
 export function findFilePaths(text: string): string[] {
   const paths = new Set<string>();
-  for (const match of text.matchAll(FILE_PATTERN)) {
+  for (const match of withoutLinkLabels(text).matchAll(FILE_PATTERN)) {
     const path = match[1];
-    if (path) paths.add(path);
+    if (path && path.includes('/')) paths.add(path);
   }
   return [...paths];
 }
