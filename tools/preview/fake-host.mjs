@@ -326,7 +326,7 @@ for (let index = 0; index < 80; index += 1) {
     event: {
       kind: 'message',
       role: 'assistant',
-      text: `${text}\n\nPaso ${index + 1}: miro el código, ajusto la prueba y lo dejo listo. Sin atajos.${index === 79 ? ' Dejo el contexto en `MEMORIA.md`.' : ''}`,
+      text: `${text}\n\nPaso ${index + 1}: miro el código, ajusto la prueba y lo dejo listo. Sin atajos.${index === 79 ? '\n\n**Listo.** Dejo el contexto en `MEMORIA.md`.\n\n- Visor de documentos\n- Cards de archivo\n- Uso del turno\n\n`pnpm test` pasa.' : ''}`,
       ...(index < 2
         ? {
             reasoning:
