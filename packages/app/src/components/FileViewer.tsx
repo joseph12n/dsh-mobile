@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { FileInfo } from '@deepseekharness-mobile/protocol';
 import { useI18n } from '../i18n/index.js';
-import { linkHit, resolveWorkspacePath, sanitizeMarkdown } from '../lib/markdown.js';
+import { linkHit, sanitizeMarkdown } from '../lib/markdown.js';
+import { resolveWorkspacePath } from '../lib/workspace-path.js';
 
 type TextPage = { text: string; offset: number; eof: boolean; nextOffset?: number };
 type BytesPage = { mime: string; data: string };
@@ -14,7 +15,7 @@ export function FileViewer({
   statFile,
   readFile,
   readFileBytes,
-}: {
+}: Readonly<{
   sessionId: string;
   path: string;
   onClose: () => void;
@@ -29,7 +30,7 @@ export function FileViewer({
     sessionId: string,
     path: string,
   ) => Promise<{ file: FileInfo; mime: string; data: string }>;
-}) {
+}>) {
   const { t } = useI18n();
   const [file, setFile] = useState<FileInfo | undefined>(undefined);
   const [text, setText] = useState('');
@@ -37,6 +38,30 @@ export function FileViewer({
   const [bytes, setBytes] = useState<BytesPage | undefined>(undefined);
   const [error, setError] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState(true);
+  const body = useRef<HTMLDivElement>(null);
+  const linkTarget = useRef({ path, onOpenPath });
+
+  useEffect(() => {
+    linkTarget.current = { path, onOpenPath };
+  }, [path, onOpenPath]);
+
+  useEffect(() => {
+    const node = body.current;
+    if (!node) return;
+
+    const onClick = (event: MouseEvent): void => {
+      const link = linkHit(event.target);
+      if (!link || link.external) return;
+
+      event.preventDefault();
+      const current = linkTarget.current;
+      const next = resolveWorkspacePath(current.path, link.href);
+      if (next) current.onOpenPath?.(next);
+    };
+
+    node.addEventListener('click', onClick);
+    return () => node.removeEventListener('click', onClick);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -106,7 +131,7 @@ export function FileViewer({
         </span>
       </header>
 
-      <div className="file-viewer-body">
+      <div className="file-viewer-body" ref={body}>
         {loading && <p className="muted small">{t('file.loading')}</p>}
         {error && (
           <p className="error" role="alert">
@@ -115,19 +140,7 @@ export function FileViewer({
         )}
 
         {!loading && !error && file?.kind === 'markdown' && (
-          <article
-            className="markdown"
-            onClick={(event) => {
-              const link = linkHit(event.target);
-              if (!link) return;
-              if (link.external) return;
-
-              event.preventDefault();
-              const next = resolveWorkspacePath(path, link.href);
-              if (next && onOpenPath) onOpenPath(next);
-            }}
-            dangerouslySetInnerHTML={{ __html: markdown }}
-          />
+          <article className="markdown" dangerouslySetInnerHTML={{ __html: markdown }} />
         )}
         {!loading && !error && file?.kind === 'text' && <pre className="file-text">{text}</pre>}
         {!loading && !error && file?.kind === 'image' && bytes && (

@@ -1,41 +1,48 @@
-import { linkHit, sanitizeMarkdown, workspacePathOf } from '../lib/markdown.js';
+import { useEffect, useRef } from 'react';
+import { linkHit, sanitizeMarkdown } from '../lib/markdown.js';
+import { workspacePathOf } from '../lib/workspace-path.js';
 import { findFilePaths } from '../lib/files.js';
 import { FileIcon } from './FileIcons.js';
 
 export function Markdown({
   text,
   onOpenFile,
-}: {
-  text: string;
-  onOpenFile?: (path: string) => void;
-}) {
+}: Readonly<{ text: string; onOpenFile?: (path: string) => void }>) {
+  const area = useRef<HTMLDivElement>(null);
+  const open = useRef(onOpenFile);
   const html = sanitizeMarkdown(text);
 
-  return (
-    <div
-      className="markdown"
-      onClick={(event) => {
-        const link = linkHit(event.target);
-        if (!link) return;
-        if (link.external) return;
+  useEffect(() => {
+    open.current = onOpenFile;
+  }, [onOpenFile]);
 
-        event.preventDefault();
-        if (!onOpenFile) return;
-        const path = workspacePathOf(link.href);
-        if (path) onOpenFile(path);
-      }}
-      dangerouslySetInnerHTML={{ __html: html }}
-    />
-  );
+  useEffect(() => {
+    const node = area.current;
+    if (!node) return;
+
+    const onClick = (event: MouseEvent): void => {
+      const link = linkHit(event.target);
+      if (!link || link.external) return;
+
+      event.preventDefault();
+      const path = workspacePathOf(link.href);
+      if (path) open.current?.(path);
+    };
+
+    node.addEventListener('click', onClick);
+    return () => node.removeEventListener('click', onClick);
+  }, []);
+
+  return <div ref={area} className="markdown" dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
 export function FileCards({
   paths,
   onOpenFile,
-}: {
+}: Readonly<{
   paths: string[];
   onOpenFile?: (path: string) => void;
-}) {
+}>) {
   if (!onOpenFile || paths.length === 0) return null;
 
   return (
@@ -61,10 +68,10 @@ export function FileCards({
 export function MessageBody({
   text,
   onOpenFile,
-}: {
+}: Readonly<{
   text: string;
   onOpenFile?: (path: string) => void;
-}) {
+}>) {
   const paths = onOpenFile ? findFilePaths(text) : [];
   return (
     <>

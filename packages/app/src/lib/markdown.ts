@@ -1,8 +1,5 @@
 import DOMPurify from 'dompurify';
 import { marked } from 'marked';
-import { resolveWorkspacePath, workspacePathOf } from './workspace-path.js';
-
-export { resolveWorkspacePath, workspacePathOf };
 
 const FORBID_TAGS = ['style', 'form', 'input', 'button', 'img', 'iframe', 'object', 'embed'];
 const FORBID_ATTR = ['style'];

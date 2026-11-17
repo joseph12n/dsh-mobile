@@ -10,7 +10,7 @@ export function workspacePathOf(href: string): string | undefined {
   }
 
   const cut = decoded.split('#')[0]?.split('?')[0] ?? '';
-  const path = cut.replace(/^\.\//, '').replace(/\\/g, '/');
+  const path = cut.replace(/^\.\//, '').replaceAll('\\', '/');
   return path.length > 0 ? path : undefined;
 }
 
