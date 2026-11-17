@@ -1,6 +1,6 @@
 {
   "name": "@deepseekharness-mobile/protocol",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Versioned wire contract shared by the DSH Mobile host plugin and PWA",
   "license": "MIT",
   "type": "module",
