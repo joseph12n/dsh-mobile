@@ -1142,6 +1142,24 @@ button.ghost.tiny {
   cursor: default;
 }
 
+.usage-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 2px 14px 8px;
+}
+
+.usage-chip {
+  padding: 2px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 .settings-folders {
   margin: 4px 0 0;
   padding: 6px 0 8px;
