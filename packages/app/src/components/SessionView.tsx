@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type {
   CommandInfo,
   CommandResult,
@@ -15,6 +15,8 @@ import { groupTurns, partTurn, type Turn } from '../lib/turns.js';
 import { plural, useI18n } from '../i18n/index.js';
 import { QuestionsCard } from './Questions.js';
 import { UsageBar } from './UsageBar.js';
+import { MessageBody } from './Markdown.js';
+import { ToolIcon } from './FileIcons.js';
 import {
   ChevronDownIcon,
   ChevronLeftIcon,
@@ -40,36 +42,6 @@ function timeOf(timestamp: number): string {
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 }
 
-const FILE_PATTERN =
-  /((?:[\w.-]+\/)*[\w.-]+\.(?:md|markdown|txt|json|ya?ml|toml|tsx?|jsx?|mjs|css|html|sh|ps1|py|rs|go|sql|csv|pdf|png|jpe?g|webp|gif|avif))/gi;
-
-function renderText(text: string, onOpenFile?: (path: string) => void): ReactNode {
-  if (!onOpenFile) return text;
-
-  const nodes: ReactNode[] = [];
-  let last = 0;
-
-  for (const match of text.matchAll(FILE_PATTERN)) {
-    const path = match[1];
-    if (!path || match.index === undefined) continue;
-    if (match.index > last) nodes.push(text.slice(last, match.index));
-    nodes.push(
-      <button
-        key={`${path}-${match.index}`}
-        type="button"
-        className="file-link"
-        onClick={() => onOpenFile(path)}
-      >
-        {path}
-      </button>,
-    );
-    last = match.index + path.length;
-  }
-
-  if (last < text.length) nodes.push(text.slice(last));
-  return nodes.length > 0 ? nodes : text;
-}
-
 function EventRow({
   entry,
   onOpenFile,
@@ -92,10 +64,10 @@ function EventRow({
               <ChevronRightIcon />
               {t('session.reasoning')}
             </summary>
-            <p>{event.reasoning}</p>
+            <MessageBody text={event.reasoning} />
           </details>
         )}
-        <p>{renderText(event.text, onOpenFile)}</p>
+        <MessageBody text={event.text} {...(onOpenFile ? { onOpenFile } : {})} />
       </li>
     );
   }
@@ -103,6 +75,9 @@ function EventRow({
   if (event.kind === 'tool') {
     return (
       <li className={`tool ${event.status}`}>
+        <span className="tool-icon">
+          <ToolIcon name={event.name} />
+        </span>
         <span className="tool-name">{event.name}</span>
         {event.summary && <span className="tool-summary">{event.summary}</span>}
       </li>
