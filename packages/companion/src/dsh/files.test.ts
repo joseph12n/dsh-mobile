@@ -1,8 +1,12 @@
+import { join, resolve } from 'node:path';
+import { tmpdir } from 'node:os';
 import { describe, expect, it } from 'vitest';
 import type { HostContext } from '../host-api.js';
 import { filesAvailable, readFile, readFileBytes, statFile } from './files.js';
 
-const ROOT = 'C:\\work\\demo';
+const ROOT = join(tmpdir(), 'dsh-files-test');
+const OUTSIDE = resolve(ROOT, '..', 'secret.txt');
+const TRAVERSAL = join('..', 'secret.txt');
 
 const ctx = {
   sessions: { get: (id: string) => (id === 's-1' ? { id: 's-1' } : undefined) },
@@ -52,12 +56,14 @@ describe('statFile', () => {
   });
 
   it('rechaza rutas fuera del workspace', async () => {
-    await expect(
-      statFile(ctx, { sessionId: 's-1', path: '..\\secret.txt' }),
-    ).resolves.toMatchObject({ ok: false, code: 'bad-request' });
-    await expect(
-      statFile(ctx, { sessionId: 's-1', path: 'C:\\Windows\\win.ini' }),
-    ).resolves.toMatchObject({ ok: false, code: 'bad-request' });
+    await expect(statFile(ctx, { sessionId: 's-1', path: TRAVERSAL })).resolves.toMatchObject({
+      ok: false,
+      code: 'bad-request',
+    });
+    await expect(statFile(ctx, { sessionId: 's-1', path: OUTSIDE })).resolves.toMatchObject({
+      ok: false,
+      code: 'bad-request',
+    });
   });
 
   it('rechaza un sessionId desconocido', async () => {
