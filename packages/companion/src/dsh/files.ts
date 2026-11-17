@@ -3,6 +3,7 @@ import type { FileInfo, FileKind } from '@deepseekharness-mobile/protocol';
 import {
   service,
   type HostContext,
+  type OfficeToPdfService,
   type ProjectionsService,
   type SessionsService,
   type WorkspaceFileStat,
@@ -77,6 +78,7 @@ function kindOf(path: string): FileKind {
   if (extension === '.md' || extension === '.markdown') return 'markdown';
   if (extension === '.pdf') return 'pdf';
   if (['.png', '.jpg', '.jpeg', '.webp', '.gif', '.avif'].includes(extension)) return 'image';
+  if (['.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx'].includes(extension)) return 'office';
   if (
     [
       '.txt',
@@ -208,6 +210,11 @@ export async function readFileBytes(
 
   const relativePath = relative(root, confined.absolute);
   const kind = kindOf(confined.absolute);
+
+  if (kind === 'office') {
+    return officeBytes(ctx, input.sessionId, relativePath, confined.absolute);
+  }
+
   if (kind !== 'image' && kind !== 'pdf') {
     return failure('bad-request', 'That file cannot be shown as bytes.');
   }
@@ -231,5 +238,42 @@ export async function readFileBytes(
     };
   } catch {
     return failure('not-found', 'The file could not be read.');
+  }
+}
+
+async function officeBytes(
+  ctx: HostContext,
+  sessionId: string,
+  relativePath: string,
+  absolutePath: string,
+): Promise<FileBytesOutcome> {
+  const office = service<OfficeToPdfService>(ctx, 'officeToPdf');
+  const sessions = service<SessionsService>(ctx, 'sessions');
+  const session = sessions?.get(sessionId);
+  if (!office || typeof office.render !== 'function' || !session) {
+    return failure('bad-request', 'Office documents are not supported here.');
+  }
+
+  try {
+    const result = await office.render(session, relativePath, 'foreground');
+    if (result.data.byteLength > MAX_BYTES) {
+      return failure('bad-request', 'The converted PDF is too large.');
+    }
+
+    return {
+      ok: true,
+      file: {
+        path: relativePath,
+        name: absolutePath.slice(
+          Math.max(absolutePath.lastIndexOf('/'), absolutePath.lastIndexOf('\\')) + 1,
+        ),
+        kind: 'office',
+        ...(result.data.byteLength > 0 ? { size: result.data.byteLength } : {}),
+      },
+      mime: 'application/pdf',
+      data: Buffer.from(result.data).toString('base64'),
+    };
+  } catch {
+    return failure('internal', 'The document could not be converted.');
   }
 }

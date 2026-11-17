@@ -112,7 +112,7 @@ export const SessionUsage = z.object({
 });
 export type SessionUsage = z.infer<typeof SessionUsage>;
 
-export const FileKind = z.enum(['text', 'markdown', 'image', 'pdf', 'other']);
+export const FileKind = z.enum(['text', 'markdown', 'image', 'pdf', 'office', 'other']);
 export type FileKind = z.infer<typeof FileKind>;
 
 export const FileInfo = z.object({

@@ -108,4 +108,28 @@ describe('readFileBytes', () => {
       readFileBytes(ctx, { sessionId: 's-1', path: 'README.md' }),
     ).resolves.toMatchObject({ ok: false, code: 'bad-request' });
   });
+
+  it('convierte un Office a PDF con officeToPdf', async () => {
+    const rendered: string[] = [];
+    const withOffice = {
+      ...(ctx as unknown as Record<string, unknown>),
+      officeToPdf: {
+        render: async (_scope: unknown, path: string) => {
+          rendered.push(path);
+          return { data: new Uint8Array([37, 80, 68, 70]), bytes: 4 };
+        },
+      },
+    } as unknown as HostContext;
+
+    await expect(
+      readFileBytes(withOffice, { sessionId: 's-1', path: 'informe.docx' }),
+    ).resolves.toMatchObject({ ok: true, mime: 'application/pdf' });
+    expect(rendered).toEqual(['informe.docx']);
+  });
+
+  it('rechaza un Office si el host no convierte', async () => {
+    await expect(
+      readFileBytes(ctx, { sessionId: 's-1', path: 'informe.docx' }),
+    ).resolves.toMatchObject({ ok: false, code: 'bad-request' });
+  });
 });

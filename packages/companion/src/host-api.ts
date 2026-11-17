@@ -162,6 +162,21 @@ export interface WorkspaceFilesService {
   ): Promise<WorkspaceFileBytes>;
 }
 
+export interface OfficePdfResult {
+  data: Uint8Array;
+  bytes?: number;
+  missingFonts?: readonly string[];
+}
+
+export interface OfficeToPdfService {
+  render(
+    scope: unknown,
+    path: string,
+    priority: 'foreground' | 'background',
+    signal?: AbortSignal,
+  ): Promise<OfficePdfResult>;
+}
+
 export interface SessionPromptRequest {
   requestId: string;
   sessionId: string;
@@ -182,6 +197,7 @@ export interface HostContext {
   settings?: SettingsService;
   credentials?: CredentialsService;
   workspaceFiles?: WorkspaceFilesService;
+  officeToPdf?: OfficeToPdfService;
   effect?(factory: () => Generator<unknown, void, unknown>, label?: string): void;
   get?(name: string): unknown;
   reflect?: { store?: Record<string, unknown> };
