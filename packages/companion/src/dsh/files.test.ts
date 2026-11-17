@@ -169,6 +169,78 @@ describe('statFile', () => {
     await statFile(withHeader, { sessionId: 's-1', path: 'README.md' });
     expect(lastCall('stat').scope.workspaceRoot).toBe(other);
   });
+
+  it('resuelve el workspace de una sesión guardada', async () => {
+    calls.length = 0;
+    const stored = join(tmpdir(), 'dsh-files-stored');
+    const withPersistence = {
+      ...(ctx as unknown as Record<string, unknown>),
+      sessions: { get: () => undefined },
+      sessionProjections: { snapshot: () => ({ asOfSeq: 1, values: {} }) },
+      sessionPersistence: { stat: async () => ({ header: { cwd: stored } }) },
+    } as unknown as HostContext;
+
+    await expect(
+      statFile(withPersistence, { sessionId: 's-2', path: 'docs/a.md' }),
+    ).resolves.toMatchObject({ ok: true });
+    expect(lastCall('stat').scope).toEqual({ sessionId: 's-2', workspaceRoot: stored });
+  });
+
+  it('cae al workspace del despliegue sin sesión', async () => {
+    calls.length = 0;
+    const fallback = join(tmpdir(), 'dsh-files-fallback');
+    const withSandbox = {
+      ...(ctx as unknown as Record<string, unknown>),
+      sessions: { get: () => undefined },
+      sessionProjections: { snapshot: () => ({ asOfSeq: 1, values: {} }) },
+      sessionPersistence: { stat: async () => undefined },
+      workspaceController: { list: async () => ({ items: [] }) },
+      sandboxPolicy: { workspaceRoot: fallback },
+    } as unknown as HostContext;
+
+    await statFile(withSandbox, { sessionId: 's-3', path: 'README.md' });
+    expect(lastCall('stat').scope).toEqual({ sessionId: 's-3', workspaceRoot: fallback });
+  });
+
+  it('usa la carpeta del workspace que lista la sesión guardada', async () => {
+    calls.length = 0;
+    const directory = join(tmpdir(), 'dsh-files-workspace');
+    const withRegistry = {
+      ...(ctx as unknown as Record<string, unknown>),
+      sessions: { get: () => undefined },
+      sessionProjections: { snapshot: () => ({ asOfSeq: 1, values: {} }) },
+      sessionPersistence: { stat: async () => undefined },
+      workspaceController: {
+        list: async () => ({
+          items: [
+            { workspaceId: 'w-1', path: join(tmpdir(), 'otro'), title: 'Otro', sessionIds: [] },
+            { workspaceId: 'w-2', path: directory, title: 'Este', sessionIds: ['s-9'] },
+          ],
+        }),
+      },
+    } as unknown as HostContext;
+
+    await statFile(withRegistry, { sessionId: 's-9', path: 'docs/a.md' });
+    expect(lastCall('stat').scope).toEqual({ sessionId: 's-9', workspaceRoot: directory });
+  });
+
+  it('no inventa un workspace si nadie lo declara', async () => {
+    const missing = {
+      ...(ctx as unknown as Record<string, unknown>),
+      sessions: { get: () => undefined },
+      sessionProjections: { snapshot: () => ({ asOfSeq: 1, values: {} }) },
+      sessionPersistence: { stat: async () => undefined },
+      workspaceController: { list: async () => ({ items: [] }) },
+    } as unknown as HostContext;
+
+    await expect(statFile(missing, { sessionId: 's-4', path: 'README.md' })).resolves.toMatchObject(
+      {
+        ok: false,
+        code: 'bad-request',
+        message: 'Files are not available here.',
+      },
+    );
+  });
 });
 
 describe('readFile', () => {
@@ -222,11 +294,11 @@ describe('readFileBytes', () => {
     ).resolves.toMatchObject({ ok: false, code: 'bad-request' });
   });
 
-  it('convierte un Office a PDF con officeToPdf', async () => {
+  it('convierte un Office a PDF con officeKit', async () => {
     calls.length = 0;
     const withOffice = {
       ...(ctx as unknown as Record<string, unknown>),
-      officeToPdf: {
+      officeKit: {
         render: async (scope: unknown, path: unknown, _priority: unknown, signal: unknown) => {
           calls.push({
             method: 'render',
