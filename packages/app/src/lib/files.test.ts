@@ -16,12 +16,24 @@ describe('findFilePaths', () => {
   it('encuentra rutas y elimina duplicados', () => {
     expect(
       findFilePaths(
-        'Dejo el contexto en `MEMORIA.md` y el logo en docs/logo.png, otra vez MEMORIA.md.',
+        'Dejo el contexto en docs/MEMORIA.md y el logo en docs/logo.png, otra vez docs/logo.png.',
       ),
-    ).toEqual(['MEMORIA.md', 'docs/logo.png']);
+    ).toEqual(['docs/MEMORIA.md', 'docs/logo.png']);
   });
 
   it('ignora texto sin archivos', () => {
     expect(findFilePaths('Sin archivos por aquí.')).toEqual([]);
+  });
+
+  it('usa la ruta del enlace y no su texto', () => {
+    expect(
+      findFilePaths('Ver ([files.ts:53](packages/companion/src/dsh/files.ts#L53)) y nada más.'),
+    ).toEqual(['packages/companion/src/dsh/files.ts']);
+  });
+
+  it('no hace cards de nombres sueltos, que no son rutas', () => {
+    expect(findFilePaths('Toco `files.ts:72` y `README.md` pero no dicen dónde están.')).toEqual(
+      [],
+    );
   });
 });

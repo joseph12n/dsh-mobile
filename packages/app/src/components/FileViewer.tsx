@@ -38,6 +38,7 @@ export function FileViewer({
   const [bytes, setBytes] = useState<BytesPage | undefined>(undefined);
   const [error, setError] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState(true);
+  const [documentUrl, setDocumentUrl] = useState<string | undefined>(undefined);
   const body = useRef<HTMLDivElement>(null);
   const linkTarget = useRef({ path, onOpenPath });
 
@@ -120,6 +121,22 @@ export function FileViewer({
 
   const markdown = file?.kind === 'markdown' ? sanitizeMarkdown(text) : '';
 
+  useEffect(() => {
+    if (!bytes) {
+      setDocumentUrl(undefined);
+      return;
+    }
+
+    const binary = atob(bytes.data);
+    const content = new Uint8Array(binary.length);
+    for (let index = 0; index < binary.length; index += 1)
+      content[index] = binary.charCodeAt(index);
+
+    const url = URL.createObjectURL(new Blob([content], { type: bytes.mime }));
+    setDocumentUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [bytes]);
+
   return (
     <div className="file-viewer" role="dialog" aria-modal="true" aria-label={file?.name ?? path}>
       <header className="file-viewer-head">
@@ -150,19 +167,13 @@ export function FileViewer({
             alt={file.name}
           />
         )}
-        {!loading && !error && file?.kind === 'pdf' && bytes && (
-          <embed
-            className="file-pdf"
-            type="application/pdf"
-            src={`data:${bytes.mime};base64,${bytes.data}`}
-          />
-        )}
-        {!loading && !error && file?.kind === 'office' && bytes && (
-          <embed
-            className="file-pdf"
-            type="application/pdf"
-            src={`data:${bytes.mime};base64,${bytes.data}`}
-          />
+        {!loading && !error && (file?.kind === 'pdf' || file?.kind === 'office') && documentUrl && (
+          <>
+            <embed className="file-pdf" type="application/pdf" src={documentUrl} />
+            <a className="file-open" href={documentUrl} target="_blank" rel="noopener noreferrer">
+              {t('file.open')}
+            </a>
+          </>
         )}
         {!loading && !error && file?.kind === 'other' && (
           <p className="muted small">{t('file.unsupported')}</p>
