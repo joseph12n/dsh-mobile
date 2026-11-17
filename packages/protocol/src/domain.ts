@@ -73,6 +73,44 @@ export const ModelCatalog = z.object({
 });
 export type ModelCatalog = z.infer<typeof ModelCatalog>;
 
+export const SessionUsage = z.object({
+  contextPressure: z
+    .object({
+      pressureTokens: z.number().int().nonnegative().optional(),
+      projectedTokens: z.number().int().nonnegative().optional(),
+      contextWindow: z.number().int().positive().optional(),
+    })
+    .optional(),
+  tokens: z
+    .object({
+      uncachedInputTokens: z.number().int().nonnegative(),
+      outputTokens: z.number().int().nonnegative(),
+      cacheReadTokens: z.number().int().nonnegative(),
+      cacheWriteTokens: z.number().int().nonnegative(),
+    })
+    .optional(),
+  breakdown: z
+    .object({
+      systemTokens: z.number().int().nonnegative(),
+      toolsTokens: z.number().int().nonnegative(),
+      messageTokens: z.number().int().nonnegative(),
+    })
+    .optional(),
+  stats: z
+    .object({
+      turns: z.number().int().nonnegative(),
+      steps: z.number().int().nonnegative(),
+      llmMs: z.number().nonnegative(),
+      toolMs: z.number().nonnegative(),
+      ttftMs: z.number().nonnegative(),
+      ttftSteps: z.number().int().nonnegative(),
+      decodeMs: z.number().nonnegative(),
+      decodeTokens: z.number().nonnegative(),
+    })
+    .optional(),
+});
+export type SessionUsage = z.infer<typeof SessionUsage>;
+
 export const SessionSummary = z.object({
   id: SessionId,
   title: z.string(),
@@ -83,6 +121,7 @@ export const SessionSummary = z.object({
   model: ModelSelection.optional(),
   archived: z.boolean().optional(),
   workspaceId: z.string().optional(),
+  usage: SessionUsage.optional(),
 });
 export type SessionSummary = z.infer<typeof SessionSummary>;
 

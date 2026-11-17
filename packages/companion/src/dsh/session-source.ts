@@ -2,6 +2,7 @@ import type {
   ModelSelection,
   SessionState as WireState,
   SessionSummary as WireSession,
+  SessionUsage,
 } from '@deepseekharness-mobile/protocol';
 import {
   service,
@@ -23,6 +24,7 @@ export interface SessionRecord {
   workspaceId?: string;
   model?: ModelSelection;
   archived?: boolean;
+  usage?: SessionUsage;
 }
 
 interface ControllerSummary {
@@ -77,6 +79,100 @@ function modelFor(item: ControllerSummary): ModelSelection | undefined {
   return selectionOf(record['next']) ?? selectionOf(record['lastUsed']) ?? selectionOf(record);
 }
 
+function recordOf(value: unknown): Record<string, unknown> | undefined {
+  return typeof value === 'object' && value !== null
+    ? (value as Record<string, unknown>)
+    : undefined;
+}
+
+function numOr(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+function usageFor(
+  ctx: HostContext,
+  sessionId: string,
+  projections: ProjectionsService | undefined,
+): SessionUsage | undefined {
+  if (!projections) return undefined;
+  const sessions = service<SessionsService>(ctx, 'sessions');
+  const session = sessions?.get(sessionId);
+  if (!session) return undefined;
+
+  let values: Record<string, unknown>;
+  try {
+    values = projections.snapshot(session).values;
+  } catch {
+    return undefined;
+  }
+
+  const pressure = recordOf(values['contextPressure']);
+  const tokens = recordOf(values['tokenUsage']);
+  const breakdown = recordOf(values['contextBreakdown']);
+  const stats = recordOf(values['sessionStats']);
+  const usage: SessionUsage = {};
+
+  if (pressure) {
+    const contextPressure: NonNullable<SessionUsage['contextPressure']> = {};
+    const pressureTokens = numOr(pressure['pressureTokens']);
+    const projectedTokens = numOr(pressure['projectedTokens']);
+    const contextWindow = numOr(pressure['contextWindow']);
+    if (pressureTokens !== undefined) contextPressure.pressureTokens = pressureTokens;
+    if (projectedTokens !== undefined) contextPressure.projectedTokens = projectedTokens;
+    if (contextWindow !== undefined) contextPressure.contextWindow = contextWindow;
+    if (Object.keys(contextPressure).length > 0) usage.contextPressure = contextPressure;
+  }
+
+  if (tokens) {
+    const uncachedInputTokens = numOr(tokens['uncachedInputTokens']);
+    const outputTokens = numOr(tokens['outputTokens']);
+    const cacheReadTokens = numOr(tokens['cacheReadTokens']);
+    const cacheWriteTokens = numOr(tokens['cacheWriteTokens']);
+    if (
+      uncachedInputTokens !== undefined &&
+      outputTokens !== undefined &&
+      cacheReadTokens !== undefined &&
+      cacheWriteTokens !== undefined
+    ) {
+      usage.tokens = { uncachedInputTokens, outputTokens, cacheReadTokens, cacheWriteTokens };
+    }
+  }
+
+  if (breakdown) {
+    const systemTokens = numOr(breakdown['systemTokens']);
+    const toolsTokens = numOr(breakdown['toolsTokens']);
+    const messageTokens = numOr(breakdown['messageTokens']);
+    if (systemTokens !== undefined && toolsTokens !== undefined && messageTokens !== undefined) {
+      usage.breakdown = { systemTokens, toolsTokens, messageTokens };
+    }
+  }
+
+  if (stats) {
+    const turns = numOr(stats['turns']);
+    const steps = numOr(stats['steps']);
+    const llmMs = numOr(stats['llmMs']);
+    const toolMs = numOr(stats['toolMs']);
+    const ttftMs = numOr(stats['ttftMs']);
+    const ttftSteps = numOr(stats['ttftSteps']);
+    const decodeMs = numOr(stats['decodeMs']);
+    const decodeTokens = numOr(stats['decodeTokens']);
+    if (
+      turns !== undefined &&
+      steps !== undefined &&
+      llmMs !== undefined &&
+      toolMs !== undefined &&
+      ttftMs !== undefined &&
+      ttftSteps !== undefined &&
+      decodeMs !== undefined &&
+      decodeTokens !== undefined
+    ) {
+      usage.stats = { turns, steps, llmMs, toolMs, ttftMs, ttftSteps, decodeMs, decodeTokens };
+    }
+  }
+
+  return Object.keys(usage).length > 0 ? usage : undefined;
+}
+
 function wireState(record: SessionRecord): WireState {
   if (record.pendingQuestions > 0) return 'waiting';
   if (record.running) return 'working';
@@ -107,6 +203,7 @@ export async function listSessions(
       const titleValue = item.projections?.values?.['title'];
       const pendingQuestions = id ? pendingFor(ctx, id, projections) : 0;
       const model = id ? modelFor(item) : undefined;
+      const usage = id ? usageFor(ctx, id, projections) : undefined;
 
       return {
         id,
@@ -117,6 +214,7 @@ export async function listSessions(
         running: item.running === true,
         pendingQuestions,
         ...(model ? { model } : {}),
+        ...(usage ? { usage } : {}),
       };
     })
     .filter((record) => record.id !== '');
@@ -154,5 +252,6 @@ export function toWireSession(record: SessionRecord): WireSession {
     ...(record.workspaceId ? { workspaceId: record.workspaceId } : {}),
     ...(record.model ? { model: record.model } : {}),
     ...(record.archived ? { archived: true } : {}),
+    ...(record.usage ? { usage: record.usage } : {}),
   };
 }

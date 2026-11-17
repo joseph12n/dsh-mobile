@@ -116,6 +116,25 @@ const sessions = [
     seq: 3,
     pendingQuestions: 1,
     workspaceId: 'ws-app',
+    usage: {
+      contextPressure: { projectedTokens: 64_000, contextWindow: 131_072 },
+      tokens: {
+        uncachedInputTokens: 12_000,
+        outputTokens: 3_400,
+        cacheReadTokens: 34_000,
+        cacheWriteTokens: 0,
+      },
+      stats: {
+        turns: 4,
+        steps: 6,
+        llmMs: 42_000,
+        toolMs: 9_000,
+        ttftMs: 900,
+        ttftSteps: 4,
+        decodeMs: 60_000,
+        decodeTokens: 2_460,
+      },
+    },
   },
   {
     id: 'session-demo-2',
