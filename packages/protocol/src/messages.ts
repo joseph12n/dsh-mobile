@@ -6,6 +6,7 @@ import {
   CommandInfo,
   CommandResult,
   DeviceInfo,
+  FileInfo,
   HostInfo,
   ModelCatalog,
   ModelSelection,
@@ -117,6 +118,22 @@ export const PushSubscribeMessage = message('push.subscribe', {
 
 export const PushUnsubscribeMessage = message('push.unsubscribe', {});
 
+export const FileStatMessage = message('file.stat', {
+  sessionId: z.string().min(1),
+  path: z.string().min(1).max(1_024),
+});
+
+export const FileReadMessage = message('file.read', {
+  sessionId: z.string().min(1),
+  path: z.string().min(1).max(1_024),
+  offset: z.number().int().nonnegative().optional(),
+});
+
+export const FileBytesMessage = message('file.bytes', {
+  sessionId: z.string().min(1),
+  path: z.string().min(1).max(1_024),
+});
+
 export const RunStartMessage = message('run.start', {
   sessionId: SessionId,
   prompt: z.string().min(1).max(32_000),
@@ -176,6 +193,9 @@ export const ClientMessage = z.discriminatedUnion('type', [
   PushKeyMessage,
   PushSubscribeMessage,
   PushUnsubscribeMessage,
+  FileStatMessage,
+  FileReadMessage,
+  FileBytesMessage,
   RunStartMessage,
   RunCancelMessage,
   PingMessage,
@@ -319,6 +339,24 @@ export const PushSubscribedMessage = message('push.subscribed', {
 
 export const PushUnsubscribedMessage = message('push.unsubscribed', {});
 
+export const FileStatOkMessage = message('file.stat.ok', {
+  file: FileInfo,
+});
+
+export const FileReadOkMessage = message('file.read.ok', {
+  file: FileInfo,
+  text: z.string(),
+  offset: z.number().int().nonnegative(),
+  eof: z.boolean(),
+  nextOffset: z.number().int().nonnegative().optional(),
+});
+
+export const FileBytesOkMessage = message('file.bytes.ok', {
+  file: FileInfo,
+  mime: z.string().min(1),
+  data: z.string(),
+});
+
 export const ErrorMessage = message('error', {
   code: ErrorCode,
   message: z.string(),
@@ -357,6 +395,9 @@ export const ServerMessage = z.discriminatedUnion('type', [
   PushKeyOkMessage,
   PushSubscribedMessage,
   PushUnsubscribedMessage,
+  FileStatOkMessage,
+  FileReadOkMessage,
+  FileBytesOkMessage,
   DevicesChangedMessage,
   ErrorMessage,
 ]);

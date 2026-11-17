@@ -31,6 +31,7 @@ import {
   type Workspace,
 } from '@deepseekharness-mobile/protocol';
 import type { Device, DeviceRegistry } from './core/devices.js';
+import type { FileBytesOutcome, FileOutcome, FileTextOutcome } from './dsh/files.js';
 import type { PairingService } from './core/pairing.js';
 import { log } from './log.js';
 import type { ProbeReport } from './probe.js';
@@ -136,6 +137,13 @@ export interface ServerDeps {
   subscribePush?: (deviceId: string, subscription: PushSubscription) => void;
   unsubscribePush?: (deviceId: string) => void;
   removePushForDevice?: (deviceId: string) => void;
+  statFile?: (input: { sessionId: string; path: string }) => Promise<FileOutcome>;
+  readFile?: (input: {
+    sessionId: string;
+    path: string;
+    offset?: number;
+  }) => Promise<FileTextOutcome>;
+  readFileBytes?: (input: { sessionId: string; path: string }) => Promise<FileBytesOutcome>;
   webRoot?: string;
   listWorkspaces?: () => Promise<Workspace[]>;
 
@@ -665,6 +673,123 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
           id: message.id,
           at: Date.now(),
           type: 'push.unsubscribed',
+        });
+        return;
+      }
+
+      if (message.type === 'file.stat') {
+        const stat = deps.statFile;
+        if (!stat) {
+          send(socket, errorMessage(message.id, 'bad-request', 'This host cannot read files.'));
+          return;
+        }
+
+        const outcome = await stat({ sessionId: message.sessionId, path: message.path });
+        if (socket.readyState !== socket.OPEN) return;
+
+        if (!outcome.ok || !outcome.file) {
+          send(
+            socket,
+            errorMessage(
+              message.id,
+              outcome.code ?? 'internal',
+              outcome.message ?? 'The file could not be read.',
+            ),
+          );
+          return;
+        }
+
+        send(socket, {
+          v: PROTOCOL_VERSION,
+          id: message.id,
+          at: Date.now(),
+          type: 'file.stat.ok',
+          file: outcome.file,
+        });
+        return;
+      }
+
+      if (message.type === 'file.read') {
+        const read = deps.readFile;
+        if (!read) {
+          send(socket, errorMessage(message.id, 'bad-request', 'This host cannot read files.'));
+          return;
+        }
+
+        const outcome = await read({
+          sessionId: message.sessionId,
+          path: message.path,
+          ...(message.offset !== undefined ? { offset: message.offset } : {}),
+        });
+        if (socket.readyState !== socket.OPEN) return;
+
+        if (
+          !outcome.ok ||
+          !outcome.file ||
+          outcome.text === undefined ||
+          outcome.offset === undefined ||
+          outcome.eof === undefined
+        ) {
+          send(
+            socket,
+            errorMessage(
+              message.id,
+              outcome.code ?? 'internal',
+              outcome.message ?? 'The file could not be read.',
+            ),
+          );
+          return;
+        }
+
+        send(socket, {
+          v: PROTOCOL_VERSION,
+          id: message.id,
+          at: Date.now(),
+          type: 'file.read.ok',
+          file: outcome.file,
+          text: outcome.text,
+          offset: outcome.offset,
+          eof: outcome.eof,
+          ...(outcome.nextOffset !== undefined ? { nextOffset: outcome.nextOffset } : {}),
+        });
+        return;
+      }
+
+      if (message.type === 'file.bytes') {
+        const readBytes = deps.readFileBytes;
+        if (!readBytes) {
+          send(socket, errorMessage(message.id, 'bad-request', 'This host cannot read files.'));
+          return;
+        }
+
+        const outcome = await readBytes({ sessionId: message.sessionId, path: message.path });
+        if (socket.readyState !== socket.OPEN) return;
+
+        if (
+          !outcome.ok ||
+          !outcome.file ||
+          outcome.mime === undefined ||
+          outcome.data === undefined
+        ) {
+          send(
+            socket,
+            errorMessage(
+              message.id,
+              outcome.code ?? 'internal',
+              outcome.message ?? 'The file could not be read.',
+            ),
+          );
+          return;
+        }
+
+        send(socket, {
+          v: PROTOCOL_VERSION,
+          id: message.id,
+          at: Date.now(),
+          type: 'file.bytes.ok',
+          file: outcome.file,
+          mime: outcome.mime,
+          data: outcome.data,
         });
         return;
       }

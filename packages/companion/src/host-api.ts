@@ -127,6 +127,41 @@ export interface LlmService {
   ): Promise<readonly DiscoveredModel[]>;
 }
 
+export interface WorkspaceFileStat {
+  absolutePath: string;
+  version?: string;
+  bytes?: number;
+}
+
+export interface WorkspaceFileText extends WorkspaceFileStat {
+  offset: number;
+  text: string;
+  lines: number;
+  eof: boolean;
+}
+
+export interface WorkspaceFileBytes extends WorkspaceFileStat {
+  offset: number;
+  data: Uint8Array;
+  eof: boolean;
+}
+
+export interface WorkspaceFilesService {
+  stat(sessionId: string, path: string, signal?: AbortSignal): Promise<WorkspaceFileStat>;
+  read(
+    sessionId: string,
+    path: string,
+    options?: { offset?: number; limit?: number },
+    signal?: AbortSignal,
+  ): Promise<WorkspaceFileText>;
+  readBytes(
+    sessionId: string,
+    path: string,
+    options?: { range?: { offset: number; length: number } },
+    signal?: AbortSignal,
+  ): Promise<WorkspaceFileBytes>;
+}
+
 export interface SessionPromptRequest {
   requestId: string;
   sessionId: string;
@@ -146,6 +181,7 @@ export interface HostContext {
   llm?: LlmService;
   settings?: SettingsService;
   credentials?: CredentialsService;
+  workspaceFiles?: WorkspaceFilesService;
   effect?(factory: () => Generator<unknown, void, unknown>, label?: string): void;
   get?(name: string): unknown;
   reflect?: { store?: Record<string, unknown> };

@@ -26,6 +26,7 @@ import {
 import { canListModels, canSelectModel, listModels, selectModel } from './dsh/models.js';
 import { commandsAvailable, listCommands, runCommand } from './dsh/slash-commands.js';
 import { activityAvailable, readSessionActivity } from './dsh/session-activity.js';
+import { filesAvailable, readFile, readFileBytes, statFile } from './dsh/files.js';
 import {
   connectProvider,
   disconnectProvider,
@@ -233,6 +234,7 @@ export function apply(ctx: HostContext): void {
     if (providersAvailable(ctx)) list.push('providers.list');
     if (providerConnectAvailable(ctx)) list.push('provider.connect');
     if (pushService) list.push('push.notifications');
+    if (filesAvailable(ctx)) list.push('workspace.files');
     list.push('devices.manage');
     return list;
   };
@@ -282,6 +284,9 @@ export function apply(ctx: HostContext): void {
       testProvider: (input) => testProvider(ctx, input),
       connectProvider: (input) => connectProvider(ctx, input),
       disconnectProvider: (input) => disconnectProvider(ctx, input),
+      statFile: (input) => statFile(ctx, input),
+      readFile: (input) => readFile(ctx, input),
+      readFileBytes: (input) => readFileBytes(ctx, input),
       answerQuestion: (input) => questionBridge.answer(input) ?? answerQuestion(ctx, input),
       readHistory: (sessionId, options) => readHistory(ctx, sessionId, options),
       subscribeSession: (sessionId, options) => subscribeSession(ctx, sessionId, options),
