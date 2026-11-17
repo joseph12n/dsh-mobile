@@ -116,6 +116,22 @@ function hostFailure(cause: unknown): FileOutcome {
   }
 }
 
+const PERMANENT = new Set([
+  'workspace-file/not-found',
+  'workspace-file/not-regular-file',
+  'workspace-file/outside-workspace',
+]);
+
+async function attempt<T>(run: () => Promise<T>): Promise<T> {
+  try {
+    return await run();
+  } catch (cause) {
+    const code = errorCode(cause);
+    if (code !== undefined && PERMANENT.has(code)) throw cause;
+    return run();
+  }
+}
+
 function within(root: string, requested: string): { absolute: string } | { error: string } {
   if (requested.includes('\0') || requested.startsWith('http:') || requested.startsWith('https:')) {
     return { error: 'The path is not a workspace file.' };
@@ -204,7 +220,9 @@ export async function statFile(
 
   const displayPath = relative(target.root, confined.absolute) || confined.absolute;
   try {
-    const stat = await workspaceFiles.stat(target.scope, confined.absolute, callerSignal());
+    const stat = await attempt(() =>
+      workspaceFiles.stat(target.scope, confined.absolute, callerSignal()),
+    );
     const kind = kindOf(confined.absolute);
     return { ok: true, file: infoOf(displayPath, stat, kind) };
   } catch (cause) {
@@ -230,19 +248,23 @@ export async function readFile(
   }
 
   try {
-    const stat = await workspaceFiles.stat(target.scope, confined.absolute, callerSignal());
+    const stat = await attempt(() =>
+      workspaceFiles.stat(target.scope, confined.absolute, callerSignal()),
+    );
     if (typeof stat.bytes === 'number' && stat.bytes > MAX_TEXT_BYTES) {
       return failure('bad-request', 'The file is too large to preview.');
     }
 
-    const page = await workspaceFiles.read(
-      target.scope,
-      confined.absolute,
-      {
-        ...(input.offset !== undefined ? { offset: input.offset } : {}),
-        limit: PAGE_LIMIT,
-      },
-      callerSignal(),
+    const page = await attempt(() =>
+      workspaceFiles.read(
+        target.scope,
+        confined.absolute,
+        {
+          ...(input.offset !== undefined ? { offset: input.offset } : {}),
+          limit: PAGE_LIMIT,
+        },
+        callerSignal(),
+      ),
     );
 
     return {
@@ -281,16 +303,15 @@ export async function readFileBytes(
   }
 
   try {
-    const stat = await workspaceFiles.stat(target.scope, confined.absolute, callerSignal());
+    const stat = await attempt(() =>
+      workspaceFiles.stat(target.scope, confined.absolute, callerSignal()),
+    );
     if (typeof stat.bytes === 'number' && stat.bytes > MAX_BYTES) {
       return failure('bad-request', 'The file is too large to preview.');
     }
 
-    const bytes = await workspaceFiles.readBytes(
-      target.scope,
-      confined.absolute,
-      {},
-      callerSignal(),
+    const bytes = await attempt(() =>
+      workspaceFiles.readBytes(target.scope, confined.absolute, {}, callerSignal()),
     );
     if (bytes.data.byteLength > MAX_BYTES) {
       return failure('bad-request', 'The file is too large to preview.');

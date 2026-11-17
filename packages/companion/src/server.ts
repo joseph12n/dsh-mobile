@@ -688,6 +688,9 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
         if (socket.readyState !== socket.OPEN) return;
 
         if (!outcome.ok || !outcome.file) {
+          log(
+            `file.stat failed session=${message.sessionId} path=${message.path} code=${outcome.code ?? 'internal'} message=${outcome.message ?? ''}`,
+          );
           send(
             socket,
             errorMessage(
@@ -730,6 +733,9 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
           outcome.offset === undefined ||
           outcome.eof === undefined
         ) {
+          log(
+            `file.read failed session=${message.sessionId} path=${message.path} code=${outcome.code ?? 'internal'} message=${outcome.message ?? ''}`,
+          );
           send(
             socket,
             errorMessage(
@@ -771,6 +777,9 @@ export function startCompanionServer(deps: ServerDeps): Promise<RunningServer> {
           outcome.mime === undefined ||
           outcome.data === undefined
         ) {
+          log(
+            `file.bytes failed session=${message.sessionId} path=${message.path} code=${outcome.code ?? 'internal'} message=${outcome.message ?? ''}`,
+          );
           send(
             socket,
             errorMessage(
