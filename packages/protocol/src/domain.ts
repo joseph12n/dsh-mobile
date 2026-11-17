@@ -23,6 +23,7 @@ export const Capability = z.enum([
   'providers.list',
   'provider.connect',
   'push.notifications',
+  'workspace.files',
 ]);
 export type Capability = z.infer<typeof Capability>;
 
@@ -110,6 +111,17 @@ export const SessionUsage = z.object({
     .optional(),
 });
 export type SessionUsage = z.infer<typeof SessionUsage>;
+
+export const FileKind = z.enum(['text', 'markdown', 'image', 'pdf', 'other']);
+export type FileKind = z.infer<typeof FileKind>;
+
+export const FileInfo = z.object({
+  path: z.string().min(1),
+  name: z.string().min(1),
+  kind: FileKind,
+  size: z.number().int().nonnegative().optional(),
+});
+export type FileInfo = z.infer<typeof FileInfo>;
 
 export const SessionSummary = z.object({
   id: SessionId,

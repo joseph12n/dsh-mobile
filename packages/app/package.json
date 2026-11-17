@@ -15,10 +15,13 @@
   },
   "dependencies": {
     "@deepseekharness-mobile/protocol": "workspace:*",
+    "dompurify": "^3.4.18",
+    "marked": "^18.2.1",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },
   "devDependencies": {
+    "@types/dompurify": "^3.2.0",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.3.0",

@@ -269,6 +269,66 @@ describe('notificaciones push', () => {
   });
 });
 
+describe('archivos del workspace', () => {
+  const base = { v: PROTOCOL_VERSION, id: 'file-1', at: 1_760_000_000_000 };
+  const file = { path: 'docs/MEMORIA.md', name: 'MEMORIA.md', kind: 'markdown', size: 1_024 };
+
+  it('acepta stat, read y bytes', () => {
+    expect(
+      ClientMessage.safeParse({
+        ...base,
+        type: 'file.stat',
+        sessionId: 's-1',
+        path: 'docs/MEMORIA.md',
+      }).success,
+    ).toBe(true);
+    expect(
+      ClientMessage.safeParse({
+        ...base,
+        type: 'file.read',
+        sessionId: 's-1',
+        path: 'docs/MEMORIA.md',
+        offset: 200,
+      }).success,
+    ).toBe(true);
+    expect(
+      ClientMessage.safeParse({
+        ...base,
+        type: 'file.bytes',
+        sessionId: 's-1',
+        path: 'logo.png',
+      }).success,
+    ).toBe(true);
+  });
+
+  it('acepta las respuestas', () => {
+    expect(ServerMessage.safeParse({ ...base, type: 'file.stat.ok', file }).success).toBe(true);
+    expect(
+      ServerMessage.safeParse({
+        ...base,
+        type: 'file.read.ok',
+        file,
+        text: '# Hola',
+        offset: 0,
+        eof: true,
+      }).success,
+    ).toBe(true);
+    expect(
+      ServerMessage.safeParse({
+        ...base,
+        type: 'file.bytes.ok',
+        file,
+        mime: 'image/png',
+        data: 'AQID',
+      }).success,
+    ).toBe(true);
+    expect(
+      ServerMessage.safeParse({ ...base, type: 'file.stat.ok', file: { ...file, kind: 'nope' } })
+        .success,
+    ).toBe(false);
+  });
+});
+
 describe('eventos de transcripción', () => {
   it('acepta el razonamiento opcional de una respuesta', () => {
     const event = { kind: 'message', role: 'assistant', text: 'hola', reasoning: 'pienso' };

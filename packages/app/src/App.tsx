@@ -29,6 +29,7 @@ import { QuestionsCard } from './components/Questions.js';
 import { SessionView, type CatalogStatus } from './components/SessionView.js';
 import { SessionList } from './components/SessionList.js';
 import { SettingsSheet } from './components/SettingsSheet.js';
+import { FileViewer } from './components/FileViewer.js';
 import { ForgetDeviceButton } from './components/ForgetDeviceButton.js';
 import { GearIcon, RefreshIcon } from './components/icons.js';
 import { useI18n } from './i18n/index.js';
@@ -84,6 +85,7 @@ export function App() {
   const [providers, setProviders] = useState<ProviderView[]>([]);
   const [providersLoading, setProvidersLoading] = useState(false);
   const [providersError, setProvidersError] = useState<string | undefined>(undefined);
+  const [filePath, setFilePath] = useState<string | undefined>(undefined);
   const [openSession, setOpenSession] = useState<SessionSummary | undefined>(undefined);
   const [commands, setCommands] = useState<CommandInfo[]>([]);
   const [activity, setActivity] = useState<SessionActivity | undefined>(undefined);
@@ -521,6 +523,9 @@ export function App() {
 
   const pushCapable =
     view.kind === 'sessions' && view.host.capabilities.includes('push.notifications');
+
+  const filesCapable =
+    view.kind === 'sessions' && view.host.capabilities.includes('workspace.files');
 
   const loadProviders = useCallback(async () => {
     const connection = client.current;
@@ -1183,6 +1188,7 @@ export function App() {
                   if (backFrom(globalThis.history, { view: 'session', id: openSession.id })) return;
                   leaveSession();
                 }}
+                {...(filesCapable ? { onOpenFile: (path: string) => setFilePath(path) } : {})}
                 onLoadMore={() => void loadMore()}
                 onCancel={() => void stop()}
                 onSend={sendText}
@@ -1283,6 +1289,17 @@ export function App() {
         onDisablePush={disablePushNotifications}
         onForget={forget}
       />
+
+      {openSession && filePath && client.current && (
+        <FileViewer
+          sessionId={openSession.id}
+          path={filePath}
+          onClose={() => setFilePath(undefined)}
+          statFile={(sessionId, path) => client.current!.fileStat(sessionId, path)}
+          readFile={(sessionId, path, offset) => client.current!.readFile(sessionId, path, offset)}
+          readFileBytes={(sessionId, path) => client.current!.readFileBytes(sessionId, path)}
+        />
+      )}
     </main>
   );
 }

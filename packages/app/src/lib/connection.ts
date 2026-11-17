@@ -14,6 +14,7 @@ import {
   type ProviderConnection,
   type ProviderTestResult,
   type ProviderView,
+  type FileInfo,
   type PushSubscription,
   type QuestionAnswerItem,
   type ServerMessage,
@@ -339,6 +340,57 @@ export class CompanionClient {
       credential: response.credential,
       ...(response.credentialSource ? { credentialSource: response.credentialSource } : {}),
     };
+  }
+
+  async fileStat(sessionId: string, path: string): Promise<FileInfo> {
+    const response = await this.#request({ type: 'file.stat', sessionId, path });
+    if (response.type === 'error') throw new ConnectionError(response.message, response.code);
+    if (response.type !== 'file.stat.ok') {
+      throw new ConnectionError('The host did not return the file.', 'internal');
+    }
+    return response.file;
+  }
+
+  async readFile(
+    sessionId: string,
+    path: string,
+    offset?: number,
+  ): Promise<{
+    file: FileInfo;
+    text: string;
+    offset: number;
+    eof: boolean;
+    nextOffset?: number;
+  }> {
+    const response = await this.#request({
+      type: 'file.read',
+      sessionId,
+      path,
+      ...(offset !== undefined ? { offset } : {}),
+    });
+    if (response.type === 'error') throw new ConnectionError(response.message, response.code);
+    if (response.type !== 'file.read.ok') {
+      throw new ConnectionError('The host did not return the text.', 'internal');
+    }
+    return {
+      file: response.file,
+      text: response.text,
+      offset: response.offset,
+      eof: response.eof,
+      ...(response.nextOffset !== undefined ? { nextOffset: response.nextOffset } : {}),
+    };
+  }
+
+  async readFileBytes(
+    sessionId: string,
+    path: string,
+  ): Promise<{ file: FileInfo; mime: string; data: string }> {
+    const response = await this.#request({ type: 'file.bytes', sessionId, path });
+    if (response.type === 'error') throw new ConnectionError(response.message, response.code);
+    if (response.type !== 'file.bytes.ok') {
+      throw new ConnectionError('The host did not return the bytes.', 'internal');
+    }
+    return { file: response.file, mime: response.mime, data: response.data };
   }
 
   async pushKey(): Promise<string> {

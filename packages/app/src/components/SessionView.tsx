@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type {
   CommandInfo,
   CommandResult,
@@ -40,7 +40,43 @@ function timeOf(timestamp: number): string {
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 }
 
-function EventRow({ entry }: { entry: HistoryEntry }) {
+const FILE_PATTERN =
+  /((?:[\w.-]+\/)*[\w.-]+\.(?:md|markdown|txt|json|ya?ml|toml|tsx?|jsx?|mjs|css|html|sh|ps1|py|rs|go|sql|csv|pdf|png|jpe?g|webp|gif|avif))/gi;
+
+function renderText(text: string, onOpenFile?: (path: string) => void): ReactNode {
+  if (!onOpenFile) return text;
+
+  const nodes: ReactNode[] = [];
+  let last = 0;
+
+  for (const match of text.matchAll(FILE_PATTERN)) {
+    const path = match[1];
+    if (!path || match.index === undefined) continue;
+    if (match.index > last) nodes.push(text.slice(last, match.index));
+    nodes.push(
+      <button
+        key={`${path}-${match.index}`}
+        type="button"
+        className="file-link"
+        onClick={() => onOpenFile(path)}
+      >
+        {path}
+      </button>,
+    );
+    last = match.index + path.length;
+  }
+
+  if (last < text.length) nodes.push(text.slice(last));
+  return nodes.length > 0 ? nodes : text;
+}
+
+function EventRow({
+  entry,
+  onOpenFile,
+}: {
+  entry: HistoryEntry;
+  onOpenFile?: (path: string) => void;
+}) {
   const { t } = useI18n();
   const event: TranscriptEvent = entry.event;
 
@@ -59,7 +95,7 @@ function EventRow({ entry }: { entry: HistoryEntry }) {
             <p>{event.reasoning}</p>
           </details>
         )}
-        <p>{event.text}</p>
+        <p>{renderText(event.text, onOpenFile)}</p>
       </li>
     );
   }
@@ -116,7 +152,15 @@ function keepsState(entry: HistoryEntry): boolean {
   );
 }
 
-function TurnBlock({ turn, number }: { turn: Turn; number: number }) {
+function TurnBlock({
+  turn,
+  number,
+  onOpenFile,
+}: {
+  turn: Turn;
+  number: number;
+  onOpenFile?: (path: string) => void;
+}) {
   const { t } = useI18n();
   const parts = partTurn(turn.entries.filter(keepsState));
   const label = turn.prompt
@@ -133,7 +177,11 @@ function TurnBlock({ turn, number }: { turn: Turn; number: number }) {
       <ul className="transcript">
         {parts.map((part) =>
           part.kind === 'entry' ? (
-            <EventRow key={part.entry.seq} entry={part.entry} />
+            <EventRow
+              key={part.entry.seq}
+              entry={part.entry}
+              {...(onOpenFile ? { onOpenFile } : {})}
+            />
           ) : (
             <ToolRun key={`herramientas-${part.entries[0]?.seq ?? 0}`} entries={part.entries} />
           ),
@@ -349,6 +397,7 @@ export function SessionView({
   onSend,
   onSelectModel,
   onReloadModels,
+  onOpenFile,
 }: {
   session: SessionSummary;
   entries: HistoryEntry[];
@@ -370,6 +419,7 @@ export function SessionView({
   onSend: (text: string) => Promise<boolean>;
   onSelectModel?: (selection: ModelSelection) => void;
   onReloadModels?: () => void;
+  onOpenFile?: (path: string) => void;
 }) {
   const { t } = useI18n();
   const [draft, setDraft] = useState('');
@@ -639,7 +689,12 @@ export function SessionView({
             aria-label={t('session.transcript')}
           >
             {groupTurns(entries).map((turn, index) => (
-              <TurnBlock key={turn.id} turn={turn} number={index + 1} />
+              <TurnBlock
+                key={turn.id}
+                turn={turn}
+                number={index + 1}
+                {...(onOpenFile ? { onOpenFile } : {})}
+              />
             ))}
           </div>
         )}
