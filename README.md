@@ -26,13 +26,13 @@
   </p>
 
   <p>
-    <img src="docs/assets/session.png" width="185" alt="A live turn with the agent activity panel over the conversation" />
-    <img src="docs/assets/settings.png" width="185" alt="Settings with model providers and paired devices" />
-    <img src="docs/assets/commands.png" width="185" alt="Slash command palette" />
-    <img src="docs/assets/pairing.png" width="185" alt="Pairing screen" />
+    <img src="docs/assets/screenshots/03-conversation.png" width="185" alt="A turn with the usage chips and an inline permission card" />
+    <img src="docs/assets/screenshots/04-activity.png" width="185" alt="The agent activity panel over the conversation" />
+    <img src="docs/assets/screenshots/07-providers.png" width="185" alt="Model providers in settings" />
+    <img src="docs/assets/screenshots/09-notifications.png" width="185" alt="The push notifications switch" />
   </p>
 
-  <p><sub>A live turn with the agent activity panel · model providers and paired devices · slash commands · pairing</sub></p>
+  <p><sub>A turn with the usage chips and an inline approval · the agent activity panel · model providers · notifications · <a href="docs/screenshots.md">all the screenshots</a></sub></p>
 </div>
 
 > **Status: working.** Pairing, live transcript, questions and approvals, slash commands, the
@@ -244,6 +244,7 @@ a local CDP harness; it is not part of CI because it needs a browser.
   with Tailscale and the usual problems.
 - [`docs/architecture.md`](docs/architecture.md) — **why** it is built this way: layers,
   protocol, pairing, and the decisions we rejected.
+- [`docs/screenshots.md`](docs/screenshots.md) — the app, screen by screen, with the demo host.
 - [`docs/publishing.md`](docs/publishing.md) — how the packages are published.
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) — how to work on the repo.
 - [`packages/protocol/src/messages.ts`](packages/protocol/src/messages.ts) — the contract, as code
