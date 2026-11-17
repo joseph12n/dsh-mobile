@@ -1,16 +1,32 @@
-import DOMPurify from 'dompurify';
-import { marked } from 'marked';
+import { linkHit, sanitizeMarkdown, workspacePathOf } from '../lib/markdown.js';
 import { findFilePaths } from '../lib/files.js';
 import { FileIcon } from './FileIcons.js';
 
-export function Markdown({ text }: { text: string }) {
-  const html = DOMPurify.sanitize(marked.parse(text) as string, {
-    USE_PROFILES: { html: true },
-    FORBID_TAGS: ['style', 'form', 'input', 'button'],
-    FORBID_ATTR: ['style'],
-  });
+export function Markdown({
+  text,
+  onOpenFile,
+}: {
+  text: string;
+  onOpenFile?: (path: string) => void;
+}) {
+  const html = sanitizeMarkdown(text);
 
-  return <div className="markdown" dangerouslySetInnerHTML={{ __html: html }} />;
+  return (
+    <div
+      className="markdown"
+      onClick={(event) => {
+        const link = linkHit(event.target);
+        if (!link) return;
+        if (link.external) return;
+
+        event.preventDefault();
+        if (!onOpenFile) return;
+        const path = workspacePathOf(link.href);
+        if (path) onOpenFile(path);
+      }}
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
+  );
 }
 
 export function FileCards({
@@ -52,7 +68,7 @@ export function MessageBody({
   const paths = onOpenFile ? findFilePaths(text) : [];
   return (
     <>
-      <Markdown text={text} />
+      <Markdown text={text} {...(onOpenFile ? { onOpenFile } : {})} />
       <FileCards paths={paths} {...(onOpenFile ? { onOpenFile } : {})} />
     </>
   );

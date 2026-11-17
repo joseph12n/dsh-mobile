@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
-import DOMPurify from 'dompurify';
-import { marked } from 'marked';
 import type { FileInfo } from '@deepseekharness-mobile/protocol';
 import { useI18n } from '../i18n/index.js';
+import { linkHit, resolveWorkspacePath, sanitizeMarkdown } from '../lib/markdown.js';
 
 type TextPage = { text: string; offset: number; eof: boolean; nextOffset?: number };
 type BytesPage = { mime: string; data: string };
@@ -11,6 +10,7 @@ export function FileViewer({
   sessionId,
   path,
   onClose,
+  onOpenPath,
   statFile,
   readFile,
   readFileBytes,
@@ -18,6 +18,7 @@ export function FileViewer({
   sessionId: string;
   path: string;
   onClose: () => void;
+  onOpenPath?: (path: string) => void;
   statFile: (sessionId: string, path: string) => Promise<FileInfo>;
   readFile: (
     sessionId: string,
@@ -41,6 +42,7 @@ export function FileViewer({
     let cancelled = false;
     setLoading(true);
     setError(undefined);
+    setFile(undefined);
     setText('');
     setPage(undefined);
     setBytes(undefined);
@@ -91,8 +93,7 @@ export function FileViewer({
     });
   };
 
-  const markdown =
-    file?.kind === 'markdown' ? DOMPurify.sanitize(marked.parse(text) as string) : '';
+  const markdown = file?.kind === 'markdown' ? sanitizeMarkdown(text) : '';
 
   return (
     <div className="file-viewer" role="dialog" aria-modal="true" aria-label={file?.name ?? path}>
@@ -114,7 +115,19 @@ export function FileViewer({
         )}
 
         {!loading && !error && file?.kind === 'markdown' && (
-          <article className="markdown" dangerouslySetInnerHTML={{ __html: markdown }} />
+          <article
+            className="markdown"
+            onClick={(event) => {
+              const link = linkHit(event.target);
+              if (!link) return;
+              if (link.external) return;
+
+              event.preventDefault();
+              const next = resolveWorkspacePath(path, link.href);
+              if (next && onOpenPath) onOpenPath(next);
+            }}
+            dangerouslySetInnerHTML={{ __html: markdown }}
+          />
         )}
         {!loading && !error && file?.kind === 'text' && <pre className="file-text">{text}</pre>}
         {!loading && !error && file?.kind === 'image' && bytes && (

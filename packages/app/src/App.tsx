@@ -443,7 +443,35 @@ export function App() {
     setEntries([]);
     setHasMore(false);
     setLoadingHistory(false);
+    setFilePath(undefined);
   }, []);
+
+  const statViewFile = useCallback(
+    (sessionId: string, path: string) => {
+      const connection = client.current;
+      if (!connection) return Promise.reject(new Error('The host is not connected.'));
+      return connection.fileStat(sessionId, path);
+    },
+    [client],
+  );
+
+  const readViewFile = useCallback(
+    (sessionId: string, path: string, offset?: number) => {
+      const connection = client.current;
+      if (!connection) return Promise.reject(new Error('The host is not connected.'));
+      return connection.readFile(sessionId, path, offset);
+    },
+    [client],
+  );
+
+  const readViewFileBytes = useCallback(
+    (sessionId: string, path: string) => {
+      const connection = client.current;
+      if (!connection) return Promise.reject(new Error('The host is not connected.'));
+      return connection.readFileBytes(sessionId, path);
+    },
+    [client],
+  );
 
   const open = useCallback(
     async (session: SessionSummary) => {
@@ -1295,9 +1323,10 @@ export function App() {
           sessionId={openSession.id}
           path={filePath}
           onClose={() => setFilePath(undefined)}
-          statFile={(sessionId, path) => client.current!.fileStat(sessionId, path)}
-          readFile={(sessionId, path, offset) => client.current!.readFile(sessionId, path, offset)}
-          readFileBytes={(sessionId, path) => client.current!.readFileBytes(sessionId, path)}
+          onOpenPath={(next) => setFilePath(next)}
+          statFile={statViewFile}
+          readFile={readViewFile}
+          readFileBytes={readViewFileBytes}
         />
       )}
     </main>

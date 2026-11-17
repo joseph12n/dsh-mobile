@@ -39,7 +39,10 @@ conversation; the transcript keeps its height.
 
 The Markdown viewer opened from a path in the conversation: headings, lists, tables and code
 are sanitized (no raw HTML), and the back button returns to the turn. Images and PDFs open in
-the same viewer; Office files arrive as a converted PDF.
+the same viewer; Office files arrive as a converted PDF. Paths render as cards, never as
+`<img>`: a workspace path has no URL in the app, so the bytes always come from the host. A
+relative link inside the document opens the next file in the same viewer instead of leaving the
+app.
 
 ## 6. Slash commands
 

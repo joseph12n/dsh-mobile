@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { WebSocketServer } from 'ws';
 
 const port = Number(process.argv[2] ?? 6799);
@@ -303,11 +304,32 @@ const file = await connection.fileStat(sessionId, 'MEMORIA.md');
 \`\`\`
 `;
 
+const IMAGE_PATH = 'docs/assets/screenshots/03-conversation.png';
+
+function fakeImage() {
+  const bytes = readFileSync(new URL(`../../${IMAGE_PATH}`, import.meta.url));
+  return {
+    file: { path: IMAGE_PATH, name: '03-conversation.png', kind: 'image', size: bytes.byteLength },
+    mime: 'image/png',
+    data: bytes.toString('base64'),
+  };
+}
+
 function fakeFile(path) {
+  if (path === IMAGE_PATH) {
+    return { file: fakeImage().file };
+  }
   if (path === 'MEMORIA.md') {
     return {
       file: { path, name: 'MEMORIA.md', kind: 'markdown', size: MEMORY_MD.length },
       text: MEMORY_MD,
+    };
+  }
+  if (path === 'docs/PRUEBA-VISOR.md') {
+    const text = readFileSync(new URL('../../docs/PRUEBA-VISOR.md', import.meta.url), 'utf8');
+    return {
+      file: { path, name: 'PRUEBA-VISOR.md', kind: 'markdown', size: text.length },
+      text,
     };
   }
   return undefined;
@@ -326,7 +348,7 @@ for (let index = 0; index < 80; index += 1) {
     event: {
       kind: 'message',
       role: 'assistant',
-      text: `${text}\n\nPaso ${index + 1}: miro el código, ajusto la prueba y lo dejo listo. Sin atajos.${index === 79 ? '\n\n**Listo.** Dejo el contexto en `MEMORIA.md`.\n\n- Visor de documentos\n- Cards de archivo\n- Uso del turno\n\n`pnpm test` pasa.' : ''}`,
+      text: `${text}\n\nPaso ${index + 1}: miro el código, ajusto la prueba y lo dejo listo. Sin atajos.${index === 79 ? '\n\n**Listo.** Dejo el contexto en `docs/PRUEBA-VISOR.md` y las notas en `MEMORIA.md`.\n\nLa captura está en [la conversación](docs/assets/screenshots/03-conversation.png) y también así:\n\n![Captura de la conversación](docs/assets/screenshots/03-conversation.png)\n\n- Visor de documentos\n- Cards de archivo\n- Uso del turno\n\n`pnpm test` pasa.' : ''}`,
       ...(index < 2
         ? {
             reasoning:
@@ -544,6 +566,10 @@ wss.on('connection', (socket) => {
     }
 
     if (message.type === 'file.bytes') {
+      if (message.path === IMAGE_PATH) {
+        reply({ type: 'file.bytes.ok', ...fakeImage() });
+        return;
+      }
       reply({
         type: 'error',
         id: message.id,
