@@ -18,6 +18,18 @@ export interface ProjectionsService {
   snapshot(session: HostSession, keys?: unknown): ProjectionSnapshot;
 }
 
+export interface StoredSessionHeader {
+  readonly cwd?: string;
+}
+
+export interface SessionPersistenceService {
+  stat(sessionId: string): Promise<{ header?: StoredSessionHeader } | undefined>;
+}
+
+export interface SandboxPolicyService {
+  readonly workspaceRoot?: string;
+}
+
 export interface CommandInvocation {
   rawInput?: string;
   agent?: { ctx?: unknown };
@@ -172,19 +184,19 @@ export interface WorkspaceFilesService {
   ): Promise<WorkspaceFileBytes>;
 }
 
-export interface OfficePdfResult {
+export interface OfficeRenderResult {
   data: Uint8Array;
   bytes?: number;
   missingFonts?: readonly string[];
 }
 
-export interface OfficeToPdfService {
+export interface OfficeKitService {
   render(
     workspaceFileScope: WorkspaceFileScope,
     path: string,
     priority: 'foreground' | 'background',
     signal: AbortSignal,
-  ): Promise<OfficePdfResult>;
+  ): Promise<OfficeRenderResult>;
 }
 
 export interface SessionPromptRequest {
@@ -201,13 +213,15 @@ export interface SessionController {
 export interface HostContext {
   sessions?: SessionsService;
   sessionProjections?: ProjectionsService;
+  sessionPersistence?: SessionPersistenceService;
+  sandboxPolicy?: SandboxPolicyService;
   commands?: CommandsService;
   subagents?: SubagentsService;
   llm?: LlmService;
   settings?: SettingsService;
   credentials?: CredentialsService;
   workspaceFiles?: WorkspaceFilesService;
-  officeToPdf?: OfficeToPdfService;
+  officeKit?: OfficeKitService;
   effect?(factory: () => Generator<unknown, void, unknown>, label?: string): void;
   get?(name: string): unknown;
   reflect?: { store?: Record<string, unknown> };

@@ -3,13 +3,16 @@ import type { FileInfo, FileKind } from '@deepseekharness-mobile/protocol';
 import {
   service,
   type HostContext,
-  type OfficeToPdfService,
+  type OfficeKitService,
   type ProjectionsService,
+  type SandboxPolicyService,
+  type SessionPersistenceService,
   type SessionsService,
   type WorkspaceFileScope,
   type WorkspaceFileStat,
   type WorkspaceFilesService,
 } from '../host-api.js';
+import { listWorkspaces } from './workspaces.js';
 
 const MAX_TEXT_BYTES = 1_048_576;
 const MAX_BYTES = 5_242_880;
@@ -47,21 +50,34 @@ export function filesAvailable(ctx: HostContext): boolean {
   );
 }
 
-function workspaceRoot(ctx: HostContext, sessionId: string): string | undefined {
+async function workspaceRoot(ctx: HostContext, sessionId: string): Promise<string | undefined> {
   const sessions = service<SessionsService>(ctx, 'sessions');
   const session = sessions?.get(sessionId);
-  const cwd = session?.header?.cwd;
-  if (typeof cwd === 'string' && isAbsolute(cwd)) return cwd;
+  const live = session?.header?.cwd;
+  if (typeof live === 'string' && isAbsolute(live)) return live;
 
-  const projections = service<ProjectionsService>(ctx, 'sessionProjections');
-  if (!session || !projections) return undefined;
-
-  try {
-    const value = projections.snapshot(session).values['workingDirectory'];
-    return typeof value === 'string' && isAbsolute(value) ? value : undefined;
-  } catch {
-    return undefined;
+  if (session) {
+    const projections = service<ProjectionsService>(ctx, 'sessionProjections');
+    try {
+      const value = projections?.snapshot(session).values['workingDirectory'];
+      if (typeof value === 'string' && isAbsolute(value)) return value;
+    } catch {}
   }
+
+  const persistence = service<SessionPersistenceService>(ctx, 'sessionPersistence');
+  try {
+    const stored = await persistence?.stat(sessionId);
+    const cwd = stored?.header?.cwd;
+    if (typeof cwd === 'string' && isAbsolute(cwd)) return cwd;
+  } catch {}
+
+  const workspaces = await listWorkspaces(ctx);
+  const owner = workspaces.find((item) => item.sessionIds.includes(sessionId));
+  if (owner && isAbsolute(owner.directory)) return owner.directory;
+
+  const sandbox = service<SandboxPolicyService>(ctx, 'sandboxPolicy');
+  const fallback = sandbox?.workspaceRoot;
+  return typeof fallback === 'string' && isAbsolute(fallback) ? fallback : undefined;
 }
 
 interface FileTarget {
@@ -69,8 +85,8 @@ interface FileTarget {
   root: string;
 }
 
-function targetOf(ctx: HostContext, sessionId: string): FileTarget | undefined {
-  const root = workspaceRoot(ctx, sessionId);
+async function targetOf(ctx: HostContext, sessionId: string): Promise<FileTarget | undefined> {
+  const root = await workspaceRoot(ctx, sessionId);
   if (!root) return undefined;
   return { scope: { sessionId, workspaceRoot: root }, root };
 }
@@ -180,7 +196,7 @@ export async function statFile(
   input: { sessionId: string; path: string },
 ): Promise<FileOutcome> {
   const workspaceFiles = files(ctx);
-  const target = targetOf(ctx, input.sessionId);
+  const target = await targetOf(ctx, input.sessionId);
   if (!workspaceFiles || !target) return failure('bad-request', 'Files are not available here.');
 
   const confined = within(target.root, input.path);
@@ -201,7 +217,7 @@ export async function readFile(
   input: { sessionId: string; path: string; offset?: number },
 ): Promise<FileTextOutcome> {
   const workspaceFiles = files(ctx);
-  const target = targetOf(ctx, input.sessionId);
+  const target = await targetOf(ctx, input.sessionId);
   if (!workspaceFiles || !target) return failure('bad-request', 'Files are not available here.');
 
   const confined = within(target.root, input.path);
@@ -247,7 +263,7 @@ export async function readFileBytes(
   input: { sessionId: string; path: string },
 ): Promise<FileBytesOutcome> {
   const workspaceFiles = files(ctx);
-  const target = targetOf(ctx, input.sessionId);
+  const target = await targetOf(ctx, input.sessionId);
   if (!workspaceFiles || !target) return failure('bad-request', 'Files are not available here.');
 
   const confined = within(target.root, input.path);
@@ -297,7 +313,7 @@ async function officeBytes(
   displayPath: string,
   absolutePath: string,
 ): Promise<FileBytesOutcome> {
-  const office = service<OfficeToPdfService>(ctx, 'officeToPdf');
+  const office = service<OfficeKitService>(ctx, 'officeKit');
   const sessions = service<SessionsService>(ctx, 'sessions');
   const session = sessions?.get(target.scope.sessionId);
   if (!office || typeof office.render !== 'function' || !session) {
