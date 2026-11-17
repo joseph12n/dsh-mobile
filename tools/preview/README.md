@@ -92,3 +92,16 @@ curl -L https://cdn.jsdelivr.net/npm/axe-core@4/axe.min.js -o tools/preview/axe.
 `live-probe.mjs` and `history-probe.mjs` pair against the real plugin on `127.0.0.1:6768` and
 report what goes over the wire. They consume a pairing code from `/pair`. Delete the probe
 device from `~/.dsh/companion/devices.json` afterwards, or restart DSH so it is not loaded.
+
+`live-files-probe.mjs <port> [session title]` pairs itself, takes a session and asks the host for
+`file.stat` plus `file.read`/`file.bytes` on four paths of this repo (`docs/PRUEBA-VISOR.md`,
+`MEMORIA.md`, `README.md` and one screenshot), then revokes its own device. It exits non-zero if
+any of them fails, so it is the check to run after the restart that loads a new plugin build:
+
+```bash
+node tools/preview/live-files-probe.mjs 6768
+```
+
+The demo host also serves `docs/PRUEBA-VISOR.md` (a Markdown fixture with headings, a table, a
+code block, a quote and links) and one real PNG, and its last message mentions both, so the file
+cards and the viewer can be exercised without a phone.

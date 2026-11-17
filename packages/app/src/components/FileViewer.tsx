@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
-import DOMPurify from 'dompurify';
-import { marked } from 'marked';
+import { useEffect, useRef, useState } from 'react';
 import type { FileInfo } from '@deepseekharness-mobile/protocol';
 import { useI18n } from '../i18n/index.js';
+import { linkHit, sanitizeMarkdown } from '../lib/markdown.js';
+import { resolveWorkspacePath } from '../lib/workspace-path.js';
 
 type TextPage = { text: string; offset: number; eof: boolean; nextOffset?: number };
 type BytesPage = { mime: string; data: string };
@@ -11,13 +11,15 @@ export function FileViewer({
   sessionId,
   path,
   onClose,
+  onOpenPath,
   statFile,
   readFile,
   readFileBytes,
-}: {
+}: Readonly<{
   sessionId: string;
   path: string;
   onClose: () => void;
+  onOpenPath?: (path: string) => void;
   statFile: (sessionId: string, path: string) => Promise<FileInfo>;
   readFile: (
     sessionId: string,
@@ -28,7 +30,7 @@ export function FileViewer({
     sessionId: string,
     path: string,
   ) => Promise<{ file: FileInfo; mime: string; data: string }>;
-}) {
+}>) {
   const { t } = useI18n();
   const [file, setFile] = useState<FileInfo | undefined>(undefined);
   const [text, setText] = useState('');
@@ -36,11 +38,36 @@ export function FileViewer({
   const [bytes, setBytes] = useState<BytesPage | undefined>(undefined);
   const [error, setError] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState(true);
+  const body = useRef<HTMLDivElement>(null);
+  const linkTarget = useRef({ path, onOpenPath });
+
+  useEffect(() => {
+    linkTarget.current = { path, onOpenPath };
+  }, [path, onOpenPath]);
+
+  useEffect(() => {
+    const node = body.current;
+    if (!node) return;
+
+    const onClick = (event: MouseEvent): void => {
+      const link = linkHit(event.target);
+      if (!link || link.external) return;
+
+      event.preventDefault();
+      const current = linkTarget.current;
+      const next = resolveWorkspacePath(current.path, link.href);
+      if (next) current.onOpenPath?.(next);
+    };
+
+    node.addEventListener('click', onClick);
+    return () => node.removeEventListener('click', onClick);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setError(undefined);
+    setFile(undefined);
     setText('');
     setPage(undefined);
     setBytes(undefined);
@@ -91,8 +118,7 @@ export function FileViewer({
     });
   };
 
-  const markdown =
-    file?.kind === 'markdown' ? DOMPurify.sanitize(marked.parse(text) as string) : '';
+  const markdown = file?.kind === 'markdown' ? sanitizeMarkdown(text) : '';
 
   return (
     <div className="file-viewer" role="dialog" aria-modal="true" aria-label={file?.name ?? path}>
@@ -105,7 +131,7 @@ export function FileViewer({
         </span>
       </header>
 
-      <div className="file-viewer-body">
+      <div className="file-viewer-body" ref={body}>
         {loading && <p className="muted small">{t('file.loading')}</p>}
         {error && (
           <p className="error" role="alert">

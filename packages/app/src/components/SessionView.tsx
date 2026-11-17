@@ -64,7 +64,7 @@ function EventRow({
               <ChevronRightIcon />
               {t('session.reasoning')}
             </summary>
-            <MessageBody text={event.reasoning} />
+            <MessageBody text={event.reasoning} {...(onOpenFile ? { onOpenFile } : {})} />
           </details>
         )}
         <MessageBody text={event.text} {...(onOpenFile ? { onOpenFile } : {})} />

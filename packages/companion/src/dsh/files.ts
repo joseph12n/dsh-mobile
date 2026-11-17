@@ -6,6 +6,7 @@ import {
   type OfficeToPdfService,
   type ProjectionsService,
   type SessionsService,
+  type WorkspaceFileScope,
   type WorkspaceFileStat,
   type WorkspaceFilesService,
 } from '../host-api.js';
@@ -48,8 +49,11 @@ export function filesAvailable(ctx: HostContext): boolean {
 
 function workspaceRoot(ctx: HostContext, sessionId: string): string | undefined {
   const sessions = service<SessionsService>(ctx, 'sessions');
-  const projections = service<ProjectionsService>(ctx, 'sessionProjections');
   const session = sessions?.get(sessionId);
+  const cwd = session?.header?.cwd;
+  if (typeof cwd === 'string' && isAbsolute(cwd)) return cwd;
+
+  const projections = service<ProjectionsService>(ctx, 'sessionProjections');
   if (!session || !projections) return undefined;
 
   try {
@@ -57,6 +61,42 @@ function workspaceRoot(ctx: HostContext, sessionId: string): string | undefined 
     return typeof value === 'string' && isAbsolute(value) ? value : undefined;
   } catch {
     return undefined;
+  }
+}
+
+interface FileTarget {
+  scope: WorkspaceFileScope;
+  root: string;
+}
+
+function targetOf(ctx: HostContext, sessionId: string): FileTarget | undefined {
+  const root = workspaceRoot(ctx, sessionId);
+  if (!root) return undefined;
+  return { scope: { sessionId, workspaceRoot: root }, root };
+}
+
+function callerSignal(): AbortSignal {
+  return new AbortController().signal;
+}
+
+function errorCode(cause: unknown): string | undefined {
+  if (typeof cause !== 'object' || cause === null || !('code' in cause)) return undefined;
+  const code = (cause as { code?: unknown }).code;
+  return typeof code === 'string' ? code : undefined;
+}
+
+function hostFailure(cause: unknown): FileOutcome {
+  switch (errorCode(cause)) {
+    case 'workspace-file/outside-workspace':
+      return failure('bad-request', 'The file is outside the session workspace.');
+    case 'workspace-file/not-regular-file':
+      return failure('bad-request', 'The path is not a regular file.');
+    case 'workspace-file/too-large':
+      return failure('bad-request', 'The file is too large to preview.');
+    case 'workspace-file/not-text':
+      return failure('bad-request', 'That file is not text.');
+    default:
+      return failure('not-found', 'The file could not be read.');
   }
 }
 
@@ -140,19 +180,19 @@ export async function statFile(
   input: { sessionId: string; path: string },
 ): Promise<FileOutcome> {
   const workspaceFiles = files(ctx);
-  const root = workspaceRoot(ctx, input.sessionId);
-  if (!workspaceFiles || !root) return failure('bad-request', 'Files are not available here.');
+  const target = targetOf(ctx, input.sessionId);
+  if (!workspaceFiles || !target) return failure('bad-request', 'Files are not available here.');
 
-  const confined = within(root, input.path);
+  const confined = within(target.root, input.path);
   if ('error' in confined) return failure('bad-request', confined.error);
 
-  const relativePath = relative(root, confined.absolute);
+  const displayPath = relative(target.root, confined.absolute) || confined.absolute;
   try {
-    const stat = await workspaceFiles.stat(input.sessionId, relativePath);
+    const stat = await workspaceFiles.stat(target.scope, confined.absolute, callerSignal());
     const kind = kindOf(confined.absolute);
-    return { ok: true, file: infoOf(relativePath, stat, kind) };
-  } catch {
-    return failure('not-found', 'The file could not be read.');
+    return { ok: true, file: infoOf(displayPath, stat, kind) };
+  } catch (cause) {
+    return hostFailure(cause);
   }
 }
 
@@ -161,39 +201,44 @@ export async function readFile(
   input: { sessionId: string; path: string; offset?: number },
 ): Promise<FileTextOutcome> {
   const workspaceFiles = files(ctx);
-  const root = workspaceRoot(ctx, input.sessionId);
-  if (!workspaceFiles || !root) return failure('bad-request', 'Files are not available here.');
+  const target = targetOf(ctx, input.sessionId);
+  if (!workspaceFiles || !target) return failure('bad-request', 'Files are not available here.');
 
-  const confined = within(root, input.path);
+  const confined = within(target.root, input.path);
   if ('error' in confined) return failure('bad-request', confined.error);
 
-  const relativePath = relative(root, confined.absolute);
+  const displayPath = relative(target.root, confined.absolute) || confined.absolute;
   const kind = kindOf(confined.absolute);
   if (kind !== 'text' && kind !== 'markdown') {
     return failure('bad-request', 'That file is not text.');
   }
 
   try {
-    const stat = await workspaceFiles.stat(input.sessionId, relativePath);
+    const stat = await workspaceFiles.stat(target.scope, confined.absolute, callerSignal());
     if (typeof stat.bytes === 'number' && stat.bytes > MAX_TEXT_BYTES) {
       return failure('bad-request', 'The file is too large to preview.');
     }
 
-    const page = await workspaceFiles.read(input.sessionId, relativePath, {
-      ...(input.offset !== undefined ? { offset: input.offset } : {}),
-      limit: PAGE_LIMIT,
-    });
+    const page = await workspaceFiles.read(
+      target.scope,
+      confined.absolute,
+      {
+        ...(input.offset !== undefined ? { offset: input.offset } : {}),
+        limit: PAGE_LIMIT,
+      },
+      callerSignal(),
+    );
 
     return {
       ok: true,
-      file: infoOf(relativePath, page, kind),
+      file: infoOf(displayPath, page, kind),
       text: page.text,
       offset: page.offset,
       eof: page.eof,
       ...(page.eof ? {} : { nextOffset: page.offset + page.lines }),
     };
-  } catch {
-    return failure('not-found', 'The file could not be read.');
+  } catch (cause) {
+    return hostFailure(cause);
   }
 }
 
@@ -202,17 +247,17 @@ export async function readFileBytes(
   input: { sessionId: string; path: string },
 ): Promise<FileBytesOutcome> {
   const workspaceFiles = files(ctx);
-  const root = workspaceRoot(ctx, input.sessionId);
-  if (!workspaceFiles || !root) return failure('bad-request', 'Files are not available here.');
+  const target = targetOf(ctx, input.sessionId);
+  if (!workspaceFiles || !target) return failure('bad-request', 'Files are not available here.');
 
-  const confined = within(root, input.path);
+  const confined = within(target.root, input.path);
   if ('error' in confined) return failure('bad-request', confined.error);
 
-  const relativePath = relative(root, confined.absolute);
+  const displayPath = relative(target.root, confined.absolute) || confined.absolute;
   const kind = kindOf(confined.absolute);
 
   if (kind === 'office') {
-    return officeBytes(ctx, input.sessionId, relativePath, confined.absolute);
+    return officeBytes(ctx, target, displayPath, confined.absolute);
   }
 
   if (kind !== 'image' && kind !== 'pdf') {
@@ -220,42 +265,47 @@ export async function readFileBytes(
   }
 
   try {
-    const stat = await workspaceFiles.stat(input.sessionId, relativePath);
+    const stat = await workspaceFiles.stat(target.scope, confined.absolute, callerSignal());
     if (typeof stat.bytes === 'number' && stat.bytes > MAX_BYTES) {
       return failure('bad-request', 'The file is too large to preview.');
     }
 
-    const bytes = await workspaceFiles.readBytes(input.sessionId, relativePath);
+    const bytes = await workspaceFiles.readBytes(
+      target.scope,
+      confined.absolute,
+      {},
+      callerSignal(),
+    );
     if (bytes.data.byteLength > MAX_BYTES) {
       return failure('bad-request', 'The file is too large to preview.');
     }
 
     return {
       ok: true,
-      file: infoOf(relativePath, bytes, kind),
+      file: infoOf(displayPath, bytes, kind),
       mime: mimeOf(confined.absolute, kind),
       data: Buffer.from(bytes.data).toString('base64'),
     };
-  } catch {
-    return failure('not-found', 'The file could not be read.');
+  } catch (cause) {
+    return hostFailure(cause);
   }
 }
 
 async function officeBytes(
   ctx: HostContext,
-  sessionId: string,
-  relativePath: string,
+  target: FileTarget,
+  displayPath: string,
   absolutePath: string,
 ): Promise<FileBytesOutcome> {
   const office = service<OfficeToPdfService>(ctx, 'officeToPdf');
   const sessions = service<SessionsService>(ctx, 'sessions');
-  const session = sessions?.get(sessionId);
+  const session = sessions?.get(target.scope.sessionId);
   if (!office || typeof office.render !== 'function' || !session) {
     return failure('bad-request', 'Office documents are not supported here.');
   }
 
   try {
-    const result = await office.render(session, relativePath, 'foreground');
+    const result = await office.render(target.scope, absolutePath, 'foreground', callerSignal());
     if (result.data.byteLength > MAX_BYTES) {
       return failure('bad-request', 'The converted PDF is too large.');
     }
@@ -263,7 +313,7 @@ async function officeBytes(
     return {
       ok: true,
       file: {
-        path: relativePath,
+        path: displayPath,
         name: absolutePath.slice(
           Math.max(absolutePath.lastIndexOf('/'), absolutePath.lastIndexOf('\\')) + 1,
         ),

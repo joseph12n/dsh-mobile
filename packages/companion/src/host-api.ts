@@ -1,5 +1,6 @@
 export interface HostSession {
   readonly id: string;
+  readonly header?: { readonly cwd?: string };
   deriveMessages?(): readonly unknown[];
 }
 
@@ -127,6 +128,11 @@ export interface LlmService {
   ): Promise<readonly DiscoveredModel[]>;
 }
 
+export interface WorkspaceFileScope {
+  readonly sessionId: string;
+  readonly workspaceRoot: string;
+}
+
 export interface WorkspaceFileStat {
   absolutePath: string;
   version?: string;
@@ -147,18 +153,22 @@ export interface WorkspaceFileBytes extends WorkspaceFileStat {
 }
 
 export interface WorkspaceFilesService {
-  stat(sessionId: string, path: string, signal?: AbortSignal): Promise<WorkspaceFileStat>;
-  read(
-    sessionId: string,
+  stat(
+    workspaceFileScope: WorkspaceFileScope,
     path: string,
-    options?: { offset?: number; limit?: number },
-    signal?: AbortSignal,
+    signal: AbortSignal,
+  ): Promise<WorkspaceFileStat>;
+  read(
+    workspaceFileScope: WorkspaceFileScope,
+    path: string,
+    options: { offset?: number; limit?: number },
+    signal: AbortSignal,
   ): Promise<WorkspaceFileText>;
   readBytes(
-    sessionId: string,
+    workspaceFileScope: WorkspaceFileScope,
     path: string,
-    options?: { range?: { offset: number; length: number } },
-    signal?: AbortSignal,
+    options: { range?: { offset: number; length: number } },
+    signal: AbortSignal,
   ): Promise<WorkspaceFileBytes>;
 }
 
@@ -170,10 +180,10 @@ export interface OfficePdfResult {
 
 export interface OfficeToPdfService {
   render(
-    scope: unknown,
+    workspaceFileScope: WorkspaceFileScope,
     path: string,
     priority: 'foreground' | 'background',
-    signal?: AbortSignal,
+    signal: AbortSignal,
   ): Promise<OfficePdfResult>;
 }
 
