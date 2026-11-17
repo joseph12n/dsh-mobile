@@ -326,3 +326,58 @@ describe('readFileBytes', () => {
     ).resolves.toMatchObject({ ok: false, code: 'bad-request' });
   });
 });
+
+describe('reintentos', () => {
+  it('reintenta una vez un fallo transitorio del host', async () => {
+    let attempts = 0;
+    const flaky = {
+      ...(ctx as unknown as Record<string, unknown>),
+      workspaceFiles: {
+        stat: async (_scope: unknown, path: unknown) => {
+          attempts += 1;
+          if (attempts === 1) throw Object.assign(new Error('EIO'), { code: 'EIO' });
+          return { absolutePath: String(path), version: 'v1', bytes: 9 };
+        },
+        read: async () => {
+          throw new Error('no');
+        },
+        readBytes: async () => {
+          throw new Error('no');
+        },
+      },
+    } as unknown as HostContext;
+
+    await expect(statFile(flaky, { sessionId: 's-1', path: 'README.md' })).resolves.toMatchObject({
+      ok: true,
+      file: { size: 9 },
+    });
+    expect(attempts).toBe(2);
+  });
+
+  it('no reintenta un archivo que no existe', async () => {
+    let attempts = 0;
+    const missing = {
+      ...(ctx as unknown as Record<string, unknown>),
+      workspaceFiles: {
+        stat: async () => {
+          attempts += 1;
+          throw Object.assign(new Error('gone'), { code: 'workspace-file/not-found' });
+        },
+        read: async () => {
+          throw new Error('no');
+        },
+        readBytes: async () => {
+          throw new Error('no');
+        },
+      },
+    } as unknown as HostContext;
+
+    await expect(statFile(missing, { sessionId: 's-1', path: 'README.md' })).resolves.toMatchObject(
+      {
+        ok: false,
+        code: 'not-found',
+      },
+    );
+    expect(attempts).toBe(1);
+  });
+});
