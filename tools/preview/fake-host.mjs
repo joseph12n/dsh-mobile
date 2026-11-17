@@ -21,6 +21,7 @@ const host = {
     'providers.list',
     'provider.connect',
     'push.notifications',
+    'workspace.files',
     'session.history',
     'reply.send',
     'run.cancel',
@@ -279,6 +280,39 @@ const topics = [
 ];
 
 const history = [];
+const MEMORY_MD = `# Memoria del proyecto
+
+Resumen de lo que cambió en esta sesión.
+
+## Lo hecho
+
+- Visor de documentos en la PWA: Markdown, texto, imágenes, PDF y Office.
+- Rutas confinadas al workspace de la sesión; solo lectura.
+- Sin HTML activo ni SVG inline.
+
+## Cómo se probó
+
+| Caso | Estado |
+| --- | --- |
+| Markdown | pasa |
+| Imagen | pasa |
+| PDF | pasa |
+
+\`\`\`ts
+const file = await connection.fileStat(sessionId, 'MEMORIA.md');
+\`\`\`
+`;
+
+function fakeFile(path) {
+  if (path === 'MEMORIA.md') {
+    return {
+      file: { path, name: 'MEMORIA.md', kind: 'markdown', size: MEMORY_MD.length },
+      text: MEMORY_MD,
+    };
+  }
+  return undefined;
+}
+
 for (let index = 0; index < 80; index += 1) {
   const text = topics[index % topics.length];
   history.push({
@@ -292,7 +326,7 @@ for (let index = 0; index < 80; index += 1) {
     event: {
       kind: 'message',
       role: 'assistant',
-      text: `${text}\n\nPaso ${index + 1}: miro el código, ajusto la prueba y lo dejo listo. Sin atajos.`,
+      text: `${text}\n\nPaso ${index + 1}: miro el código, ajusto la prueba y lo dejo listo. Sin atajos.${index === 79 ? ' Dejo el contexto en `MEMORIA.md`.' : ''}`,
       ...(index < 2
         ? {
             reasoning:
@@ -486,6 +520,36 @@ wss.on('connection', (socket) => {
     if (message.type === 'push.unsubscribe') {
       pushSubscriptions = [];
       reply({ type: 'push.unsubscribed' });
+      return;
+    }
+
+    if (message.type === 'file.stat') {
+      const found = fakeFile(message.path);
+      if (!found) {
+        reply({ type: 'error', id: message.id, code: 'not-found', message: 'Unknown file.' });
+        return;
+      }
+      reply({ type: 'file.stat.ok', file: found.file });
+      return;
+    }
+
+    if (message.type === 'file.read') {
+      const found = fakeFile(message.path);
+      if (!found || found.text === undefined) {
+        reply({ type: 'error', id: message.id, code: 'not-found', message: 'Unknown file.' });
+        return;
+      }
+      reply({ type: 'file.read.ok', file: found.file, text: found.text, offset: 0, eof: true });
+      return;
+    }
+
+    if (message.type === 'file.bytes') {
+      reply({
+        type: 'error',
+        id: message.id,
+        code: 'bad-request',
+        message: 'No bytes in the demo.',
+      });
       return;
     }
 
