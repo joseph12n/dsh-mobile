@@ -15,6 +15,14 @@
     <a href="https://github.com/joseph12n/dsh-mobile/blob/main/packages/protocol/package.json"><img src="https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white" alt="TypeScript" /></a>
     <a href="https://github.com/joseph12n/dsh-mobile/blob/main/packages/protocol/package.json"><img src="https://img.shields.io/badge/node-%3E%3D24-339933?logo=nodedotjs&logoColor=white" alt="Node" /></a>
   </p>
+
+  <p>
+    <img src="https://raw.githubusercontent.com/joseph12n/dsh-mobile/main/docs/assets/screenshots/02-sessions.png" width="170" alt="Sessions list" />
+    <img src="https://raw.githubusercontent.com/joseph12n/dsh-mobile/main/docs/assets/screenshots/03-conversation.png" width="170" alt="A live turn" />
+    <img src="https://raw.githubusercontent.com/joseph12n/dsh-mobile/main/docs/assets/screenshots/05b-file-viewer.png" width="170" alt="The file viewer" />
+    <br />
+    <sub>What speaks this contract: the DSH Mobile PWA.</sub>
+  </p>
 </div>
 
 ## The contract

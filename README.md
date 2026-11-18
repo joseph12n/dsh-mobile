@@ -9,7 +9,7 @@
   with no cloud in between.</p>
 
   <p>
-    <a href="https://github.com/joseph12n/dsh-mobile/actions/workflows/ci.yml"><img src="https://img.shields.io/badge/tests-588%20passing-2ea44f?logo=vitest&logoColor=white" alt="Tests" /></a>
+    <a href="https://github.com/joseph12n/dsh-mobile/actions/workflows/ci.yml"><img src="https://img.shields.io/badge/tests-636%20passing-2ea44f?logo=vitest&logoColor=white" alt="Tests" /></a>
     <a href="https://sonarcloud.io/summary/new_code?id=joseph12n_dsh-mobile"><img src="https://sonarcloud.io/api/project_badges/measure?project=joseph12n_dsh-mobile&metric=alert_status" alt="Quality Gate" /></a>
     <a href="https://www.npmjs.com/package/@deepseekharness-mobile/companion"><img src="https://img.shields.io/npm/v/@deepseekharness-mobile/companion?label=npm&color=4D6BFE" alt="npm" /></a>
     <a href="https://www.npmjs.com/package/@deepseekharness-mobile/companion"><img src="https://img.shields.io/npm/dm/@deepseekharness-mobile/companion?color=4D6BFE" alt="Downloads" /></a>
@@ -59,7 +59,11 @@ goes through a third-party server.
   to. Folders carry their own icon and colour, keep their heading while the list scrolls, and
   collapse.
 - **Live transcript** — paged history and live events, with the reasoning separated from the
-  answer.
+  answer, markdown rendered, and the paths the agent mentions as cards.
+- **File viewer** — markdown, text, images, PDFs and Office documents. The host converts the
+  document and the app draws its pages, so nothing has to be downloaded; files are read only
+  inside the session workspace.
+- **Turn usage** — context over the window, cache-hit ratio and decode speed under the model.
 - **Model and effort** — switch from the top of the conversation without scrolling back.
 - **Questions and approvals** — the full text and options, including the agent's blocking
   `ask_user_question`, answered in an inline card.
