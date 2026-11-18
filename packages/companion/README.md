@@ -18,10 +18,58 @@
   </p>
 
   <p>
-    <img src="https://raw.githubusercontent.com/joseph12n/dsh-mobile/main/docs/assets/session.png" width="215" alt="A live turn with the agent activity panel" />
-    <img src="https://raw.githubusercontent.com/joseph12n/dsh-mobile/main/docs/assets/settings.png" width="215" alt="Model providers and paired devices" />
+    <img src="https://raw.githubusercontent.com/joseph12n/dsh-mobile/main/docs/assets/screenshots/03-conversation.png" width="180" alt="A turn with the usage chips and an inline permission card" />
+    <img src="https://raw.githubusercontent.com/joseph12n/dsh-mobile/main/docs/assets/screenshots/05b-file-viewer.png" width="180" alt="The file viewer with a markdown document" />
+    <img src="https://raw.githubusercontent.com/joseph12n/dsh-mobile/main/docs/assets/screenshots/04-activity.png" width="180" alt="The agent activity panel over the conversation" />
   </p>
 </div>
+
+## Features
+
+<table>
+  <tr>
+    <td align="center" width="33%">
+      <img src="https://raw.githubusercontent.com/joseph12n/dsh-mobile/main/docs/assets/screenshots/01-pairing.png" width="200" alt="Pairing screen with a QR code" /><br />
+      <sub><b>Pairing</b><br />QR or one-time code, 10 minutes, one device.</sub>
+    </td>
+    <td align="center" width="33%">
+      <img src="https://raw.githubusercontent.com/joseph12n/dsh-mobile/main/docs/assets/screenshots/02-sessions.png" width="200" alt="Sessions grouped by folder" /><br />
+      <sub><b>Sessions</b><br />Folders, state, pending questions and model per row.</sub>
+    </td>
+    <td align="center" width="33%">
+      <img src="https://raw.githubusercontent.com/joseph12n/dsh-mobile/main/docs/assets/screenshots/03-conversation.png" width="200" alt="A live turn with usage chips" /><br />
+      <sub><b>Conversation</b><br />Streaming turns, markdown, usage chips, inline approvals.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="33%">
+      <img src="https://raw.githubusercontent.com/joseph12n/dsh-mobile/main/docs/assets/screenshots/04-activity.png" width="200" alt="Agent activity panel" /><br />
+      <sub><b>Agent activity</b><br />Goal and round, subagents and open tasks, floating.</sub>
+    </td>
+    <td align="center" width="33%">
+      <img src="https://raw.githubusercontent.com/joseph12n/dsh-mobile/main/docs/assets/screenshots/05b-file-viewer.png" width="200" alt="File viewer with a markdown document" /><br />
+      <sub><b>File viewer</b><br />Markdown, text, images and Office drawn page by page.</sub>
+    </td>
+    <td align="center" width="33%">
+      <img src="https://raw.githubusercontent.com/joseph12n/dsh-mobile/main/docs/assets/screenshots/06-commands.png" width="200" alt="Slash command palette" /><br />
+      <sub><b>Slash commands</b><br />Run them from the composer, outside the transcript.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="33%">
+      <img src="https://raw.githubusercontent.com/joseph12n/dsh-mobile/main/docs/assets/screenshots/07-providers.png" width="200" alt="Model providers in settings" /><br />
+      <sub><b>Providers</b><br />Test a key and connect it; the key stays on the host.</sub>
+    </td>
+    <td align="center" width="33%">
+      <img src="https://raw.githubusercontent.com/joseph12n/dsh-mobile/main/docs/assets/screenshots/08-devices.png" width="200" alt="Paired devices" /><br />
+      <sub><b>Devices</b><br />Last seen, revoke, forget — the host revokes first.</sub>
+    </td>
+    <td align="center" width="33%">
+      <img src="https://raw.githubusercontent.com/joseph12n/dsh-mobile/main/docs/assets/screenshots/09-notifications.png" width="200" alt="Push notifications switch" /><br />
+      <sub><b>Notifications</b><br />Push when a turn ends or a question waits.</sub>
+    </td>
+  </tr>
+</table>
 
 ## Install
 
@@ -40,7 +88,11 @@ problems, is in
 
 ## What the phone gets
 
-- **Live transcript** with paged history, separated reasoning and streaming events.
+- **Live transcript** with paged history, separated reasoning, markdown and file cards.
+- **File viewer** for markdown, text, images, PDFs and Office documents — the host converts the
+  document and the app draws its pages, so a phone shows it instead of downloading it. Files are
+  read inside the session workspace only.
+- **Turn usage**: context over the window, cache-hit ratio and decode speed under the model.
 - **Questions and approvals**, including the blocking `ask_user_question`, in an inline card.
 - **Agent activity**: goal and round, running subagents and open tasks in a floating panel that
   does not shrink the conversation.
