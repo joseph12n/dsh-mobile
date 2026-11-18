@@ -4,7 +4,7 @@ import { PairingService } from './core/pairing.js';
 import { DevicesFile } from './persist/devices-file.js';
 import { join } from 'node:path';
 import { findWebRoot } from './routes/web-root.js';
-import { resolvePublicOrigin, type ResolvedOrigin } from './public-origin.js';
+import { resolvePublicOrigin, serveStateSync, type ResolvedOrigin } from './public-origin.js';
 import { listSessions } from './dsh/session-source.js';
 import { answerQuestion, listPendingQuestions } from './dsh/questions.js';
 import { cancelRun, readHistory, subscribeSession } from './dsh/transcript.js';
@@ -137,6 +137,9 @@ export function apply(ctx: HostContext): void {
               expiresAt: current.expiresAt,
               origin,
               port: listeningPort,
+              ...(origin?.source === 'tailscale'
+                ? { serve: serveStateSync(listeningPort ?? DEFAULT_PORT) }
+                : {}),
               listenerError,
               fallbackPort: DEFAULT_PORT,
               qr: wantsQr ? qrFor(current.code) : undefined,

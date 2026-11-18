@@ -43,6 +43,32 @@ describe('mensaje de emparejamiento', () => {
     expect(text).toContain('loopback');
   });
 
+  it('enseña el comando cuando Tailscale está pero serve no', () => {
+    const { text } = buildPairingMessage({
+      ...base,
+      origin: TAILNET,
+      port: 6768,
+      serve: 'missing',
+    });
+
+    expect(text).toContain('tailscale serve --bg 6768');
+  });
+
+  it('no mete ruido cuando serve ya apunta al listener', () => {
+    const { text } = buildPairingMessage({ ...base, origin: TAILNET, port: 6768, serve: 'ready' });
+    expect(text).not.toContain('tailscale serve');
+  });
+
+  it('tampoco adivina si no pudo comprobar serve', () => {
+    const { text } = buildPairingMessage({
+      ...base,
+      origin: TAILNET,
+      port: 6768,
+      serve: 'unknown',
+    });
+    expect(text).not.toContain('tailscale serve');
+  });
+
   it('avisa mientras el origen aún no se ha resuelto', () => {
     const { text, compromised } = buildPairingMessage({ ...base, port: 6768 });
     expect(compromised).toBe(true);

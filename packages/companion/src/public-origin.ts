@@ -1,4 +1,4 @@
-import { execFile } from 'node:child_process';
+import { execFile, spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { isValidOrigin } from './routes/origin.js';
@@ -103,5 +103,49 @@ export function isLoopback(origin: string): boolean {
     return host === 'localhost' || host === '::1' || host.startsWith('127.');
   } catch {
     return false;
+  }
+}
+
+export type ServeState = 'ready' | 'missing' | 'unknown';
+
+interface ServeStatus {
+  Web?: Record<string, { Handlers?: Record<string, { Proxy?: unknown }> }>;
+}
+
+export function parseServeState(json: string, port: number): ServeState {
+  let parsed: ServeStatus;
+  try {
+    parsed = JSON.parse(json) as ServeStatus;
+  } catch {
+    return 'unknown';
+  }
+
+  const handlers = Object.values(parsed.Web ?? {}).flatMap((entry) =>
+    Object.values(entry.Handlers ?? {}),
+  );
+  if (handlers.length === 0) return 'missing';
+
+  const target = new RegExp(`(^|[:/])${port}(/|$)`);
+  return handlers.some((handler) => typeof handler.Proxy === 'string' && target.test(handler.Proxy))
+    ? 'ready'
+    : 'missing';
+}
+
+const SERVE_TIMEOUT_MS = 800;
+
+export function serveStateSync(port: number): ServeState {
+  const binary = findTailscaleBinary();
+  if (!binary) return 'unknown';
+
+  try {
+    const result = spawnSync(binary, ['serve', 'status', '--json'], {
+      timeout: SERVE_TIMEOUT_MS,
+      windowsHide: true,
+      encoding: 'utf8',
+    });
+    if (result.error || typeof result.stdout !== 'string') return 'unknown';
+    return parseServeState(result.stdout, port);
+  } catch {
+    return 'unknown';
   }
 }
