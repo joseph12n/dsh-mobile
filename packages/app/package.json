@@ -17,6 +17,7 @@
     "@deepseekharness-mobile/protocol": "workspace:*",
     "dompurify": "^3.4.18",
     "marked": "^18.2.1",
+    "pdfjs-dist": "^6.5.438",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },

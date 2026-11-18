@@ -7,6 +7,59 @@ import { resolveWorkspacePath } from '../lib/workspace-path.js';
 type TextPage = { text: string; offset: number; eof: boolean; nextOffset?: number };
 type BytesPage = { mime: string; data: string };
 
+const MAX_PAGES = 40;
+const MAX_PIXEL_RATIO = 2;
+
+function toBytes(data: string): Uint8Array<ArrayBuffer> {
+  const binary = atob(data);
+  const content = new Uint8Array(new ArrayBuffer(binary.length));
+  for (let index = 0; index < binary.length; index += 1) content[index] = binary.charCodeAt(index);
+  return content;
+}
+
+async function renderPages(
+  container: HTMLDivElement,
+  bytes: Uint8Array<ArrayBuffer>,
+  cancelled: () => boolean,
+): Promise<() => void> {
+  const pdfjs = await import('pdfjs-dist');
+  const workerUrl = (await import('pdfjs-dist/build/pdf.worker.min.mjs?url')).default;
+  pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
+
+  const task = pdfjs.getDocument({ data: bytes });
+  const pdf = await task.promise;
+  if (cancelled()) {
+    void task.destroy();
+    return () => undefined;
+  }
+
+  const width = container.clientWidth > 0 ? container.clientWidth : 320;
+  const ratio = Math.min(globalThis.devicePixelRatio || 1, MAX_PIXEL_RATIO);
+  const total = Math.min(pdf.numPages, MAX_PAGES);
+
+  for (let number = 1; number <= total; number += 1) {
+    if (cancelled()) break;
+    const page = await pdf.getPage(number);
+    const base = page.getViewport({ scale: 1 });
+    const viewport = page.getViewport({ scale: (width * ratio) / base.width });
+    const canvas = document.createElement('canvas');
+    canvas.className = 'file-page';
+    canvas.width = Math.floor(viewport.width);
+    canvas.height = Math.floor(viewport.height);
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${Math.floor(viewport.height / ratio)}px`;
+    const context = canvas.getContext('2d');
+    if (!context) continue;
+    await page.render({ canvasContext: context, viewport, canvas }).promise;
+    if (cancelled()) break;
+    container.append(canvas);
+  }
+
+  return () => {
+    void task.destroy();
+  };
+}
+
 export function FileViewer({
   sessionId,
   path,
@@ -39,8 +92,40 @@ export function FileViewer({
   const [error, setError] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [documentUrl, setDocumentUrl] = useState<string | undefined>(undefined);
+  const [documentError, setDocumentError] = useState(false);
   const body = useRef<HTMLDivElement>(null);
+  const pages = useRef<HTMLDivElement>(null);
   const linkTarget = useRef({ path, onOpenPath });
+
+  const isDocument = file?.kind === 'pdf' || file?.kind === 'office';
+
+  useEffect(() => {
+    const container = pages.current;
+    if (!bytes || !isDocument || !container) return;
+
+    let cancelled = false;
+    let dispose: (() => void) | undefined;
+    setDocumentError(false);
+    container.replaceChildren();
+
+    void renderPages(container, toBytes(bytes.data), () => cancelled)
+      .then((cleanup) => {
+        if (cancelled) {
+          cleanup();
+          return;
+        }
+        dispose = cleanup;
+      })
+      .catch(() => {
+        if (!cancelled) setDocumentError(true);
+      });
+
+    return () => {
+      cancelled = true;
+      dispose?.();
+      container.replaceChildren();
+    };
+  }, [bytes, isDocument]);
 
   useEffect(() => {
     linkTarget.current = { path, onOpenPath };
@@ -127,12 +212,7 @@ export function FileViewer({
       return;
     }
 
-    const binary = atob(bytes.data);
-    const content = new Uint8Array(binary.length);
-    for (let index = 0; index < binary.length; index += 1)
-      content[index] = binary.charCodeAt(index);
-
-    const url = URL.createObjectURL(new Blob([content], { type: bytes.mime }));
+    const url = URL.createObjectURL(new Blob([toBytes(bytes.data)], { type: bytes.mime }));
     setDocumentUrl(url);
     return () => URL.revokeObjectURL(url);
   }, [bytes]);
@@ -167,12 +247,17 @@ export function FileViewer({
             alt={file.name}
           />
         )}
-        {!loading && !error && (file?.kind === 'pdf' || file?.kind === 'office') && documentUrl && (
+        {!loading && !error && isDocument && (
           <>
-            <embed className="file-pdf" type="application/pdf" src={documentUrl} />
-            <a className="file-open" href={documentUrl} target="_blank" rel="noopener noreferrer">
-              {t('file.open')}
-            </a>
+            <div className="file-pages" ref={pages} />
+            {documentUrl && (
+              <a className="file-open" href={documentUrl} target="_blank" rel="noopener noreferrer">
+                {t('file.open')}
+              </a>
+            )}
+            {documentError && documentUrl && (
+              <embed className="file-pdf" type="application/pdf" src={documentUrl} />
+            )}
           </>
         )}
         {!loading && !error && file?.kind === 'other' && (
