@@ -5,6 +5,16 @@ import { linkHit, sanitizeMarkdown } from '../lib/markdown.js';
 import { resolveWorkspacePath } from '../lib/workspace-path.js';
 
 type TextPage = { text: string; offset: number; eof: boolean; nextOffset?: number };
+type ViewError = { message: string; code?: string };
+
+function errorOf(cause: unknown): ViewError {
+  const message = cause instanceof Error ? cause.message : String(cause);
+  const code =
+    typeof cause === 'object' && cause !== null && 'code' in cause
+      ? (cause as { code?: unknown }).code
+      : undefined;
+  return { message, ...(typeof code === 'string' ? { code } : {}) };
+}
 type BytesPage = { mime: string; data: string };
 
 const MAX_PAGES = 40;
@@ -89,7 +99,7 @@ export function FileViewer({
   const [text, setText] = useState('');
   const [page, setPage] = useState<TextPage | undefined>(undefined);
   const [bytes, setBytes] = useState<BytesPage | undefined>(undefined);
-  const [error, setError] = useState<string | undefined>(undefined);
+  const [error, setError] = useState<ViewError | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [documentUrl, setDocumentUrl] = useState<string | undefined>(undefined);
   const [documentError, setDocumentError] = useState(false);
@@ -179,9 +189,7 @@ export function FileViewer({
         }
       })
       .catch((cause: unknown) => {
-        if (!cancelled) {
-          setError(cause instanceof Error ? cause.message : String(cause));
-        }
+        if (!cancelled) setError(errorOf(cause));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -232,7 +240,7 @@ export function FileViewer({
         {loading && <p className="muted small">{t('file.loading')}</p>}
         {error && (
           <p className="error" role="alert">
-            {error}
+            {error.code === 'not-found' ? t('file.missing') : error.message}
           </p>
         )}
 
