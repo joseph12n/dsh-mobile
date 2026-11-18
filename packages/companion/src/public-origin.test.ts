@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { findTailscaleBinary, parseTailnetName, resolvePublicOrigin } from './public-origin.js';
+import {
+  findTailscaleBinary,
+  parseServeState,
+  parseTailnetName,
+  resolvePublicOrigin,
+  serveStateSync,
+} from './public-origin.js';
 
 describe('nombre del tailnet', () => {
   it('lee el DNSName y le quita el punto final', () => {
@@ -72,6 +78,38 @@ describe('resolución del origen público', () => {
     );
     expect(resolved.source).toBe('tailscale');
     expect(resolved.origin).toBe('https://maquina.tailnet.ts.net');
+  });
+});
+
+describe('estado de tailscale serve', () => {
+  const served = JSON.stringify({
+    TCP: { '443': { HTTPS: true } },
+    Web: {
+      'maquina.tailnet.ts.net:443': {
+        Handlers: { '/': { Proxy: 'http://127.0.0.1:6768' } },
+      },
+    },
+  });
+
+  it('reconoce el proxy a nuestro puerto', () => {
+    expect(parseServeState(served, 6768)).toBe('ready');
+  });
+
+  it('no lo da por bueno si sirve otro puerto', () => {
+    expect(parseServeState(served, 6800)).toBe('missing');
+  });
+
+  it('sin web configurada, falta', () => {
+    expect(parseServeState('{}', 6768)).toBe('missing');
+    expect(parseServeState('{"TCP":{"443":{"HTTPS":true}}}', 6768)).toBe('missing');
+  });
+
+  it('con algo que no es JSON, no se pronuncia', () => {
+    expect(parseServeState('no serve config', 6768)).toBe('unknown');
+  });
+
+  it('lee el binario real sin lanzar', () => {
+    expect(() => serveStateSync(6768)).not.toThrow();
   });
 });
 

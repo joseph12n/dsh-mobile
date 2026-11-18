@@ -1,5 +1,5 @@
 import { buildPairingUrl } from '@deepseekharness-mobile/protocol';
-import type { ResolvedOrigin } from './public-origin.js';
+import type { ResolvedOrigin, ServeState } from './public-origin.js';
 
 const ORIGIN_LABEL: Record<string, string> = {
   config: 'the configured address',
@@ -13,6 +13,7 @@ export interface PairingView {
   expiresAt: number;
   origin?: ResolvedOrigin | undefined;
   port?: number | undefined;
+  serve?: ServeState | undefined;
   listenerError?: string | undefined;
   fallbackPort: number;
   qr?: string | undefined;
@@ -62,6 +63,16 @@ export function buildPairingMessage(view: PairingView): PairingLink {
       '',
       'Heads up: this link points at loopback, which on a phone is the phone itself.',
       'Open it through the tailnet name, or set DSH_MOBILE_PUBLIC_URL.',
+    );
+  }
+
+  if (view.origin?.source === 'tailscale' && view.serve === 'missing') {
+    lines.push(
+      '',
+      'Tailscale is running, but nothing is serving HTTPS yet, so this link will not',
+      'answer. Run this once and try again:',
+      '',
+      `  tailscale serve --bg ${port}`,
     );
   }
 
